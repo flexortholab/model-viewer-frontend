@@ -1,0 +1,20 @@
+{
+  "name": "dental-viewer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Visor web de disyuntores sinterizados con anclaje esqueletico: unidades en mm, cortes seccionales con capping y mediciones.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "sample": "node scripts/make-sample.mjs",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.1"
+  }
+}

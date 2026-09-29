@@ -118,3 +118,9 @@ mesh, animaciones FBX (se conservan en estado estático a propósito).
   probar GLB/FBX reales de Blender.
 
 - Deploy grayscale completado (GitHub Pages, rama `gh-pages`): demo en https://rms1982.github.io/dental-viewer/
+
+- Hallazgo de la noche (a investigar cuando lleguen GLB reales):
+- ABIERTO (investigacion): en la demo de Pages (mismo bundle que el local) una combinacion
+  concreta de Chromium headless + SwiftShader lanza TypeError reading "x" en Vector3.copy
+  durante el primer render con clipping planes. El mismo bundle pasa 34/34 en preview local
+  y CI (Ubuntu): especifico de un estado GL del entorno; vigilar con GLB reales.

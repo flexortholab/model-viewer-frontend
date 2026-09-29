@@ -153,8 +153,41 @@ function toggleMeasure() {
   container.classList.toggle('is-measuring', active)
   const button = document.querySelector('[data-action="measure"]')
   button?.setAttribute('aria-pressed', String(active))
+  if (active && markerMode) toggleMarkerTool()
   showHint(active ? 'Medir: pulsa dos puntos sobre la pieza. Doble clic en la cifra para borrar.' : '')
   return active
+}
+
+/**
+ * Modo marcador: pulsar sobre la pieza anade un marcador (texto via prompt).
+ * Convive con la medicion: se activa uno desactiva el otro.
+ */
+let markerMode = false
+
+function toggleMarkerTool() {
+  markerMode = !markerMode
+  if (markerMode && viewer.measure?.enabled) {
+    viewer.setTool('orbit')
+    container.classList.remove('is-measuring')
+    document.querySelector('[data-action="measure"]')?.setAttribute('aria-pressed', 'false')
+  }
+  container.classList.toggle('is-marking', markerMode)
+  document.querySelector('[data-action="add-marker"]')?.setAttribute('aria-pressed', String(markerMode))
+  showHint(markerMode ? 'Marcador: pulsa un punto de la pieza' : '')
+}
+
+function addMarkerAt(event) {
+  viewer.setPointer(event)
+  const hit = viewer.pick()
+  if (!hit) {
+    showHint('No hay pieza bajo el cursor', 1500)
+    return
+  }
+  const text = (window.prompt('Texto del marcador (opcional):', '') ?? '').trim()
+  const kindInput = (window.prompt("Clase del marcador: 'note', 'warning' o 'screw':", 'note') ?? '').trim()
+  const kind = ['warning', 'screw'].includes(kindInput) ? kindInput : 'note'
+  viewer.addMarker({ position: hit.point.toArray(), text, kind })
+  showHint('Marcador añadido' + (text ? `: ${text}` : ''))
 }
 
 // --- Comandos del webclip --------------------------------------------------
@@ -201,6 +234,13 @@ const ACTIONS = {
   clearMeasurements() {
     viewer.measure?.clear()
   },
+  marker({ position, text, kind }) {
+    if (!Array.isArray(position)) throw new Error('marker: falta position (array de 3)')
+    return viewer.addMarker({ position, text, kind })
+  },
+  clearMarkers() {
+    viewer.clearMarkers()
+  },
   getAnnotations() {
     bridge.post('annotations', { annotations: viewer.getAnnotations() })
   },
@@ -244,6 +284,13 @@ document.getElementById('toolbar').addEventListener('click', (event) => {
     case 'clear-measurements':
       viewer.measure?.clear()
       showHint('Medidas borradas')
+      break
+    case 'add-marker':
+      toggleMarkerTool()
+      break
+    case 'clear-markers':
+      viewer.clearMarkers()
+      showHint('Marcadores borrados')
       break
     case 'export':
       exportAnnotations()
@@ -300,6 +347,10 @@ for (const check of document.querySelectorAll('input[data-axis-check]')) {
 }
 
 container.addEventListener('pointerdown', (event) => {
+  if (markerMode && !event.target.closest('.panel, #toolbar')) {
+    addMarkerAt(event)
+    return
+  }
   if (!viewer.measure?.enabled) return
   if (event.target.closest('.panel, #toolbar')) return
   viewer.handleMeasureClick(event)
@@ -324,6 +375,10 @@ window.addEventListener('keydown', (event) => {
       break
     case 'escape':
       if (viewer.measure?.enabled) toggleMeasure()
+      if (markerMode) toggleMarkerTool()
+      break
+    case 'k':
+      toggleMarkerTool()
       break
   }
 })

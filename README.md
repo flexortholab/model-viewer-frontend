@@ -10,6 +10,9 @@ Pensado para **disyuntores sinterizados con anclaje esquelético** diseñados en
 - embebible en un **webclip / iframe** vía `postMessage`, o por enlace directo
 
 Estado actual: **v0.1.0** funcional. Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta.
+> **Demo desplegada (GitHub Pages, rama gh-pages):** https://rms1982.github.io/dental-viewer/
+> **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/disyuntor-4-pilares.stl&section=y=0
+> La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.
 
 ---
 

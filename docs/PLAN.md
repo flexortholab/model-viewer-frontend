@@ -67,7 +67,7 @@ Estado del plan: **implementado en su totalidad**. Lo restante está en la hoja 
 
 ### Más adelante (distribución)
 
-- [ ] Deploy estático (Cloudflare Pages / Vercel; `base './'` ya soporta subcarpeta)
+- [x] Deploy estático (Cloudflare Pages / Vercel; `base './'` ya soporta subcarpeta)
 - [ ] Manifiesto con casos para el enlace directo al doctor
 - [x] CI: `npm test` + build + smoke en cada PR
 - [x] LICENSE
@@ -116,3 +116,5 @@ mesh, animaciones FBX (se conservan en estado estático a propósito).
   `node --test test/`).
 - Pendiente para otra sesión: UI de marcadores editables, deduplicar Draco/Basis,
   probar GLB/FBX reales de Blender.
+
+- Deploy grayscale completado (GitHub Pages, rama `gh-pages`): demo en https://rms1982.github.io/dental-viewer/

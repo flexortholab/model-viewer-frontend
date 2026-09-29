@@ -39,7 +39,8 @@ body {
   touch-action: none;
 }
 
-#viewport.is-measuring canvas {
+#viewport.is-measuring canvas,
+#viewport.is-marking canvas {
   cursor: crosshair;
 }
 

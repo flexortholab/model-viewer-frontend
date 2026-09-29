@@ -1,6 +1,6 @@
 {
   "name": "dental-viewer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Visor web de disyuntores sinterizados con anclaje esqueletico: unidades en mm, cortes seccionales con capping y mediciones.",
   "type": "module",

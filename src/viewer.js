@@ -332,7 +332,24 @@ export class DentalViewer {
     return marker
   }
 
+  /** Retira todos los marcadores de la pieza (y sus etiquetas). */
+  clearMarkers() {
+    for (const marker of [...this.doc.markers]) {
+      this.measure?.removeOverlay(`marker:${marker.id}`)
+    }
+    for (const child of this.markerGroup.children.filter((c) => c.userData?.isMarker)) {
+      child.traverse((node) => {
+        node.geometry?.dispose?.()
+        node.material?.dispose?.()
+      })
+      this.markerGroup.remove(child)
+    }
+    this.doc.markers = []
+    this._syncDoc()
+  }
+
   _renderMarkers() {
+    // Retira los marcadores anteriores (y sus overlays) antes de dibujar.
     for (const child of this.markerGroup.children.filter((c) => c.userData?.isMarker)) {
       child.traverse((node) => {
         node.geometry?.dispose?.()

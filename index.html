@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Visor de disyuntores sinterizados</title>
+    <script type="module" crossorigin src="./assets/index-DKWGDkMI.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-B7ukBWwX.css">
+  </head>
+  <body>
+    <div id="app">
+      <div id="viewport">
+        <div id="labels" aria-live="polite"></div>
+
+        <div id="toolbar" role="toolbar" aria-label="Herramientas del visor">
+          <div class="tb-group">
+            <button type="button" data-action="frame" title="Encuadrar (F)">Encuadrar</button>
+            <button type="button" data-view="frontal" title="Vista frontal">Frontal</button>
+            <button type="button" data-view="superior" title="Vista superior (oclusal)">Superior</button>
+            <button type="button" data-view="lateral" title="Vista lateral">Lateral</button>
+            <button type="button" data-view="lingual" title="Vista lingual (palatina)">Lingual</button>
+            <button type="button" data-view="isometrica" title="Vista isométrica">Isométrica</button>
+          </div>
+          <div class="tb-group">
+            <button type="button" data-action="measure" aria-pressed="false" title="Medir (M)">
+              Medir
+            </button>
+            <button type="button" data-action="clear-measurements" title="Borrar medidas">
+              Borrar medidas
+            </button>
+          </div>
+          <div class="tb-group">
+            <button type="button" data-action="export" title="Descargar anotaciones (E)">
+              Exportar
+            </button>
+          </div>
+        </div>
+
+        <div id="hint" class="hint"></div>
+
+        <div id="status" class="status">
+          <span id="status-units" class="badge" hidden></span>
+          <span id="status-info"></span>
+        </div>
+
+        <div id="panel" class="panel" hidden>
+          <div class="panel-head">
+            <strong>Corte seccional</strong>
+            <button type="button" class="panel-toggle" data-action="toggle-panel" aria-label="Plegar">
+              –
+            </button>
+          </div>
+          <div class="panel-body">
+            <label class="switch">
+              <input type="checkbox" id="section-enabled" />
+              <span>Activar corte</span>
+            </label>
+
+            <div class="axes">
+              <div class="axis">
+                <label class="axis-check">
+                  <input type="checkbox" data-axis-check="y" />
+                  <span>Axial</span>
+                </label>
+                <input type="range" data-axis="y" min="-30" max="30" step="0.1" value="0" />
+                <output data-axis-output="y">0.0 mm</output>
+              </div>
+              <div class="axis">
+                <label class="axis-check">
+                  <input type="checkbox" data-axis-check="z" />
+                  <span>Sagital</span>
+                </label>
+                <input type="range" data-axis="z" min="-30" max="30" step="0.1" value="0" />
+                <output data-axis-output="z">0.0 mm</output>
+              </div>
+              <div class="axis">
+                <label class="axis-check">
+                  <input type="checkbox" data-axis-check="x" />
+                  <span>Coronal</span>
+                </label>
+                <input type="range" data-axis="x" min="-30" max="30" step="0.1" value="0" />
+                <output data-axis-output="x">0.0 mm</output>
+              </div>
+            </div>
+
+            <label class="field">
+              <span>Color de la superficie de corte</span>
+              <input type="color" id="cap-color" value="#c0554a" />
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>

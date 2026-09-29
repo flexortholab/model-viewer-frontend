@@ -41,7 +41,7 @@ function showUnitsBadge(units) {
     : `${units.maxDimMm.toFixed(1)} mm (${units.units} detectados)`
   statusUnits.title = warn
     ? 'Tamano fuera de rango: revisa las unidades del archivo'
-    : `Archivo en ${units.units} (max ${units.maxDimRaw.toFixed(3)}), escalado x${units.scale}`
+    : `Archivo en ${units.units} (max ${units.rawMaxDim.toFixed(3)}), escalado x${units.scale}`
 }
 
 function syncSectionUI() {

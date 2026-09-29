@@ -135,6 +135,9 @@ export class DentalViewer {
     this.section?.dispose()
     this.measure?.dispose()
     this.modelRoot.clear()
+    // modelRoot.clear() descolgó markerGroup: hay que re-adjuntarlo para que
+    // los marcadores sigan visibles (y disponibles) tras cargar otro modelo.
+    this.modelRoot.add(this.markerGroup)
 
     this.modelRoot.add(root)
     applyDentalMaterial(result.meshes)
@@ -185,7 +188,13 @@ export class DentalViewer {
     this.markerGroup.add(this.measure.group)
     this.measure.setResolution(this.container.clientWidth, this.container.clientHeight)
 
-    this.controls.addEventListener('change', () => this.measure?.rebuild?.(false))
+    // Cada carga re-crea las herramientas: retirar el listener anterior evita
+    // acumular copias (y referencias al measure viejo) en cada load().
+    if (this._onControlsChange) {
+      this.controls.removeEventListener('change', this._onControlsChange)
+    }
+    this._onControlsChange = () => this.measure?.rebuild?.(false)
+    this.controls.addEventListener('change', this._onControlsChange)
   }
 
   /** Encuadra la camara sobre el modelo con un margen razonable. */
@@ -266,7 +275,7 @@ export class DentalViewer {
     return this.section.serialize()
   }
 
-  setSectionAxis(axis, offset, { enable = false } = {}) {
+  setSectionAxis(axis, offset, { enable = true } = {}) {
     if (enable) this.section?.setAxisEnabled(axis, true)
     this.section?.setOffset(axis, offset)
     this._syncDoc()
@@ -460,8 +469,18 @@ export class DentalViewer {
   }
 
   screenshot(scale = 1) {
+    const ratio = Math.max(1, Math.min(Number(scale) || 1, 4))
+    if (ratio === 1) {
+      this.renderer.render(this.scene, this.camera)
+      return this.renderer.domElement.toDataURL('image/png')
+    }
+    const width = this.container.clientWidth || 1
+    const height = this.container.clientHeight || 1
+    this.renderer.setSize(width * ratio, height * ratio, false)
     this.renderer.render(this.scene, this.camera)
-    return this.renderer.domElement.toDataURL('image/png')
+    const dataUrl = this.renderer.domElement.toDataURL('image/png')
+    this.renderer.setSize(width, height, false)
+    return dataUrl
   }
 
   _loop() {

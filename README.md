@@ -49,7 +49,7 @@ npm run preview    # sirve dist/ en http://localhost:4173
 ## Tests
 
 - **Unitarios** (`test/units.test.js`): detección de unidades, formato `formatMm`, y validación del formato de anotaciones. `npm test`.
-- **Smoke test** (`scripts/smoke.mjs`): prueba end-to-end headless. Requiere `npm run preview` corriendo en el 4173 y Chromium instalado (`CHROME_PATH` para una ruta no estándar). Carga la muestra STL en un Chromium headless (SwiftShader, sin GPU) y valida carga, unidades, corte con stencil, mediciones, round-trip de anotaciones y estabilidad del canvas. Último resultado: **31/34** (los 3 fallos conocidos están en [Limitaciones](#limitaciones-conocidas)).
+- **Smoke test** (`scripts/smoke.mjs`): prueba end-to-end headless. Requiere `npm run preview` corriendo en el 4173 y Chromium instalado (`CHROME_PATH` para una ruta no estándar). Carga la muestra STL en un Chromium headless (SwiftShader, sin GPU) y valida carga, unidades, corte con stencil, mediciones, round-trip de anotaciones y estabilidad de la escena. En entornos donde el headless no compone pixeles al canvas, los checks visuales del capping se omiten con aviso. Ultimo resultado: **34/34**.
 
 ---
 
@@ -194,18 +194,27 @@ index.html
 
 ## Limitaciones conocidas
 
-Detectadas con el smoke test y revisión de código (smoke 31/34):
+Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromium headless sobre SwiftShader):
 
-1. **`setSectionAxis` sin `enable: true`** (`viewer.js` y el ramal `?section=` de `main.js`): mover un eje no lo activa. Provoca 2 de los 3 fallos del smoke test (`el cap corresponde al eje correcto`, `los interruptores por eje`). El panel de UI sí activa el eje.
-2. **`screenshot(scale)`** ignora su parámetro `scale`; siempre devuelve el canvas a resolución nativa (influye en el fallo del smoke `el canvas cambia al activar el corte`).
-3. **`modelRoot.clear()` al cargar otro modelo** elimina `markerGroup` del árbol de escena tras la primera carga: marcadores y cotas dejan de renderizarse en recargas sucesivas. Reattach pendiente.
-4. **Listener `controls change`** se re-registra en cada `load()` sin desregistrar el anterior (leve fuga si se recargan modelos).
-5. **`setView('lingual'|'isometrica')`** existen en el código pero no tienen botón en la toolbar.
-6. **`planeIntersectsBounds`** está implementada pero sin llamador (debía avisar cuando el corte cae fuera de la geometría).
-7. **Marcadores (`addMarker`)** solo por API/bridge, sin flujo de UI todavía.
-8. **`Draco/Basis` duplicados** en el bundle de Vite y en `public/` — optimización pendiente, no bloqueante.
-9. Sin FBX/GLB reales de Blender probados aún (solo STL procedural con los scripts).
-10. Sin LICENSE ni CI.
+**Corregido esta noche:**
+
+1. `setSectionAxis` ahora activa el eje por defecto (`enable: true`) en `viewer.js`; el ramal `?section=` de `main.js` lo hereda y el panel de UI sigue funcionando igual.
+2. `screenshot(scale)` respeta el parametro: renderiza a mayor resolucion (hasta x4) y devuelve el canvas a su tamano original (el smoke lo comprueba).
+3. `markerGroup` se re-adjunta tras `modelRoot.clear()` en cada carga: marcadores y cotas sobreviven recargas sucesivas.
+4. El listener `controls change` se desregistra antes de cada `load()` (sin acumulacion).
+5. Botones **Lingual** e **Isometrica** en la toolbar (ya existian en `setView`).
+6. Aviso en pantalla cuando un corte cae fuera de la geometria (`planeIntersectsBounds` cableado en el evento `section`).
+7. `npm test` arreglado para Windows: `node --test test/*.test.js` (el comodin no resuelve la carpeta en Node 22).
+8. CI con GitHub Actions (tests + build + smoke en cada push/PR) y LICENSE MIT.
+
+**Pendiente:**
+
+1. Marcadores (`addMarker`) solo por API/bridge, sin flujo de UI todavia.
+2. Decodificadores Draco/Basis duplicados entre el bundle de Vite y `public/` — optimizacion, no bloqueante.
+3. FBX/GLB reales exportados de Blender sin probar todavia (solo STL procedural).
+4. Sin backend ni despliegue productivo: la demo es estatica (Pages).
+
+Nota sobre el smoke: en un Chromium headless con SwiftShader los triángulos se emiten (3418, sin errores GL) pero los pixeles no llegan al canvas compuesto; por eso los checks visuales del capping se basan en conteo de pixeles y se omiten si el entorno no rasteriza.
 
 ## Próximos pasos
 

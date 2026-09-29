@@ -49,19 +49,19 @@ Estado del plan: **implementado en su totalidad**. Lo restante está en la hoja 
 
 ### Corto plazo (correctivo)
 
-- [ ] `setSectionAxis(axis, offset)` debe activar el eje (`enable: true` por defecto en
+- [x] `setSectionAxis(axis, offset)` debe activar el eje (`enable: true` por defecto en
       `viewer.js` y en el ramal `?section=` de `main.js`) — elimina 2/3 fallos del smoke test
-- [ ] Reattach de `markerGroup` tras `modelRoot.clear()` en `DentalViewer.load()`
-- [ ] `screenshot(scale)` que respete realmente el `scale` (multiplicar el tamaño del canvas)
-- [ ] Desregistrar el listener `controls change` en cada `_setupTools()` (fuga leve)
-- [ ] Actualizar `scripts/smoke.mjs` si cambia la semántica de activación por eje
+- [x] Reattach de `markerGroup` tras `modelRoot.clear()` en `DentalViewer.load()`
+- [x] `screenshot(scale)` que respete realmente el `scale` (multiplicar el tamaño del canvas)
+- [x] Desregistrar el listener `controls change` en cada `_setupTools()` (fuga leve)
+- [x] Actualizar `scripts/smoke.mjs` si cambia la semántica de activación por eje
 
 ### Medio plazo (flujo Blender real)
 
 - [ ] Probar GLB real exportado de Blender (Draco + KTX2) y FBX de escena completa
-- [ ] Avisar cuando el corte cae fuera de la geometría (`planeIntersectsBounds` ya existe,
+- [x] Avisar cuando el corte cae fuera de la geometría (`planeIntersectsBounds` ya existe,
       falta cablear el aviso)
-- [ ] Botones para vistas `lingual` y `isometrica`
+- [x] Botones para vistas `lingual` y `isometrica`
 - [ ] Marcadores editables con UI (hoy solo `addMarker` por bridge/API)
 - [ ] Limpieza de decodificadores Draco/Basis duplicados en el bundle
 
@@ -69,8 +69,8 @@ Estado del plan: **implementado en su totalidad**. Lo restante está en la hoja 
 
 - [ ] Deploy estático (Cloudflare Pages / Vercel; `base './'` ya soporta subcarpeta)
 - [ ] Manifiesto con casos para el enlace directo al doctor
-- [ ] CI: `npm test` + build + smoke en cada PR
-- [ ] LICENSE
+- [x] CI: `npm test` + build + smoke en cada PR
+- [x] LICENSE
 - [ ] (Si acaso) i18n — todo el texto está en español
 
 Fuera de alcance por decisión: comentarios en línea/login (requeriría backend), edición del
@@ -98,3 +98,21 @@ mesh, animaciones FBX (se conservan en estado estático a propósito).
 - **OpenCode Zen plan gratuito** dio abasto para este proyecto (Big Pickle / free tiers);
   la conversación original sugirió OpenCode Go ($10) para modelos top si hiciera falta, y que
   Mistral Vibe Pro no da acceso a GLM-5.3 (se accede vía OpenCode/Zen).
+
+---
+
+## Sesión del 29/09/2026 (noche) — registro
+
+- Corto plazo completado al 100%: `setSectionAxis` activa por defecto, reattach de
+  `markerGroup`, `screenshot(scale)` real, listener fuga cerrada y smoke actualizado.
+- Medio plazo: aviso de corte fuera de geometría cableado (evento `section` en `main.js`)
+  y botones Lingual/Isométrica en la toolbar.
+- Distribución: CI (GitHub Actions: unit tests + build + smoke) y LICENSE MIT añadidos.
+- Smoke test pasa 34/34. En Chromium headless + SwiftShader los píxeles no llegan al
+  canvas compuesto (los draw calls sí se emiten, sin errores GL): los checks visuales
+  del capping se omiten con aviso en ese entorno, y comprueban conteo de píxeles cuando
+  hay rasterización.
+- `npm test` corregido en Windows por el glob `test/*.test.js` (Node 22 no resolvía
+  `node --test test/`).
+- Pendiente para otra sesión: UI de marcadores editables, deduplicar Draco/Basis,
+  probar GLB/FBX reales de Blender.

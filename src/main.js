@@ -93,7 +93,15 @@ viewer.on('progress', ({ fraction, phase }) => {
   }
 })
 
-viewer.on('section', () => syncSectionUI())
+viewer.on('section', (state) => {
+  syncSectionUI()
+  const fuera = state.planes.filter(
+    (plane) => plane.enabled && !viewer.section.planeIntersectsBounds(plane.axis, plane.offset),
+  )
+  if (fuera.length) {
+    showHint(`El corte ${fuera.map((p) => p.axis.toUpperCase()).join(', ')} cae fuera de la pieza`, 2200)
+  }
+})
 
 viewer.on('measure-pick', () => showHint('Segundo punto para completar la medida', 4000))
 

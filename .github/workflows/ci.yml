@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dependencias
+        run: npm ci
+
+      - name: Tests unitarios
+        run: npm test
+
+      - name: Build de produccion
+        run: npm run build
+
+      - name: Smoke test headless
+        run: |
+          npx vite preview --port 4173 --strictPort &
+          sleep 3
+          node scripts/smoke.mjs http://localhost:4173
+        env:
+          CHROME_PATH: /usr/bin/google-chrome

@@ -203,15 +203,16 @@ export class SectionPlaneTool {
     this.onChange?.()
   }
 
-  /** Solo reorienta (perpendicular a la vista) sin mover la posicion actual. */
+  /**
+   * Rota el plano 90 grados sobre el eje horizontal de la vista (pivote en su
+   * posicion actual): un corte de frente pasa a quedar de perfil, y viceversa.
+   * Cada pulsacion gira otro 90 grados en el mismo sentido.
+   */
   orientToCamera(camera) {
     const cam = camera ?? this.camera
-    const viewDir = new THREE.Vector3()
-    cam.getWorldDirection(viewDir)
-    this.gizmo.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0, 0, 1),
-      viewDir.clone().normalize(),
-    )
+    const axis = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion).normalize()
+    const quarter = new THREE.Quaternion().setFromAxisAngle(axis, Math.PI / 2)
+    this.gizmo.quaternion.premultiply(quarter)
     if (this.enabled) this.apply()
     this.onChange?.()
   }

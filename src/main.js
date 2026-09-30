@@ -445,7 +445,7 @@ document.addEventListener('click', (event) => {
       break
     case 'section-orient':
       viewer.orientSectionPlane()
-      showHint('Plano reorientado (perpendicular a la vista) en su posicion actual')
+      showHint('Plano girado 90 grados en su sitio', 2200)
       break
     case 'marker-unfocus':
       viewer.exitMarkerFocus()

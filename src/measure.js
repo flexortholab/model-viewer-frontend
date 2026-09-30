@@ -70,6 +70,9 @@ export class MeasureTool {
     line.computeLineDistances()
     line.renderOrder = 999
     line.raycast = () => {}
+    // Las Line2 pueden calcular bounding boxes erroneas con coordenadas
+    // universales → el frustum culling las oculta en GPUs reales. Fuera.
+    line.frustumCulled = false
     return line
   }
 
@@ -154,7 +157,10 @@ export class MeasureTool {
     if (!best) best = new THREE.Vector3(0, 1, 0)
     best.normalize()
 
-    const offset = best.clone().multiplyScalar(OFFSET)
+    // Separacion de la linea de cota: escala con la longitud de la medida
+    // (una pieza de 9 m no cabe con un offset fijou de 2.4 mm).
+    const offsetScale = Math.min(Math.max(OFFSET, length * 0.04), 120)
+    const offset = best.clone().multiplyScalar(offsetScale)
     const a2 = a.clone().add(offset)
     const b2 = b.clone().add(offset)
 
@@ -209,6 +215,7 @@ export class MeasureTool {
     const points = new THREE.Points(geometry, material)
     points.renderOrder = 1000
     points.raycast = () => {}
+    points.frustumCulled = false
     return points
   }
 

@@ -105,33 +105,54 @@ export class SectionPlaneTool {
     this._stencilFront = null
     this._stencilMeshes = []
 
-    // Gizmo de transformaciones.
-    this.transform = new TransformControls(camera, renderer.domElement)
-    this.transform.attach(this.gizmo)
-    this._gizmoHelper = this.transform.getHelper ? this.transform.getHelper() : this.transform
-    scene.add(this._gizmoHelper)
+    // Dos gizmos sobre el mismo plano: flechas (mover) y anillos (rotar)
+    // siempre visibles; mientras se arrastra uno, el otro queda bloqueado
+    // para que la orbita no capture el gesto.
+    this.transformT = new TransformControls(camera, renderer.domElement)
+    this.transformT.setMode?.('translate')
+    this.transformT.attach(this.gizmo)
+    this._helperT = this.transformT.getHelper ? this.transformT.getHelper() : this.transformT
+    scene.add(this._helperT)
+
+    this.transformR = new TransformControls(camera, renderer.domElement)
+    this.transformR.setMode?.('rotate')
+    this.transformR.setSpace?.('local')
+    this.transformR.attach(this.gizmo)
+    this._helperR = this.transformR.getHelper ? this.transformR.getHelper() : this.transformR
+    scene.add(this._helperR)
+
     this._onGizmoChange = () => {
       if (this.enabled) this.apply()
       this.onChange?.()
     }
-    this.transform.addEventListener('change', this._onGizmoChange)
-    this.transform.addEventListener('dragging-changed', (event) => {
-      // Mientras se arrastra el gizmo, la orbita debe estar quieta.
-      if (this.controls) this.controls.enabled = !event.value
-    })
-    this.transform.visible = false
-    this.transform.enabled = false
-    this._gizmoHelper.visible = false
+    for (const [own, other] of [[this.transformT, this.transformR], [this.transformR, this.transformT]]) {
+      own.addEventListener('change', this._onGizmoChange)
+      own.addEventListener('dragging-changed', (event) => {
+        // Mientras se arrastra un gizmo: orbita quieta y el otro bloqueado.
+        if (this.controls) this.controls.enabled = !event.value
+        other.enabled = !event.value
+      })
+    }
+    this.setEnabled(false)
   }
 
   /** Espacio del gizmo: trasladar en mundo, rotar local al plano. */
   setMode(mode) {
+    // Con ambos gizmos activos a la vez, "mode" solo cambia el enfasis en la
+    // UI; se mantiene la API por compatibilidad con el bridge.
     this.mode = mode === 'rotate' ? 'rotate' : 'translate'
-    this.transform.setSpace?.(this.mode === 'rotate' ? 'local' : 'world')
   }
 
   getMode() {
     return this.mode
+  }
+
+  /** Muestra u oculta los gizmos sin perder la posicion del plano. */
+  _setGizmoVisible(visible) {
+    this.transformT.enabled = visible
+    this.transformR.enabled = visible
+    this._helperT.visible = visible
+    this._helperR.visible = visible
   }
 
   setCapColor(hex) {
@@ -142,9 +163,7 @@ export class SectionPlaneTool {
 
   setEnabled(enabled) {
     this.enabled = !!enabled
-    this.transform.visible = this.enabled
-    this.transform.enabled = this.enabled
-    this._gizmoHelper.visible = this.enabled
+    this._setGizmoVisible(this.enabled)
     this.apply()
   }
 
@@ -338,10 +357,15 @@ export class SectionPlaneTool {
   }
 
   dispose() {
-    this.transform.removeEventListener('change', this._onGizmoChange)
-    this.transform.detach()
-    this.transform.dispose?.()
-    if (this._gizmoHelper.parent) this._gizmoHelper.parent.remove(this._gizmoHelper)
+    for (const transform of [this.transformT, this.transformR]) {
+      transform.removeEventListener('change', this._onGizmoChange)
+      transform.detach()
+      transform.dispose?.()
+      transform.removeEventListener('dragging-changed', () => {})
+    }
+    for (const helper of [this._helperT, this._helperR]) {
+      if (helper.parent) helper.parent.remove(helper)
+    }
     this._teardownStencil()
     this._capGeometry.dispose()
     this.planeMesh.geometry.dispose()

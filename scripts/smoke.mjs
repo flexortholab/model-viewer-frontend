@@ -197,6 +197,18 @@ check('genera el grupo de stencil (caras traseras y delanteras)', section.stenci
 check('los materiales recortan con el plano', section.planes === 1)
 check('stencil activo en el capping y en los strokes', section.capWrite === true && section.stencilWrite === true)
 
+// Doble gizmo: flechas de mover y anillos de rotar a la vez
+const gizmo = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    return {
+      helpers: v.section._helperT.visible && v.section._helperR.visible,
+      modes: [v.section.transformT.getMode?.() ?? 'translate', v.section.transformR.getMode?.() ?? 'rotate'],
+    }
+  })()
+`)
+check('el gizmo muestra mover y rotar simultaneamente', gizmo.helpers === true && gizmo.modes.join(',') === 'translate,rotate')
+
 // Manipulacion del plano: mover y rotar la normal
 const planeManipulation = await evaluate(`
   (() => {

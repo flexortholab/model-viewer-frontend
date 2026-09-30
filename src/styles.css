@@ -188,8 +188,8 @@ button.wide {
 
 .panel {
   position: absolute;
-  top: 12px;
   right: 12px;
+  top: 12px;
   width: 248px;
   border-radius: var(--radius);
   background: var(--panel);
@@ -199,13 +199,26 @@ button.wide {
   box-shadow: 0 1px 8px rgba(20, 22, 26, 0.08);
 }
 
+/* Objetos: columna izquierda, debajo de la barra de herramientas */
 .panel.objects {
   top: 76px;
+  left: 12px;
+  right: auto;
 }
 
+/* Presentacion: abajo a la derecha, sin chocar con el panel de corte (arriba) */
 .panel.markers {
   top: auto;
-  bottom: 64px;
+  bottom: 56px;
+}
+
+.panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  max-height: min(38vh, 380px);
+  overflow-y: auto;
 }
 
 .panel-head {
@@ -229,15 +242,6 @@ button.wide {
   padding: 0 6px;
   font-size: 16px;
   line-height: 1;
-}
-
-.panel-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px;
-  max-height: min(46vh, 420px);
-  overflow-y: auto;
 }
 
 .panel.is-collapsed .panel-body {

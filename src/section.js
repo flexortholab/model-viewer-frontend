@@ -327,11 +327,10 @@ export class SectionPlaneTool {
       const mCenter = mBox.getCenter(new THREE.Vector3())
       const mRadius = Math.max(mBox.getSize(new THREE.Vector3()).length() / 2, 1)
       const diag = this.radius * 1.5385 // radius ≈ diag*0.65
-      // Linea FINA y PEGADA al modelo: outer define el grosor (~2-4px a la
-      // vista actual) y inner se queda casi a cero para no dejar hueco entre
-      // linea y pieza (antes quedaba una banda interna despoblada).
-      const growthOuter = Math.max(diag * 0.0045, 0.5)
-      const growthInner = growthOuter * 0.08
+      // Linea FINA y PEGADA al modelo: outer define el grosor (~2-3px) y
+      // inner casi a cero para que no haya hueco entre linea y pieza.
+      const growthOuter = Math.max(diag * 0.0035, 0.4)
+      const growthInner = growthOuter * 0.06
 
       const hull = (growth, op, order) => {
         const factor = 1 + growth / mRadius
@@ -342,8 +341,11 @@ export class SectionPlaneTool {
           clippingPlanes: this._clippingPlanes,
           stencilWrite: true,
           stencilFunc: THREE.AlwaysStencilFunc,
-          stencilFail: op,
-          stencilZFail: op,
+          // CRITICO: solo se cuenta lo VISIBLE. Con ZFail=Incremente el anillo
+          // aparecia pintado a traves de piezas porque sumaba stencil en
+          // fragmentos ocultos por la geometria de delante.
+          stencilFail: THREE.KeepStencilOp,
+          stencilZFail: THREE.KeepStencilOp,
           stencilZPass: op,
         })
         const hullMesh = new THREE.Mesh(mesh.geometry, material)
@@ -368,13 +370,16 @@ export class SectionPlaneTool {
         this._capGeometry,
         new THREE.MeshBasicMaterial({
           color: ringColor,
-          depthTest: false,
+          // depthTest ON: con la contabilidad de stencil corregida, el anillo
+          // solo cubre el contorno VISIBLE; no debe verse a traves de piezas
+          // de delante.
+          depthTest: true,
           depthWrite: false,
           stencilWrite: true,
           stencilRef: 1,
           stencilFunc: THREE.EqualStencilFunc,
-          stencilFail: THREE.ReplaceStencilOp,
-          stencilZFail: THREE.ReplaceStencilOp,
+          stencilFail: THREE.KeepStencilOp,
+          stencilZFail: THREE.KeepStencilOp,
           stencilZPass: THREE.ReplaceStencilOp,
         }),
       )

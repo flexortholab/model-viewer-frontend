@@ -327,8 +327,11 @@ export class SectionPlaneTool {
       const mCenter = mBox.getCenter(new THREE.Vector3())
       const mRadius = Math.max(mBox.getSize(new THREE.Vector3()).length() / 2, 1)
       const diag = this.radius * 1.5385 // radius ≈ diag*0.65
-      const growthOuter = Math.max(diag * 0.009, 1.0)
-      const growthInner = growthOuter * 0.45
+      // Linea FINA y PEGADA al modelo: outer define el grosor (~2-4px a la
+      // vista actual) y inner se queda casi a cero para no dejar hueco entre
+      // linea y pieza (antes quedaba una banda interna despoblada).
+      const growthOuter = Math.max(diag * 0.0045, 0.5)
+      const growthInner = growthOuter * 0.08
 
       const hull = (growth, op, order) => {
         const factor = 1 + growth / mRadius
@@ -417,8 +420,8 @@ export class SectionPlaneTool {
     const canvas = document.createElement('canvas')
     canvas.width = canvas.height = 128
     const ctx = canvas.getContext('2d')
-    const light = color.clone().lerp(new THREE.Color(0xffffff), 0.25)
-    const dark = color.clone().multiplyScalar(0.72)
+    const light = color.clone().lerp(new THREE.Color(0xffffff), 0.1)
+    const dark = color.clone().multiplyScalar(0.9)
     ctx.fillStyle = '#' + light.getHexString()
     ctx.fillRect(0, 0, 128, 128)
     ctx.strokeStyle = '#' + dark.getHexString()
@@ -431,7 +434,7 @@ export class SectionPlaneTool {
     ctx.stroke()
     const texture = new THREE.CanvasTexture(canvas)
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping
-    texture.repeat.set(6, 6)
+    texture.repeat.set(10, 10)
     texture.colorSpace = THREE.SRGBColorSpace
     cache.set(key, texture)
     return texture

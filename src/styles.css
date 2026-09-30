@@ -122,12 +122,32 @@ body {
   }
 }
 
-/* --- Barra de herramientas ----------------------------------------------- */
+/* --- Contenedores de columna: nada puede solaparse ------------------------- */
 
-#toolbars {
+.col {
   position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  max-height: calc(100% - 24px);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.col > * {
+  pointer-events: auto;
+}
+
+#leftbar {
   top: 12px;
   left: 12px;
+}
+
+#rightbar {
+  top: 12px;
+  right: 12px;
+  align-items: stretch;
 }
 
 #toolbar {
@@ -139,7 +159,7 @@ body {
   background: var(--panel);
   border: 1px solid var(--border);
   backdrop-filter: blur(8px);
-  max-width: calc(100% - 24px);
+  max-width: min(420px, calc(100vw - 24px));
   box-shadow: 0 1px 8px rgba(20, 22, 26, 0.08);
 }
 
@@ -185,12 +205,13 @@ button.wide {
   border: 1px solid var(--border);
 }
 
-/* --- Paneles (corte, objetos, presentacion) ------------------------------- */
+/* --- Paneles (corte, objetos, presentacion) en su columna ------------------- */
 
 .panel {
-  position: absolute;
-  right: 12px;
-  top: 12px;
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
   width: 248px;
   border-radius: var(--radius);
   background: var(--panel);
@@ -200,25 +221,12 @@ button.wide {
   box-shadow: 0 1px 8px rgba(20, 22, 26, 0.08);
 }
 
-/* Objetos: columna izquierda, debajo de la barra de herramientas */
-.panel.objects {
-  top: 76px;
-  left: 12px;
-  right: auto;
-}
-
-/* Presentacion: abajo a la derecha, sin chocar con el panel de corte (arriba) */
-.panel.markers {
-  top: auto;
-  bottom: 56px;
-}
-
-.panel-body {
+.panel .panel-body {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 10px;
-  max-height: min(38vh, 380px);
+  max-height: min(32vh, 320px);
   overflow-y: auto;
 }
 
@@ -448,41 +456,6 @@ select {
   color: var(--danger);
 }
 
-/* --- Estado e indicadores ------------------------------------------------ */
-
-.status {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
-  border-radius: 7px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--muted);
-  backdrop-filter: blur(8px);
-  max-width: calc(100% - 24px);
-  box-shadow: 0 1px 8px rgba(20, 22, 26, 0.08);
-}
-
-.badge {
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
-  color: #1d4fc9;
-  font-variant-numeric: tabular-nums;
-}
-
-.badge.is-warn {
-  background: rgba(220, 68, 55, 0.12);
-  border-color: var(--danger);
-  color: #b3261e;
-}
-
 .hint {
   position: absolute;
   left: 50%;
@@ -506,26 +479,12 @@ select {
 
 @media (max-width: 640px) {
   .panel {
-    top: auto;
-    bottom: 56px;
-    right: 8px;
-    width: min(248px, calc(100% - 16px));
-  }
-
-  .panel.objects {
-    top: 12px;
-    left: 8px;
-    right: 8px;
-    bottom: auto;
-    width: min(280px, calc(100% - 16px));
-  }
-
-  .panel.markers {
-    bottom: 56px;
+    width: min(240px, calc(100vw - 132px));
   }
 
   #toolbar {
-    max-width: calc(100vw - 160px);
+    max-width: min(420px, calc(100vw - 24px));
     overflow-x: auto;
+    flex-wrap: nowrap;
   }
 }

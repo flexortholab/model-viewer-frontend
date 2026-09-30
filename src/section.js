@@ -275,9 +275,10 @@ export class SectionPlaneTool {
       frontMesh.raycast = () => {}
 
       const capMaterial = new THREE.MeshStandardMaterial({
-        color: this.capColor ?? this._pieceColor(mesh),
-        metalness: 0.08,
-        roughness: 0.72,
+        // Color por pieza + trama diagonal tenue como en un plano de taller.
+        map: this._hatchMap(this._pieceColor(mesh)),
+        roughness: 0.85,
+        metalness: 0.05,
         side: THREE.DoubleSide,
         stencilWrite: true,
         stencilRef: 0,
@@ -300,6 +301,35 @@ export class SectionPlaneTool {
       this._stencilMeshes.push(cap, backMesh, frontMesh)
       this.capGroup.userData.pieceCaps = this.capGroup.userData.pieceCaps || []
       this.capGroup.userData.pieceCaps.push({ mesh, cap })
+
+      // Contorno del corte por pieza: malla "hull invertida" (caras traseras)
+      // engrandecida un pelin: queda visible solo como ribete en el borde
+      // del corte y en la silueta exterior de la pieza.
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox()
+      const mBox = mesh.geometry.boundingBox
+      const mCenter = mBox.getCenter(new THREE.Vector3())
+      const mRadius = Math.max(mBox.getSize(new THREE.Vector3()).length() / 2, 1)
+      const growth = Math.max(this.radius * 1.5385 * 0.0035, 0.4) // radius ≈ diag*0.65
+      const factor = 1 + growth / mRadius
+      const outlineColor = (this._pieceColor(mesh) ?? new THREE.Color(this._seedColor)).multiplyScalar(0.62)
+      const outline = new THREE.Mesh(
+        mesh.geometry,
+        new THREE.MeshBasicMaterial({
+          color: outlineColor,
+          side: THREE.BackSide,
+          clippingPlanes: this._clippingPlanes,
+        }),
+      )
+      // Escalar la pieza sobre su propio centro (matrixAutoUpdate off).
+      outline.position.copy(mCenter).multiplyScalar(1 - factor)
+      outline.scale.setScalar(factor)
+      outline.quaternion.identity()
+      outline.updateMatrix()
+      outline.matrixAutoUpdate = false
+      outline.renderOrder = order - 1
+      outline.raycast = () => {}
+      this.stencilGroup.add(outline)
+      this._stencilMeshes.push(outline)
     })
   }
 
@@ -317,20 +347,43 @@ export class SectionPlaneTool {
     this._stencilGroups = null
   }
 
-  /** Color de la pieza ligeramente sombreado para la superficie de corte. */
+  /** Color de la pieza (ligeramente oscurecido) para la superficie de corte. */
   _pieceColor(mesh) {
-    const fallback = new THREE.Color(0x9a968f)
+    const fallback = 0x9a968f
     const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
     const colored = list.find((mat) => mat?.color)
-    if (!colored) return this.capColor ?? fallback
-    const piece = colored.color.clone()
-    if ('roughness' in colored) {
-      // pieza oscurcida ~30% para que la superficie de corte se lea como seccion.
-      piece.multiplyScalar(0.7)
-    } else {
-      piece.multiplyScalar(0.85)
+    const base = (colored?.color ?? null)?.clone() ?? new THREE.Color(fallback)
+    return base.multiplyScalar(0.86)
+  }
+
+  /** Trama diagonal tenue pintada proceduralmente (mapa por color de pieza). */
+  _hatchMap(color) {
+    color = color?.clone?.() ?? new THREE.Color(0x9a968f)
+    const key = color.getHexString()
+    const cache = (this._hatchCache ??= new Map())
+    if (cache.has(key)) return cache.get(key)
+
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 128
+    const ctx = canvas.getContext('2d')
+    const light = color.clone().lerp(new THREE.Color(0xffffff), 0.25)
+    const dark = color.clone().multiplyScalar(0.72)
+    ctx.fillStyle = '#' + light.getHexString()
+    ctx.fillRect(0, 0, 128, 128)
+    ctx.strokeStyle = '#' + dark.getHexString()
+    ctx.lineWidth = 1.4
+    ctx.beginPath()
+    for (let i = -128; i < 256; i += 10) {
+      ctx.moveTo(i, 0)
+      ctx.lineTo(i + 128, 128)
     }
-    return piece
+    ctx.stroke()
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping
+    texture.repeat.set(6, 6)
+    texture.colorSpace = THREE.SRGBColorSpace
+    cache.set(key, texture)
+    return texture
   }
 
   /** Cambio de visibilidad/geometria: reconstruir stencil. */

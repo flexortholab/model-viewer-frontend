@@ -602,15 +602,24 @@ export class DentalViewer {
 
   handleMeasureClick(event) {
     this.setPointer(event)
-    const hit = this.pick()
-    if (!hit) return null
-    if (!this._pendingPoint) {
-      this._pendingPoint = hit.point.clone()
-      this.measure.setPending(hit.point)
-      this.emit('measure-pick', { point: hit.point.clone() })
+    // Edicion: si el cursor agarra un extremo de una medida, arrastrarlo
+    // manda sobre crear una nueva.
+    const grab = this.measure.findEndpoint?.(event.clientX, event.clientY)
+    if (grab) {
+      this._dragMeasure = grab
       return null
     }
-    const measurement = this.measure.add(this._pendingPoint, hit.point)
+    const hit = this.pick()
+    if (!hit) return null
+    // Adherencia a superficie/borde: ajusta al vertice cercano si procede.
+    const snapped = this.measure.snapToSurface?.(hit) ?? hit.point
+    if (!this._pendingPoint) {
+      this._pendingPoint = (snapped ?? hit.point).clone()
+      this.measure.setPending(hit.point)
+      this.emit('measure-pick', { point: (snapped ?? hit.point).clone() })
+      return null
+    }
+    const measurement = this.measure.add(this._pendingPoint, snapped ?? hit.point)
     this._pendingPoint = null
     this.measure.setPending(null)
     this.emit('measure-add', measurement)
@@ -618,6 +627,16 @@ export class DentalViewer {
   }
 
   handleMeasureMove(event) {
+    if (this._dragMeasure) {
+      // Arrastre de extremo: ajusta a la superficie y repinta al vuelo.
+      this.setPointer(event)
+      const hit = this.pick()
+      if (hit) {
+        const snapped = this.measure.snapToSurface?.(hit) ?? hit.point
+        this.measure.moveEndpoint(this._dragMeasure.measurement, this._dragMeasure.key, snapped ?? hit.point)
+      }
+      return
+    }
     this.setPointer(event)
     const hit = this.pick()
     if (!hit || !this.measure?.enabled) return
@@ -634,9 +653,14 @@ export class DentalViewer {
       const views = {
         frontal: [0, 0.12, 1],
         superior: [0, 1, 0.001],
+        inferior: [0, -1, 0.001],
+        // Izquierda y derecha referidos a la vista frontal del paciente.
+        izquierda: [-1, 0.05, 0.02],
+        derecha: [1, 0.05, 0.02],
+        isometrica: [0.42, 0.36, 0.83],
+        // Alias del bridge antiguo.
         lateral: [1, 0.05, 0.02],
         lingual: [-1, 0.05, 0.02],
-        isometrica: [0.42, 0.36, 0.83],
       }
       const dir = views[view]
       if (!dir) return
@@ -676,6 +700,13 @@ export class DentalViewer {
     const dataUrl = this.renderer.domElement.toDataURL('image/png')
     this.renderer.setSize(width, height, false)
     return dataUrl
+  }
+
+  handleMeasureRelease() {
+    if (this._dragMeasure) {
+      this._dragMeasure = null
+      this.measure?.syncDoc?.()
+    }
   }
 
   _loop() {

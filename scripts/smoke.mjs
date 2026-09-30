@@ -265,21 +265,23 @@ const measure = await evaluate(`
       nodes: Object.values(m.__nodes).filter(Boolean).length,
       nodeKeys: Object.keys(m.__nodes),
       lineMaterials: v.measure.lineMaterials.size,
-      displayed: style?.display,
-      transform: style?.transform,
+      spriteText: v.measure.measurements[0]?.__nodes?.value?.material?.map?.image ? 'ok' : 'sin sprite',
+      spriteVisible: v.measure.measurements[0]?.__nodes?.value?.visible,
     }
   })()
 `)
 check('crea una medicion', measure.count === 1, measure.id)
 check('la distancia se expresa en mm', measure.label === '12.35 mm', measure.label)
-// dim, extA, extB, tickA, tickB, pointA, pointB
+// dim, extA, extB, tickA, tickB, pointA, pointB, value (sprite con la cifra)
 check(
-  'dibuja linea de cota, extensiones, tildes y puntos',
-  measure.nodes === 7,
+  'dibuja linea de cota, extensiones, tildes, puntos y cifra en sprite',
+  measure.nodes === 8,
   `${measure.nodes} elementos (${measure.nodeKeys.join(', ')})`,
 )
 check('cada nodo tiene su material', measure.lineMaterials >= 7, `${measure.lineMaterials} materiales`)
-check('la etiqueta se proyecta en pantalla', Boolean(measure.transform) && measure.displayed !== 'none', measure.transform)
+check('la cifra mm es un sprite visible',
+  measure.spriteText === 'ok' && measure.spriteVisible === true,
+  `${measure.spriteText}/${measure.spriteVisible}`)
 
 // Las etiquetas se ocultan cuando el corte elimina la pieza.
 // La pieza va de y = -3.6 a y = +3.6: un plano en y = 40 no deja nada visible.
@@ -290,10 +292,17 @@ const hidden = await evaluate(`
     v.setSectionAxis('y', 40)   // muy por encima de la pieza
     v.renderer.render(v.scene, v.camera)
     v.measure.update()
-    const visible = v.measure.labels.filter((l) => l.el.style.display !== 'none').length
+    const countVisible = () => v.measure.labels.filter((l) => {
+      if (l.spriteKey) {
+        const sprite = v.measure.measurements.find((m) => m.id === l.id)?.__nodes?.value
+        return sprite?.visible !== false
+      }
+      return !l.el || l.el.style.display !== 'none'
+    }).length
+    const visible = countVisible()
     v.setSectionAxis('y', 0)
     v.measure.update()
-    const visibleAfter = v.measure.labels.filter((l) => l.el.style.display !== 'none').length
+    const visibleAfter = countVisible()
     v.measure.clear()
     v.setTool('orbit')
     v.setSection({ enabled: false })

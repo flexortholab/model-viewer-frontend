@@ -5,12 +5,9 @@ import { formatMm } from './units.js'
 
 const container = document.getElementById('viewport')
 const labelLayer = document.getElementById('labels')
-const statusInfo = document.getElementById('status-info')
-const statusUnits = document.getElementById('status-units')
 const hint = document.getElementById('hint')
 const panel = document.getElementById('panel')
 const sectionEnabled = document.getElementById('section-enabled')
-const capColorMode = document.getElementById('cap-color-mode')
 const objectsPanel = document.getElementById('objects-panel')
 const objectsCount = document.getElementById('objects-count')
 const objectsList = document.getElementById('objects-list')
@@ -38,24 +35,7 @@ function showHint(text, duration = 2600) {
   showHint.timer = setTimeout(() => hint.classList.remove('is-visible'), duration)
 }
 
-function setStatus(text) {
-  statusInfo.textContent = text
-}
-
-function showUnitsBadge(units) {
-  const forced = units.source === 'forced'
-  const warn = units.confidence < 0.5
-  statusUnits.hidden = false
-  statusUnits.classList.toggle('is-warn', warn)
-  statusUnits.textContent = forced
-    ? `${units.maxDimMm.toFixed(1)} mm (forzado: ${units.units})`
-    : `${units.maxDimMm.toFixed(1)} mm (${units.units} detectados)`
-  statusUnits.title = warn
-    ? 'Tamano fuera de rango: revisa las unidades del archivo'
-    : `Archivo en ${units.units} (max ${units.rawMaxDim.toFixed(3)}), escalado x${units.scale}`
-}
-
-// --- Paneles ---------------------------------------------------------------
+function setStatus() {}
 
 function panelVisibility(visible) {
   panel.hidden = !visible
@@ -75,13 +55,9 @@ function syncSectionUI() {
   if (!viewer.section) return
   const state = viewer.section.serialize()
   sectionEnabled.checked = state.enabled
-  const hex = String(state.capColor ?? 'auto').replace('#', '').toLowerCase()
-  capColorMode.value = hex === 'c0554a' ? 'rojo' : hex === 'd9d5cc' ? 'dental' : 'auto'
   const fuera = state.enabled && !viewer.section.planeIntersectsBounds()
   panel.classList.toggle('is-outside', fuera)
 }
-
-const CAP_PRESETS = { auto: null, dental: 0xd9d5cc, rojo: 0xc0554a }
 
 // --- Lista de objetos --------------------------------------------------------
 
@@ -192,7 +168,6 @@ function renderMarkers() {
 viewer.on('loaded', (info) => {
   currentModel = info
   panelVisibility(true)
-  showUnitsBadge(info.units)
   const { x, y, z } = info.sizeMm
   setStatus(
     `${info.stats.triangles.toLocaleString('es')} tri · ${x} × ${y} × ${z} mm`,
@@ -431,6 +406,12 @@ document.addEventListener('click', (event) => {
     case 'frame':
       viewer.frameModel()
       break
+    case 'move':
+      // Camara libre: cancela cotas y marcador a la vez.
+      if (viewer.measure?.enabled) toggleMeasure()
+      if (markerMode) toggleMarkerTool()
+      showHint('Cámara libre')
+      break
     case 'measure':
       toggleMeasure()
       break
@@ -480,11 +461,6 @@ sectionEnabled.addEventListener('change', () => {
   )
 })
 
-capColorMode.addEventListener('change', () => {
-  const preset = CAP_PRESETS[capColorMode.value]
-  viewer.setCapColor(preset ?? 'auto')
-  showHint(preset ? 'Superficie con color fijo' : 'Superficie con el color de cada pieza (sombreado)')
-})
 
 container.addEventListener('pointerdown', (event) => {
   if (markerMode && !event.target.closest('.panel, #toolbar, #toolbars')) {
@@ -499,6 +475,10 @@ container.addEventListener('pointerdown', (event) => {
 container.addEventListener('pointermove', (event) => {
   if (!viewer.measure?.enabled) return
   viewer.handleMeasureMove(event)
+})
+
+container.addEventListener('pointerup', () => {
+  viewer.handleMeasureRelease?.()
 })
 
 window.addEventListener('keydown', (event) => {

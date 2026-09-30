@@ -10,7 +10,7 @@ const statusUnits = document.getElementById('status-units')
 const hint = document.getElementById('hint')
 const panel = document.getElementById('panel')
 const sectionEnabled = document.getElementById('section-enabled')
-const capColor = document.getElementById('cap-color')
+const capColorMode = document.getElementById('cap-color-mode')
 const objectsPanel = document.getElementById('objects-panel')
 const objectsCount = document.getElementById('objects-count')
 const objectsList = document.getElementById('objects-list')
@@ -63,10 +63,10 @@ function panelVisibility(visible) {
   markersPanel.hidden = !visible
 }
 
-function togglePanelContent(panelEl, listEl) {
+function togglePanelContent(panelEl) {
   panelEl.classList.toggle('is-collapsed')
   const button = panelEl.querySelector('.panel-toggle')
-  button.textContent = panelEl.classList.contains('is-collapsed') ? '+' : '-'
+  if (button) button.textContent = panelEl.classList.contains('is-collapsed') ? '+' : '-'
 }
 
 // --- Corte seccional --------------------------------------------------------
@@ -75,14 +75,13 @@ function syncSectionUI() {
   if (!viewer.section) return
   const state = viewer.section.serialize()
   sectionEnabled.checked = state.enabled
-  for (const button of document.querySelectorAll('[data-gizmo]')) {
-    button.setAttribute('aria-pressed', String(viewer.section.getMode() === button.dataset.gizmo))
-  }
-  capColor.value = state.capColor
+  const hex = String(state.capColor ?? 'auto').replace('#', '').toLowerCase()
+  capColorMode.value = hex === 'c0554a' ? 'rojo' : hex === 'd9d5cc' ? 'dental' : 'auto'
   const fuera = state.enabled && !viewer.section.planeIntersectsBounds()
   panel.classList.toggle('is-outside', fuera)
-  if (fuera) showHint('El plano de corte no toca la pieza', 2200)
 }
+
+const CAP_PRESETS = { auto: null, dental: 0xd9d5cc, rojo: 0xc0554a }
 
 // --- Lista de objetos --------------------------------------------------------
 
@@ -93,6 +92,7 @@ function renderObjects() {
   objects.forEach((object) => {
     const li = document.createElement('li')
     li.className = 'obj-item' + (object.visible ? '' : ' is-hidden')
+    li.title = 'Clic: centrar la vista en esta pieza'
 
     const eye = document.createElement('button')
     eye.type = 'button'
@@ -113,12 +113,33 @@ function renderObjects() {
     tris.className = 'obj-tris'
     tris.textContent = `${object.triangles.toLocaleString('es')} tri`
 
-    li.append(eye, name, tris)
+    const cut = document.createElement('button')
+    cut.type = 'button'
+    cut.className = 'obj-cut'
+    cut.textContent = '\u2702'
+    cut.title = 'Centrar la vista y activar el corte en esta pieza'
+    cut.addEventListener('click', () => {
+      viewer.focusObject(object.index, { withPlane: true })
+      syncSectionUI()
+      showHint(`Corte preparado en "${object.name}": ajusta el plano con el gizmo`, 3200)
+    })
+
+    const row = document.createElement('span')
+    row.className = 'obj-row'
+    row.append(eye, name, tris, cut)
+    li.dataset.index = object.index
+    row.addEventListener('click', (event) => {
+      if (event.target.closest('button')) return
+      viewer.focusObject(object.index)
+      showHint(`Vista centrada en "${object.name}"`)
+    })
+    li.append(row)
     objectsList.append(li)
   })
 }
 
 // --- Presentacion (marcadores) --------------------------------------------
+let activeMarkerId = null
 
 function renderMarkers() {
   const markers = viewer.doc.markers ?? []
@@ -140,12 +161,15 @@ function renderMarkers() {
 
     li.append(idx, text)
 
+    if (marker.id === activeMarkerId) li.classList.add('is-active')
+
     const del = document.createElement('button')
     del.type = 'button'
     del.className = 'marker-delete'
     del.textContent = '\u00d7'
     del.title = 'Eliminar marcador'
     del.addEventListener('click', () => {
+      if (viewer._preservingMeasures) viewer.exitMarkerFocus()
       viewer.removeMarker(marker.id)
       renderMarkers()
     })
@@ -154,7 +178,10 @@ function renderMarkers() {
     li.addEventListener('click', (event) => {
       if (event.target.closest('.marker-delete')) return
       const result = viewer.focusMarker(marker.id)
-      if (result) showHint(`Paso ${index + 1}${result.text ? `: ${result.text}` : ''}`, 3200)
+      if (result) {
+        activePopupId = marker.id
+        showHint(`Paso ${index + 1}${result.text ? `: ${result.text}` : ''}`, 3200)
+      }
     })
     markersList.append(li)
   })
@@ -194,6 +221,12 @@ viewer.on('progress', ({ fraction, phase }) => {
 viewer.on('section', () => syncSectionUI())
 
 viewer.on('measure-pick', () => showHint('Segundo punto para completar la medida', 4000))
+
+viewer.on('measure-add', () => {
+  // Medida creada: devolver el modelo a la camara libre (era la queja: el
+  // modo cotas bloqueaba la orbita indefinidamente).
+  showHint('Medida creada', 2600)
+})
 
 viewer.on('error', (error) => {
   setStatus(error.message)
@@ -244,12 +277,21 @@ function exportAnnotations() {
 }
 
 function toggleMeasure() {
-  const active = viewer.setTool('measure') === 'measure'
+  let active = false
+  if (viewer.measure?.enabled) {
+    viewer.setTool('orbit') // segundo pulsado del boton: salir del modo cotas
+  } else {
+    active = viewer.setTool('measure') === 'measure'
+  }
   container.classList.toggle('is-measuring', active)
   const button = document.querySelector('[data-action="measure"]')
   button?.setAttribute('aria-pressed', String(active))
   if (active && markerMode) toggleMarkerTool()
-  showHint(active ? 'Medir: pulsa dos puntos sobre la pieza. Doble clic en la cifra para borrar.' : '')
+  showHint(
+    active
+      ? 'Medir: pulsa dos puntos sobre la pieza. Doble clic en la cifra para borrar.'
+      : 'Cámara libre: pulsa Medir para cotar otra vez',
+  )
   return active
 }
 
@@ -375,7 +417,9 @@ function handleHostCommand(action, payload) {
 
 // --- Interfaz --------------------------------------------------------------
 
-document.getElementById('toolbar').addEventListener('click', (event) => {
+// Un solo receptor de clics para TODA la UI (toolbar, paneles): sin esto los
+// botones de los paneles no reaccionan en Firefox.
+document.addEventListener('click', (event) => {
   const button = event.target.closest('button')
   if (!button) return
 
@@ -416,6 +460,13 @@ document.getElementById('toolbar').addEventListener('click', (event) => {
       break
     case 'section-reset':
       viewer.resetSectionPlane()
+      showHint('Plano centrado en la pieza, perpendicular a la vista actual')
+      break
+    case 'marker-unfocus':
+      viewer.exitMarkerFocus()
+      activeMarkerId = null
+      renderMarkers()
+      showHint('Vista libre: se vuelven a mostrar todas las mediciones')
       break
   }
 })
@@ -429,16 +480,10 @@ sectionEnabled.addEventListener('change', () => {
   )
 })
 
-for (const button of document.querySelectorAll('[data-gizmo]')) {
-  button.addEventListener('click', () => {
-    viewer.setSectionMode(button.dataset.gizmo)
-    syncSectionUI()
-    showHint(button.dataset.gizmo === 'rotate' ? 'Gizmo en modo rotar: gira el plano' : 'Gizmo en modo mover: arrastra el plano')
-  })
-}
-
-capColor.addEventListener('input', () => {
-  viewer.setCapColor(Number.parseInt(capColor.value.slice(1), 16))
+capColorMode.addEventListener('change', () => {
+  const preset = CAP_PRESETS[capColorMode.value]
+  viewer.setCapColor(preset ?? 'auto')
+  showHint(preset ? 'Superficie con color fijo' : 'Superficie con el color de cada pieza (sombreado)')
 })
 
 container.addEventListener('pointerdown', (event) => {
@@ -512,6 +557,7 @@ async function boot() {
 }
 
 boot().catch((error) => {
+  console.error('[dental-viewer] arranque:', error)
   setStatus(error.message)
   bridge.error(error)
 })

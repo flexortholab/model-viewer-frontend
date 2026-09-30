@@ -42,7 +42,8 @@ export class SectionPlaneTool {
 
     this.enabled = false
     this.mode = 'translate'
-    this.capColor = 0xc0554a
+    this.capColor = 'auto'
+    this._seedColor = 0x8a7f72
 
     // Tamano del visual: envuelve la pieza con margen.
     const box = new THREE.Box3()
@@ -61,7 +62,7 @@ export class SectionPlaneTool {
     this.planeMesh = new THREE.Mesh(
       new THREE.CircleGeometry(this.radius, 64),
       new THREE.MeshBasicMaterial({
-        color: this.capColor,
+        color: this._seedColor,
         transparent: true,
         opacity: 0.14,
         side: THREE.DoubleSide,
@@ -75,7 +76,7 @@ export class SectionPlaneTool {
     this.ringMesh = new THREE.Mesh(
       new THREE.RingGeometry(this.radius * 0.985, this.radius, 96),
       new THREE.MeshBasicMaterial({
-        color: this.capColor,
+        color: this._seedColor,
         transparent: true,
         opacity: 0.5,
         side: THREE.DoubleSide,
@@ -101,8 +102,6 @@ export class SectionPlaneTool {
 
     this._capGeometry = new THREE.PlaneGeometry(this.radius * 1.9, this.radius * 1.9)
     this._capMesh = null
-    this._stencilBack = null
-    this._stencilFront = null
     this._stencilMeshes = []
 
     // Dos gizmos sobre el mismo plano: flechas (mover) y anillos (rotar)
@@ -156,13 +155,22 @@ export class SectionPlaneTool {
   }
 
   setCapColor(hex) {
-    this.capColor = hex
-    this.planeMesh.material.color.setHex(hex)
-    this.ringMesh.material.color.setHex(hex)
+    if (hex === 'auto' || hex == null) {
+      this.capColor = null
+      this.planeMesh.material.color.setHex(this._seedColor)
+      this.ringMesh.material.color.setHex(this._seedColor)
+      if (this.enabled) this.apply()
+      return
+    }
+    this.capColor = Number.isFinite(hex) ? hex : Number.parseInt(String(hex).replace('#', ''), 16)
+    this.planeMesh.material.color.setHex(this.capColor)
+    this.ringMesh.material.color.setHex(this.capColor)
   }
 
   setEnabled(enabled) {
     this.enabled = !!enabled
+    // Sin corte: ni visual del plano ni gizmo en pantalla.
+    this.gizmo.visible = this.enabled
     this._setGizmoVisible(this.enabled)
     this.apply()
   }
@@ -233,74 +241,96 @@ export class SectionPlaneTool {
     )
     if (!visibleMeshes.length) return
 
-    const base = new THREE.MeshBasicMaterial()
-    base.depthWrite = false
-    base.depthTest = false
-    base.colorWrite = false
-    base.stencilWrite = true
-    base.stencilFunc = THREE.AlwaysStencilFunc
+    // Por pieza: pases de stencil + tapa de CADA malla, con el color de esa
+    // pieza ligeramente sombreado. El clear de stencil tras cada tapa (i+1)
+    // garantiza que cada tapa pinta solo el interior de su propia pieza.
+    visibleMeshes.forEach((mesh, index) => {
+      const base = new THREE.MeshBasicMaterial()
+      base.depthWrite = false
+      base.depthTest = false
+      base.colorWrite = false
+      base.stencilWrite = true
+      base.stencilFunc = THREE.AlwaysStencilFunc
 
-    this._stencilBack = base.clone()
-    this._stencilBack.side = THREE.BackSide
-    this._stencilBack.clippingPlanes = this._clippingPlanes
-    this._stencilBack.stencilFail = THREE.IncrementWrapStencilOp
-    this._stencilBack.stencilZFail = THREE.IncrementWrapStencilOp
-    this._stencilBack.stencilZPass = THREE.IncrementWrapStencilOp
+      const back = base.clone()
+      back.side = THREE.BackSide
+      back.clippingPlanes = this._clippingPlanes
+      back.stencilFail = THREE.IncrementWrapStencilOp
+      back.stencilZFail = THREE.IncrementWrapStencilOp
+      back.stencilZPass = THREE.IncrementWrapStencilOp
 
-    this._stencilFront = base.clone()
-    this._stencilFront.side = THREE.FrontSide
-    this._stencilFront.clippingPlanes = this._clippingPlanes
-    this._stencilFront.stencilFail = THREE.DecrementWrapStencilOp
-    this._stencilFront.stencilZFail = THREE.DecrementWrapStencilOp
-    this._stencilFront.stencilZPass = THREE.DecrementWrapStencilOp
+      const front = base.clone()
+      front.side = THREE.FrontSide
+      front.clippingPlanes = this._clippingPlanes
+      front.stencilFail = THREE.DecrementWrapStencilOp
+      front.stencilZFail = THREE.DecrementWrapStencilOp
+      front.stencilZPass = THREE.DecrementWrapStencilOp
 
-    for (const mesh of visibleMeshes) {
-      const backMesh = new THREE.Mesh(mesh.geometry, this._stencilBack)
-      backMesh.renderOrder = 1
+      const order = (index + 1) * 2
+      const backMesh = new THREE.Mesh(mesh.geometry, back)
+      backMesh.renderOrder = order
       backMesh.raycast = () => {}
-      const frontMesh = new THREE.Mesh(mesh.geometry, this._stencilFront)
-      frontMesh.renderOrder = 1
+      const frontMesh = new THREE.Mesh(mesh.geometry, front)
+      frontMesh.renderOrder = order
       frontMesh.raycast = () => {}
-      this.stencilGroup.add(backMesh, frontMesh)
-      this._stencilMeshes.push(backMesh, frontMesh)
-    }
 
-    const capMaterial = new THREE.MeshStandardMaterial({
-      color: this.capColor,
-      metalness: 0.08,
-      roughness: 0.72,
-      side: THREE.DoubleSide,
-      stencilWrite: true,
-      stencilRef: 0,
-      stencilFunc: THREE.NotEqualStencilFunc,
-      stencilFail: THREE.ReplaceStencilOp,
-      stencilZFail: THREE.ReplaceStencilOp,
-      stencilZPass: THREE.ReplaceStencilOp,
-      depthWrite: true,
+      const capMaterial = new THREE.MeshStandardMaterial({
+        color: this.capColor ?? this._pieceColor(mesh),
+        metalness: 0.08,
+        roughness: 0.72,
+        side: THREE.DoubleSide,
+        stencilWrite: true,
+        stencilRef: 0,
+        stencilFunc: THREE.NotEqualStencilFunc,
+        stencilFail: THREE.ReplaceStencilOp,
+        stencilZFail: THREE.ReplaceStencilOp,
+        stencilZPass: THREE.ReplaceStencilOp,
+        depthWrite: true,
+      })
+      const cap = new THREE.Mesh(this._capGeometry, capMaterial)
+      cap.name = `cap-${String(mesh.name || index)}`
+      cap.position.z = 0.015
+      cap.renderOrder = order + 1
+      cap.raycast = () => {}
+      // Limpiar el stencil despues de esta tapa, antes de la siguiente pieza.
+      cap.onAfterRender = (renderer) => renderer.clearStencil()
+
+      this.capGroup.add(cap)
+      this.stencilGroup.add(backMesh, frontMesh)
+      this._stencilMeshes.push(cap, backMesh, frontMesh)
+      this.capGroup.userData.pieceCaps = this.capGroup.userData.pieceCaps || []
+      this.capGroup.userData.pieceCaps.push({ mesh, cap })
     })
-    this._capMesh = new THREE.Mesh(this._capGeometry, capMaterial)
-    this._capMesh.name = 'section-cap'
-    // Un pelin por delante del plano (hacia +Z local) para ganar la prueba de
-    // profundidad contra la geometria recortada.
-    this._capMesh.position.z = 0.015
-    this._capMesh.renderOrder = 2
-    this._capMesh.raycast = () => {}
-    this._capMesh.onAfterRender = (renderer) => renderer.clearStencil()
-    this.capGroup.add(this._capMesh)
   }
 
   _teardownStencil() {
-    for (const mesh of this._stencilMeshes) this.stencilGroup.remove(mesh)
-    this._stencilMeshes = []
-    this._stencilBack?.dispose()
-    this._stencilFront?.dispose()
-    this._stencilBack = null
-    this._stencilFront = null
-    if (this._capMesh) {
-      this._capMesh.material.dispose()
-      this.capGroup.remove(this._capMesh)
-      this._capMesh = null
+    for (const mesh of this._stencilMeshes) {
+      this.stencilGroup.remove(mesh)
+      // Solo el cap tiene material propio (las caras de stencil por pieza
+      // comparten grupo); disponer todos con material.
+      mesh.material?.dispose?.()
     }
+    this._stencilMeshes = []
+    this.capGroup.clear()
+    this.capGroup.userData.pieceCaps = []
+    this._capMesh = null
+    this._stencilGroups = null
+  }
+
+  /** Color de la pieza ligeramente sombreado para la superficie de corte. */
+  _pieceColor(mesh) {
+    const fallback = new THREE.Color(0x9a968f)
+    const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    const colored = list.find((mat) => mat?.color)
+    if (!colored) return this.capColor ?? fallback
+    const piece = colored.color.clone()
+    if ('roughness' in colored) {
+      // pieza oscurcida ~30% para que la superficie de corte se lea como seccion.
+      piece.multiplyScalar(0.7)
+    } else {
+      piece.multiplyScalar(0.85)
+    }
+    return piece
   }
 
   /** Cambio de visibilidad/geometria: reconstruir stencil. */
@@ -336,7 +366,7 @@ export class SectionPlaneTool {
     const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(this.gizmo.quaternion)
     return {
       enabled: this.enabled,
-      capColor: `#${this.capColor.toString(16).padStart(6, '0')}`,
+      capColor: this.capColor ?? 'auto',
       point: [round(this.gizmo.position.x), round(this.gizmo.position.y), round(this.gizmo.position.z)],
       normal: [round(normal.x), round(normal.y), round(normal.z)],
       mode: this.mode,
@@ -346,8 +376,11 @@ export class SectionPlaneTool {
   restore(data) {
     if (!data || typeof data !== 'object') return
     if (typeof data.capColor === 'string') {
-      const hex = Number.parseInt(String(data.capColor).replace('#', ''), 16)
-      if (Number.isFinite(hex)) this.setCapColor(hex)
+      if (data.capColor.toLowerCase() === 'auto') this.setCapColor('auto')
+      else {
+        const hex = Number.parseInt(String(data.capColor).replace('#', ''), 16)
+        if (Number.isFinite(hex)) this.setCapColor(hex)
+      }
     }
     if (data.point || data.normal) {
       this.setPlane({ point: data.point, normal: data.normal })

@@ -8,6 +8,13 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
 import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh'
+
+// Raycast acelerado: escenas de 3M triangulos responden al clic en ms en vez
+// de bloquear el navegador segundos.
+THREE.Mesh.prototype.raycast = acceleratedRaycast
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree
 
 import { detectUnits } from './units.js'
 
@@ -192,6 +199,9 @@ export function normalizeModel(root, { forcedUnits = null, merge = false } = {})
     if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox()
     bounds.union(mesh.geometry.boundingBox)
   }
+
+  // BVH para el raycast: imprescindible con escenas grandes.
+  for (const mesh of outputMeshes) mesh.geometry.computeBoundsTree?.()
 
   return {
     meshes: outputMeshes,

@@ -43,6 +43,7 @@ export class DentalViewer {
     this._setupGrid()
 
     this.raycaster = new THREE.Raycaster()
+    this.raycaster.firstHitOnly = true
     this.pointer = new THREE.Vector2()
 
     this.modelRoot = new THREE.Group()
@@ -364,6 +365,49 @@ export class DentalViewer {
     this.emit('objects', this.listObjects())
   }
 
+  /**
+   * Centra la vista en un objeto concreto; con conPlane coloca y activa el
+   * corte de ese objeto (despues lo ajusta el doctor con el gizmo).
+   */
+  focusObject(index, { withPlane = false } = {}) {
+    const mesh = this.model?.meshes?.[index]
+    if (!mesh) return null
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox()
+    const box = mesh.geometry.boundingBox.clone()
+    const center = box.getCenter(new THREE.Vector3())
+    const radius = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 2)
+
+    this.camera.near = Math.max(radius / 500, 0.05)
+    this.camera.far = radius * 200
+    this.camera.updateProjectionMatrix()
+
+    if (withPlane) {
+      const viewDir = new THREE.Vector3()
+      this.camera.getWorldDirection(viewDir)
+      this.camera.position.copy(center).addScaledVector(viewDir, radius * 2.1)
+      this.controls.target.copy(center)
+      this.controls.update()
+      this.section?.setPlane({ point: center.toArray(), normal: viewDir.normalize().toArray() })
+      if (!this.section?.enabled) this.section?.setEnabled(true)
+      this._syncDoc()
+      this.emit('section', this.section.serialize())
+    } else {
+      const dir = new THREE.Vector3(0.42, 0.36, 0.83).normalize()
+      this.camera.position.copy(center).addScaledVector(dir, radius * 1.9)
+      this.controls.target.copy(center)
+      this.controls.update()
+    }
+    this.emit('framed', { center, radius, object: index })
+    this.emit('objects', this.listObjects())
+    return { center, radius }
+  }
+
+  /** Vuelve a encuadrar el caso completo (salir del paso enfocado). */
+  exitFocus() {
+    this.frameModel()
+    return true
+  }
+
   // --- Anotaciones ---------------------------------------------------------
 
   getAnnotations() {
@@ -399,13 +443,15 @@ export class DentalViewer {
       kind,
     }
     if (snapshot && serial) {
-      // Snapshot de presentacion: como estaba la vista y el corte en el
-      // momento de crear el marcador. Pulsarlo en la lista lo restaura.
+      // Snapshot de presentacion: como estaba la vista, el corte y las
+      // mediciones en el momento de crear el marcador. Pulsarlo en la lista
+      // lo restaura todo.
       marker.view = {
         position: this.camera.position.toArray().map((n) => round(n)),
         target: this.controls.target.toArray().map((n) => round(n)),
       }
       marker.section = serial
+      marker.measurements = this.measure?.serialize() ?? []
     }
     this.doc.markers.push(marker)
     this._renderMarkers()
@@ -436,13 +482,29 @@ export class DentalViewer {
       this.emit('view', marker.id)
     }
     if (marker.section) {
-      this.section?.restore(marker.section)
-      this._syncDoc()
-      this.emit('section', this.section.serialize())
+      // Mientras dura el paso, _syncDoc no debe reescribir las mediciones
+      // del documento (el conjunto completo vive en doc.measurements).
+      this._preservingMeasures = true
+      this.section?.restore({ ...marker.section, enabled: !!marker.section.enabled })
+    }
+    if (Array.isArray(marker.measurements)) {
+      this.measure?.restore(marker.measurements)
+      this.measure?.update()
     }
     // Pulso visual en la etiqueta del marcador.
     this.measure?.pulse?.(`marker:${id}`)
+    this.emit('markers', this.doc.markers)
     return marker
+  }
+
+  /** Sale del paso enfocado y recupera todas las mediciones. */
+  exitMarkerFocus() {
+    this._preservingMeasures = false
+    this.measure?.restore(this.doc.measurements ?? [])
+    this.measure?.update()
+    this.frameModel()
+    this.emit('markers', this.doc.markers)
+    return true
   }
 
   /** Retira todos los marcadores de la pieza (y sus etiquetas). */
@@ -511,7 +573,9 @@ export class DentalViewer {
   _syncDoc() {
     if (!this.section || !this.measure) return
     this.doc.section = this.section.serialize()
-    this.doc.measurements = this.measure.serialize()
+    if (!this._preservingMeasures) {
+      this.doc.measurements = this.measure.serialize()
+    }
     this.doc.units = 'mm'
     this.emit('changed', this.doc)
   }

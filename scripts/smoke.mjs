@@ -387,6 +387,7 @@ const markerFlow = await evaluate(`
     }
     v.removeMarker(marker.id)
     v.setSection({ enabled: false })
+    v.exitMarkerFocus()
     return { saved, restored, markersAfterRemove: v.doc.markers.length }
   })()
 `)

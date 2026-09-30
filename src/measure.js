@@ -50,7 +50,7 @@ export class MeasureTool {
     for (const material of this.lineMaterials) material.resolution.set(width, height)
   }
 
-  _makeLine(points, { color = 0xf0f0f0, width = 2, dashed = false } = {}) {
+  _makeLine(points, { color = 0x14141a, width = 2, dashed = false } = {}) {
     const geometry = new LineGeometry()
     geometry.setPositions(points)
     const material = new LineMaterial({
@@ -158,21 +158,21 @@ export class MeasureTool {
     const a2 = a.clone().add(offset)
     const b2 = b.clone().add(offset)
 
-    nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 2.5 })
-    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 1.5, color: 0x9a9a9a })
-    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 1.5, color: 0x9a9a9a })
+    nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 4 })
+    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 2.4, color: 0x3c3c44 })
+    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 2.4, color: 0x3c3c44 })
 
     // Tildes oblicuas en los extremos, estilo plano de taller.
     const tickDir = direction.clone().add(best).normalize().multiplyScalar(TICK)
     nodes.tickA = this._makeLine(
       [a2.x - tickDir.x, a2.y - tickDir.y, a2.z - tickDir.z,
        a2.x + tickDir.x, a2.y + tickDir.y, a2.z + tickDir.z],
-      { width: 2.5 },
+      { width: 4 },
     )
     nodes.tickB = this._makeLine(
       [b2.x - tickDir.x, b2.y - tickDir.y, b2.z - tickDir.z,
        b2.x + tickDir.x, b2.y + tickDir.y, b2.z + tickDir.z],
-      { width: 2.5 },
+      { width: 4 },
     )
 
     nodes.pointA = this._makePoint(a)
@@ -273,6 +273,18 @@ export class MeasureTool {
     this.labels[index].el.remove()
     this.labels.splice(index, 1)
     return true
+  }
+
+  /** Destello visual sobre una etiqueta concreta (p.ej. al pulsar un marcador). */
+  pulse(id) {
+    const entry = this.labels.find((l) => l.id === id)
+    if (!entry?.el) return
+    entry.el.classList.remove('is-pulse')
+    // Forzar reinicio de la animacion.
+    void entry.el.offsetWidth
+    entry.el.classList.add('is-pulse')
+    clearTimeout(entry.__pulseTimer)
+    entry.__pulseTimer = setTimeout(() => entry.el.classList.remove('is-pulse'), 1200)
   }
 
   setPending(point) {

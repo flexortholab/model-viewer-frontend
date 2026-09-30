@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
-import { loadModel, normalizeModel, applyDentalMaterial, isSupported } from './loaders.js'
-import { SectionTool, AXIS_LABELS } from './section.js'
+import { loadModel, normalizeModel, applyDentalMaterial, prepareMaterialsForReview, isSupported } from './loaders.js'
+import { SectionPlaneTool } from './section.js'
 import { MeasureTool } from './measure.js'
 import { createDocument, validateDocument } from './annotations.js'
 import { formatMm, round } from './units.js'
@@ -13,7 +13,10 @@ export class DentalViewer {
     this.labelLayer = labelLayer
 
     this.scene = new THREE.Scene()
-    this.scene.background = new THREE.Color(0x14161a)
+    // Fondo blanco por defecto: las escenas se exportan a color desde Blender
+    // y el doctor trabaja sobre un lienzo claro. ??background=dark vuelve al
+    // tema oscuro.
+    this.scene.background = new THREE.Color(0xffffff)
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -113,7 +116,7 @@ export class DentalViewer {
 
   /**
    * @param {string} url .glb | .gltf | .stl | .obj | .fbx | .3mf
-   * @param {{forcedUnits?:string|null, merge?:boolean}} options
+   * @param {{forcedUnits?:string|null, merge?:boolean, keepMaterials?:boolean}} options
    */
   async load(url, options = {}) {
     if (!url) throw new Error('Falta la URL del modelo.')
@@ -126,9 +129,11 @@ export class DentalViewer {
       onProgress: (fraction, label) => this.emit('progress', { phase: 'loading', fraction, label }),
     })
 
+    // Sin merge por defecto: las escenas de Blender traen varios objetos y la
+    // lista de objetos con el ojo los necesita por separado.
     const result = normalizeModel(root, {
       forcedUnits: options.forcedUnits ?? null,
-      merge: options.merge ?? true,
+      merge: options.merge ?? false,
     })
 
     // Limpieza del modelo anterior.
@@ -140,9 +145,14 @@ export class DentalViewer {
     this.modelRoot.add(this.markerGroup)
 
     this.modelRoot.add(root)
-    applyDentalMaterial(result.meshes)
+    // Colored exports: preserve the original materials unless asked otherwise.
+    if (options.keepMaterials) {
+      prepareMaterialsForReview(result.meshes)
+    } else {
+      applyDentalMaterial(result.meshes)
+    }
 
-    this.model = { url, ...result }
+    this.model = { url, keepMaterials: options.keepMaterials ?? false, ...result }
     this.doc.model = url
 
     this._setupTools()
@@ -165,16 +175,20 @@ export class DentalViewer {
         z: round(result.size.z),
       },
       stats: result.stats,
+      objects: this.listObjects(),
     }
     this.emit('loaded', info)
     return info
   }
 
   _setupTools() {
-    this.section = new SectionTool(this.renderer, {
+    this.section = new SectionPlaneTool(this.renderer, {
+      scene: this.scene,
       modelRoot: this.modelRoot,
       meshes: this.model.meshes,
-      size: this.model.size,
+      camera: this.camera,
+      controls: this.controls,
+      onChange: () => this._syncDoc(),
     })
 
     this.measure = new MeasureTool({
@@ -225,9 +239,9 @@ export class DentalViewer {
   setBackground(value) {
     if (value === 'light' || value === 'dark' || value === 'studio') {
       const map = {
-        light: 0xf2f3f5,
+        light: 0xffffff,
         dark: 0x14161a,
-        studio: 0x8f9296,
+        studio: 0xf0f0f0,
       }
       this.scene.background = new THREE.Color(map[value])
       this.renderer.toneMappingExposure = value === 'light' ? 0.85 : 1.05
@@ -263,42 +277,91 @@ export class DentalViewer {
     return enabled ? 'measure' : 'orbit'
   }
 
-  // --- Corte seccional -----------------------------------------------------
+  // --- Corte seccional (plano unico con gizmo) -------------------------------
 
-  setSection({ enabled, planes } = {}) {
+  setSection({ enabled, plane } = {}) {
     if (!this.section) throw new Error('No hay modelo cargado.')
-    if (planes) this.section.configure(planes)
-    if (enabled !== undefined) this.section.setEnabled(enabled)
-    else this.section.apply()
+    if (plane) this.section.setPlane(plane)
+    if (enabled !== undefined) {
+      this.section.setEnabled(enabled)
+      if (enabled) {
+        // Sin posicion guardada: centrar el plano de cara a la camara.
+        if (!plane && !this.section.gizmo.position.lengthSq()) this.section.reset(this.camera)
+      }
+    } else {
+      this.section.apply()
+    }
     this._syncDoc()
     this.emit('section', this.section.serialize())
     return this.section.serialize()
   }
 
+  /**
+   * Compatibilidad con el viejo semieje: interpreta el eje/offset como una
+   * normal de plano en ese eje desplazada `offset` mm del centro, conservando
+   * la mitad positiva (misma semantica que la version anterior).
+   */
   setSectionAxis(axis, offset, { enable = true } = {}) {
-    if (enable) this.section?.setAxisEnabled(axis, true)
-    this.section?.setOffset(axis, offset)
-    this._syncDoc()
-    this.emit('section', this.section.serialize())
+    axis = String(axis ?? '').toLowerCase()
+    const dir = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) }[axis]
+    if (dir) {
+      const point = dir.clone().multiplyScalar(Number(offset) || 0)
+      this.section?.setPlane({ point: point.toArray(), normal: dir.toArray() })
+    }
+    if (enable && this.section && !this.section.enabled) {
+      this.section.setEnabled(true)
+      this._syncDoc()
+      this.emit('section', this.section.serialize())
+    }
   }
 
-  setSectionAxisEnabled(axis, enabled) {
-    this.section?.setAxisEnabled(axis, enabled)
-    this._syncDoc()
-    this.emit('section', this.section.serialize())
-  }
+  setSectionAxisEnabled() {}
 
-  sectionAxisRange(axis) {
-    return this.section?.axisRange(axis) ?? { min: -1, max: 1, half: 1 }
+  sectionAxisRange() {
+    return { min: -1, max: 1, half: 1 }
   }
 
   axisLabel(axis) {
-    return AXIS_LABELS[axis] ?? axis
+    return String(axis ?? '').toUpperCase()
   }
 
   setCapColor(hex) {
     this.section?.setCapColor(hex)
     this._syncDoc()
+  }
+
+  setSectionMode(mode) {
+    this.section?.setMode(mode)
+  }
+
+  resetSectionPlane() {
+    this.section?.reset(this.camera)
+    this._syncDoc()
+    this.emit('section', this.section.serialize())
+  }
+
+  // --- Lista de objetos -------------------------------------------------------
+
+  listObjects() {
+    return (this.model?.meshes ?? []).map((mesh, index) => ({
+      index,
+      name: nameOf(mesh, index),
+      visible: mesh.visible,
+      triangles: Math.round(
+        mesh.geometry.getIndex()
+          ? mesh.geometry.getIndex().count / 3
+          : mesh.geometry.getAttribute('position').count / 3,
+      ),
+    }))
+  }
+
+  setMeshVisible(index, visible) {
+    const mesh = this.model?.meshes?.[index]
+    if (!mesh) return
+    mesh.visible = !!visible
+    this.section?.refreshMeshes(this.model.meshes)
+    this._syncDoc()
+    this.emit('objects', this.listObjects())
   }
 
   // --- Anotaciones ---------------------------------------------------------
@@ -313,8 +376,11 @@ export class DentalViewer {
     this.doc = doc
     if (!this.model) return doc
 
+    // Copiar los arrays ANTES: section.restore dispara _syncDoc (via onChange)
+    // y reescribiria doc.measurements/doc.section con el estado actual.
+    const measurements = doc.measurements
     this.section.restore(doc.section)
-    this.measure.restore(doc.measurements)
+    this.measure.restore(measurements)
     this._renderMarkers()
 
     if (doc.model && doc.model !== this.model.url) {
@@ -324,11 +390,58 @@ export class DentalViewer {
     return doc
   }
 
-  addMarker({ position, text = '', kind = 'note' }) {
-    const marker = { id: `k${this.markerGroup.children.length + 1}`, position, text, kind }
+  addMarker({ position, text = '', kind = 'note', snapshot = true }) {
+    const serial = this.section?.serialize() ?? null
+    const marker = {
+      id: `k${this.markerGroup.children.length + 1}_${Date.now().toString(36).slice(-4)}`,
+      position,
+      text,
+      kind,
+    }
+    if (snapshot && serial) {
+      // Snapshot de presentacion: como estaba la vista y el corte en el
+      // momento de crear el marcador. Pulsarlo en la lista lo restaura.
+      marker.view = {
+        position: this.camera.position.toArray().map((n) => round(n)),
+        target: this.controls.target.toArray().map((n) => round(n)),
+      }
+      marker.section = serial
+    }
     this.doc.markers.push(marker)
     this._renderMarkers()
     this._syncDoc()
+    this.emit('markers', this.doc.markers)
+    return marker
+  }
+
+  removeMarker(id) {
+    const index = this.doc.markers.findIndex((m) => m.id === id)
+    if (index === -1) return false
+    for (const marker of this.doc.markers) this.measure?.removeOverlay(`marker:${marker.id}`)
+    this.doc.markers.splice(index, 1)
+    this._renderMarkers()
+    this._syncDoc()
+    this.emit('markers', this.doc.markers)
+    return true
+  }
+
+  /** Muestra el caso como estaba cuando se creo el marcador. */
+  focusMarker(id) {
+    const marker = this.doc.markers.find((m) => m.id === id)
+    if (!marker) return null
+    if (marker.view?.position && marker.view?.target) {
+      this.camera.position.fromArray(marker.view.position)
+      this.controls.target.fromArray(marker.view.target)
+      this.controls.update()
+      this.emit('view', marker.id)
+    }
+    if (marker.section) {
+      this.section?.restore(marker.section)
+      this._syncDoc()
+      this.emit('section', this.section.serialize())
+    }
+    // Pulso visual en la etiqueta del marcador.
+    this.measure?.pulse?.(`marker:${id}`)
     return marker
   }
 
@@ -367,6 +480,7 @@ export class DentalViewer {
 
       const group = new THREE.Group()
       group.userData.isMarker = true
+      group.userData.markerId = marker.id
 
       const dot = new THREE.Mesh(
         new THREE.SphereGeometry(0.55, 16, 12),
@@ -518,3 +632,10 @@ export class DentalViewer {
 }
 
 export { formatMm }
+
+/** Nombre amigable de un objeto para la lista. */
+function nameOf(mesh, index) {
+  if (mesh.name) return mesh.name
+  if (mesh.parent?.name) return `${mesh.parent.name} #${index + 1}`
+  return `Pieza ${index + 1}`
+}

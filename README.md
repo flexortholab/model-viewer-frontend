@@ -5,11 +5,11 @@ Pensado para **disyuntores sinterizados con anclaje esquelético** diseñados en
 
 - unidades en **milímetros** con detección automática
 - **cortes seccionales** en 3 ejes con capping sólido (stencil buffer)
-- **mediciones** estilo plano de taller con etiquetas proyectadas
+-  estilo plano de taller con etiquetas proyectadas
 - **anotaciones** exportables como sidecar JSON
 - embebible en un **webclip / iframe** vía `postMessage`, o por enlace directo
 
-Estado actual: **v0.1.0** funcional. Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta.
+Estado actual: **v0.2.0** funcional (tema claro, plano de corte unico con gizmo, lista de objetos y presentacion con marcadores). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta.
 > **Demo desplegada (GitHub Pages, rama gh-pages):** https://rms1982.github.io/dental-viewer/
 > **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/disyuntor-4-pilares.stl&section=y=0
 > La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.
@@ -65,8 +65,9 @@ Todos los parámetros son opcionales y combinables:
 | `model` | `?model=samples/pieza.glb` | URL del modelo (relativa o absoluta) |
 | `units` | `?units=mm` | Fuerza unidades: `mm\|cm\|m\|um\|in` |
 | `annotations` | `?annotations=caso.json` | Sidecar JSON a aplicar tras la carga |
-| `section` | `?section=y=2.5` o `?section=z=-1` | Corte inicial `axis=offset` (lo deja definido pero **sin activar** por defecto; ver bugs) |
-| `background` | `?background=light` o `?background=#1a1d21` | Preset (`light\|dark\|studio`) o color CSS |
+| `section` | `?section=y=2.5` o `?section=z=-1` | Corte inicial por semieje (compatibilidad: se traduce a plano con normal en ese eje) |
+| `background` | `?background=dark` o `?background=#1a1d21` | Preset (`light`=blanco por defecto, `dark`, `studio`) o color CSS |
+| `material` | `?material=dental` | Por defecto conserva los colores/texturas de la exportacion; `dental` aplica el material neutral clasico |
 | `embed` | `?embed=1` | Oculta toolbar y panel (modo iframe para el webclip) |
 
 Sin `?model=`, el visor queda a la espera de un comando `load` por `postMessage`.
@@ -190,7 +191,8 @@ index.html
 ## Decisiones de diseño relevantes
 
 - **Sin framework SPA**: una vista, tal vez dos; Vite + three.js basta.
-- **Materiales dentalizados**: `applyDentalMaterial` aplica un MeshStandardUniform (color `0xd9d5cc`, roughness 0.42) a todo — el visor es para *revisión clínica*, no para presentación artística.
+- **Materiales**: por defecto se conservan los colores y texturas de la exportacion (`?material=dental` aplica el neutral clasico `0xd9d5cc` si se quiere revisar shape puro). Los materiales por defecto sin color se viran a un gris neutro para que se vean sobre el fondo blanco.
+
 - **Normalización agresiva** (`normalizeModel`): hornea transformaciones, recentra en el origen, fusiona mallas opcionales, descarta atributos no posicionales. Simplifica el corte y la medición.
 - **Anotaciones fuera del mesh**: decisión clave para el flujo de trabajo Blender→web (editable sin reexportar).
 - **WASM en `public/`**: decodificadores Draco/Basis servidos estáticos junto al bundle, referenciados con `document.baseURI`. `assetsInlineLimit: 0` en Vite para que no los inlinee.

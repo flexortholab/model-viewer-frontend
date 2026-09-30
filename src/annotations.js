@@ -19,7 +19,9 @@ export function createDocument({ model = '', meta = {} } = {}) {
       date: meta.date ?? new Date().toISOString().slice(0, 10),
       ...meta,
     },
-    section: { enabled: false, capColor: '#c0554a', planes: [] },
+    // Plano unico de corte: punto y normal en mm, coordenadas del modelo
+    // normalizado (centro en el origen).
+    section: { enabled: false, capColor: '#c0554a', point: [0, 0, 0], normal: [0, 0, 1] },
     measurements: [],
     markers: [],
   }
@@ -44,16 +46,22 @@ export function validateDocument(raw) {
     const section = raw.section
     doc.section.enabled = !!section.enabled
     if (typeof section.capColor === 'string') doc.section.capColor = section.capColor
-    if (Array.isArray(section.planes)) {
-      doc.section.planes = section.planes
-        .filter((p) => p && typeof p.axis === 'string')
-        .map((p) => ({
-          axis: p.axis.toLowerCase(),
-          offset: Number.isFinite(p.offset) ? Number(p.offset) : 0,
-          enabled: typeof p.enabled === 'boolean' ? p.enabled : undefined,
-          label: typeof p.label === 'string' ? p.label : undefined,
-        }))
+
+    if (isVec3(section.point) && isVec3(section.normal)) {
+      // Esquema nuevo: un plano unico (punto + normal).
+      doc.section.point = section.point.map(Number)
+      doc.section.normal = section.normal.map(Number)
+    } else if (Array.isArray(section.planes) && section.planes.length) {
+      // Compatibilidad: esquema antiguo por ejes. Se traduce el primer eje
+      // activo (o el primero) a punto+normal conservando la mitad positiva.
+      const legacy = section.planes.find((p) => p?.enabled) ?? section.planes[0]
+      const axis = String(legacy.axis ?? 'y').toLowerCase()
+      const axisVec = axis === 'x' ? [1, 0, 0] : axis === 'z' ? [0, 0, 1] : [0, 1, 0]
+      const offset = Number.isFinite(legacy.offset) ? Number(legacy.offset) : 0
+      doc.section.point = axisVec.map((n) => n * offset)
+      doc.section.normal = axisVec
     }
+    if (typeof section.mode === 'string') doc.section.mode = section.mode
   }
 
   if (Array.isArray(raw.measurements)) {
@@ -76,12 +84,26 @@ export function validateDocument(raw) {
   if (Array.isArray(raw.markers)) {
     doc.markers = raw.markers
       .filter((m) => m && isVec3(m.position))
-      .map((m, i) => ({
-        id: typeof m.id === 'string' && m.id ? m.id : `k${i + 1}`,
-        position: m.position.map(Number),
-        text: String(m.text ?? ''),
-        kind: ['screw', 'note', 'warning'].includes(m.kind) ? m.kind : 'note',
-      }))
+      .map((m, i) => {
+        const marker = {
+          id: typeof m.id === 'string' && m.id ? m.id : `k${i + 1}`,
+          position: m.position.map(Number),
+          text: String(m.text ?? ''),
+          kind: ['screw', 'note', 'warning'].includes(m.kind) ? m.kind : 'note',
+        }
+        if (m.view && isVec3(m.view.position) && isVec3(m.view.target)) {
+          marker.view = { position: m.view.position.map(Number), target: m.view.target.map(Number) }
+        }
+        if (m.section && typeof m.section === 'object') {
+          const s = m.section
+          const snap = { enabled: !!s.enabled }
+          if (typeof s.capColor === 'string') snap.capColor = s.capColor
+          if (isVec3(s.point)) snap.point = s.point.map(Number)
+          if (isVec3(s.normal)) snap.normal = s.normal.map(Number)
+          marker.section = snap
+        }
+        return marker
+      })
   }
 
   return doc

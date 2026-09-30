@@ -1,219 +1,219 @@
 import * as THREE from 'three'
+import { TransformControls } from 'three/addons/controls/TransformControls.js'
 
 /**
- * Cortes seccionales con "capping" solido.
+ * Corte seccional con UN plano unico y gizmo.
  *
- * Un simple clipping plane deja la pieza abierta por dentro: el doctor ve
- * el interior del solide y no puede interpretar la seccion. Para tapar el
- * hueco hay que usar el stencil buffer:
+ * El plano esta anclado al MODELO (es hijo de modelRoot), no a la escena ni a
+ * la camara: girar el foco no desplaza el corte; el corte es propiedad de la
+ * pieza y gira con ella. Se coloca con un gizmo (TransformControls):
  *
- *   1. Se dibuja la geometria con las caras traseras (incrementando el
- *      stencil) y las delanteras (decrementando), recortadas por el plano.
- *      Solo escriben stencil: ni color ni profundidad.
- *   2. El resultado es "hay solido dentro de este plano" (valor distinto
- *      de 0 gracias al wrap del contador).
- *   3. Un quad situado sobre el plano, que solo se pinta donde el stencil
- *      != 0, tapia el hueco con un color solido.
+ *   - Modo MOVER: arrastra el plano por el espacio.
+ *   - Modo ROTAR: gira el plano sobre si mismo (espacio local).
  *
- * Con varios planos, el IncrementWrap hace que la cuenta se componga sola:
- * el capping solo aparece donde el punto queda dentro del solido y en el
- * lado positivo de todos los planos activos.
+ * La superficie de corte se tapa con capping por stencil (caras traseras
+ * incrementan el contador, delanteras lo decrementan y un quad coplanar pinta
+ * donde el contador no es 0): el interior se ve solido, no hueco.
+ *
+ * El plano de recorte es una instancia mutable: mover el gizmo solo actualiza
+ * su normal/constante y three.js recarga los uniforms en el siguiente render,
+ * asi que arrastrar no reconstruye nada.
  */
-
-// Normales positivas: el plano en `offset` conserva la mitad hacia +eje.
-const AXES = {
-  x: new THREE.Vector3(1, 0, 0),
-  y: new THREE.Vector3(0, 1, 0),
-  z: new THREE.Vector3(0, 0, 1),
-}
-
-const round = (n, decimals = 4) => {
-  const f = 10 ** decimals
-  return Math.round(n * f) / f
-}
-
-export const AXIS_LABELS = {
-  x: 'Coronal (izq-der)',
-  y: 'Axial / horizontal',
-  z: 'Sagital (ant-post)',
-}
-
-export class SectionTool {
+export class SectionPlaneTool {
   /**
    * @param {THREE.WebGLRenderer} renderer
-   * @param {{modelRoot: THREE.Object3D, meshes: THREE.Mesh[], size: THREE.Vector3}} ctx
+   * @param {{
+   *   scene: THREE.Object3D,
+   *   modelRoot: THREE.Object3D,
+   *   meshes: THREE.Mesh[],
+   *   camera: THREE.Camera,
+   *   controls: {enabled: boolean},
+   *   onChange: () => void,
+   * }} ctx
    */
-  constructor(renderer, { modelRoot, meshes, size }) {
+  constructor(renderer, { scene, modelRoot, meshes, camera, controls, onChange }) {
     this.renderer = renderer
+    this.scene = scene
     this.modelRoot = modelRoot
     this.meshes = meshes
-    this.size = size.clone()
-    this.radius = this.size.length() * 0.75 + 10
+    this.camera = camera
+    this.controls = controls
+    this.onChange = onChange
 
-    this.capColor = 0xc0554a
     this.enabled = false
-    /**
-     * Cada plano lleva su propio interruptor: el corte axial, sagital y coronal
-     * son cortes distintos y a menudo solo interesa uno. El interruptor global
-     * apaga y enciende el juego completo sin perder los offsets.
-     * @type {Array<{axis:'x'|'y'|'z', offset:number, enabled:boolean, label:string, color:number}>}
-     */
-    this.planes = [
-      { axis: 'y', offset: 0, enabled: true, label: 'Axial', color: 0xc0554a },
-      { axis: 'z', offset: 0, enabled: false, label: 'Sagital', color: 0x4a7fc0 },
-      { axis: 'x', offset: 0, enabled: false, label: 'Coronal', color: 0x4a9a63 },
-    ]
-    this.active = []
+    this.mode = 'translate'
+    this.capColor = 0xc0554a
+
+    // Tamano del visual: envuelve la pieza con margen.
+    const box = new THREE.Box3()
+    for (const mesh of meshes) {
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox()
+      box.union(mesh.geometry.boundingBox)
+    }
+    this.radius = Math.max(box.getSize(new THREE.Vector3()).length() * 0.65, 12)
+
+    // Nodo anclado al modelo, manipulado por el gizmo.
+    this.gizmo = new THREE.Group()
+    this.gizmo.name = 'section-plane'
+    modelRoot.add(this.gizmo)
+
+    // Visual del plano: disco translucido + anillo de borde.
+    this.planeMesh = new THREE.Mesh(
+      new THREE.CircleGeometry(this.radius, 64),
+      new THREE.MeshBasicMaterial({
+        color: this.capColor,
+        transparent: true,
+        opacity: 0.14,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    )
+    this.planeMesh.renderOrder = 4
+    this.planeMesh.raycast = () => {}
+    this.gizmo.add(this.planeMesh)
+
+    this.ringMesh = new THREE.Mesh(
+      new THREE.RingGeometry(this.radius * 0.985, this.radius, 96),
+      new THREE.MeshBasicMaterial({
+        color: this.capColor,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    )
+    this.ringMesh.renderOrder = 5
+    this.ringMesh.raycast = () => {}
+    this.gizmo.add(this.ringMesh)
+
+    // Tapa (quad coplanar con el corte) y mallas de stencil.
+    this.capGroup = new THREE.Group()
+    this.capGroup.name = 'section-caps'
+    this.gizmo.add(this.capGroup)
 
     this.stencilGroup = new THREE.Group()
     this.stencilGroup.name = 'section-stencils'
-    this.capGroup = new THREE.Group()
-    this.capGroup.name = 'section-caps'
-    modelRoot.add(this.stencilGroup, this.capGroup)
+    modelRoot.add(this.stencilGroup)
 
-    this.capGeometry = new THREE.PlaneGeometry(this.radius * 2, this.radius * 2)
-    this._clippingPlanes = []
+    // Plano mutable: se refresca al mover el gizmo.
+    this.plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0)
+    this._clippingPlanes = [this.plane]
+
+    this._capGeometry = new THREE.PlaneGeometry(this.radius * 1.9, this.radius * 1.9)
+    this._capMesh = null
+    this._stencilBack = null
+    this._stencilFront = null
+    this._stencilMeshes = []
+
+    // Gizmo de transformaciones.
+    this.transform = new TransformControls(camera, renderer.domElement)
+    this.transform.attach(this.gizmo)
+    this._gizmoHelper = this.transform.getHelper ? this.transform.getHelper() : this.transform
+    scene.add(this._gizmoHelper)
+    this._onGizmoChange = () => {
+      if (this.enabled) this.apply()
+      this.onChange?.()
+    }
+    this.transform.addEventListener('change', this._onGizmoChange)
+    this.transform.addEventListener('dragging-changed', (event) => {
+      // Mientras se arrastra el gizmo, la orbita debe estar quieta.
+      if (this.controls) this.controls.enabled = !event.value
+    })
+    this.transform.visible = false
+    this.transform.enabled = false
+    this._gizmoHelper.visible = false
   }
 
-  axisRange(axis) {
-    const key = axis.toLowerCase()
-    const half = this.size[key] / 2
-    return { min: -half, max: half, half }
+  /** Espacio del gizmo: trasladar en mundo, rotar local al plano. */
+  setMode(mode) {
+    this.mode = mode === 'rotate' ? 'rotate' : 'translate'
+    this.transform.setSpace?.(this.mode === 'rotate' ? 'local' : 'world')
+  }
+
+  getMode() {
+    return this.mode
   }
 
   setCapColor(hex) {
     this.capColor = hex
-    for (const cap of this.capGroup.children) {
-      cap.material.color.setHex(hex)
-    }
-  }
-
-  /**
-   * Fusiona una lista de planos con la configuracion actual.
-   *
-   * No reemplaza la lista: los tres ejes (axial, sagital, coronal) existen
-   * siempre y cada uno guarda su offset y su interruptor. Si el archivo de
-   * anotaciones solo menciona el eje sagital, el axial conserva lo que tenia
-   * en vez de desaparecer.
-   */
-  configure(planes) {
-    const touched = new Set()
-    for (const entry of planes ?? []) {
-      const axis = String(entry.axis ?? '').toLowerCase()
-      if (!AXES[axis]) continue
-      touched.add(axis)
-      const base = this.planes.find((p) => p.axis === axis)
-      if (!base) {
-        this.planes.push({
-          axis,
-          offset: 0,
-          enabled: entry.enabled !== false,
-          label: entry.label ?? AXIS_LABELS[axis],
-          color: entry.color ?? 0xc0554a,
-        })
-        continue
-      }
-      if (Number.isFinite(entry.offset)) base.offset = entry.offset
-      if (typeof entry.enabled === 'boolean') base.enabled = entry.enabled
-      if (typeof entry.label === 'string' && entry.label) base.label = entry.label
-      if (Number.isFinite(entry.color)) base.color = entry.color
-    }
-    // Un documento que solo lista un eje desactiva los demas: si el archivo
-    // dice "corte axial activo", el sagital no debe aparecer de la nada.
-    if (touched.size && touched.size < this.planes.length) {
-      for (const plane of this.planes) {
-        if (!touched.has(plane.axis)) plane.enabled = false
-      }
-    }
-    return this.planes
-  }
-
-  setOffset(axis, offset) {
-    const plane = this.planes.find((p) => p.axis === axis)
-    if (!plane) return
-    plane.offset = offset
-    if (this.enabled) this.apply()
-  }
-
-  /** Enciende o apaga un eje concreto sin tocar los demas. */
-  setAxisEnabled(axis, enabled) {
-    const plane = this.planes.find((p) => p.axis === axis)
-    if (!plane) return
-    plane.enabled = !!enabled
-    if (this.enabled) this.apply()
-  }
-
-  isAxisEnabled(axis) {
-    return !!this.planes.find((p) => p.axis === axis)?.enabled
+    this.planeMesh.material.color.setHex(hex)
+    this.ringMesh.material.color.setHex(hex)
   }
 
   setEnabled(enabled) {
     this.enabled = !!enabled
+    this.transform.visible = this.enabled
+    this.transform.enabled = this.enabled
+    this._gizmoHelper.visible = this.enabled
     this.apply()
   }
 
-  /** Recalcula planos, materiales y capping. */
+  /** Posiciona el gizmo desde una especificacion {point, normal}. */
+  setPlane({ point, normal } = {}) {
+    if (Array.isArray(point)) this.gizmo.position.fromArray(point)
+    if (Array.isArray(normal)) {
+      const n = new THREE.Vector3(...normal)
+      if (n.lengthSq() > 1e-12 && Number.isFinite(n.x)) {
+        this.gizmo.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n.normalize())
+      }
+    }
+    if (this.enabled) this.apply()
+    this.onChange?.()
+  }
+
+  /** Centra el plano en la pieza y lo orienta perpendicular a la vista. */
+  reset(camera) {
+    const cam = camera ?? this.camera
+    const viewDir = new THREE.Vector3()
+    cam.getWorldDirection(viewDir)
+    this.gizmo.position.set(0, 0, 0)
+    // La normal (Z local) apunta HACIA la camara: conservamos la mitad cercana.
+    this.gizmo.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      viewDir.clone().normalize(),
+    )
+    if (this.enabled) this.apply()
+    this.onChange?.()
+  }
+
+  /** Recalcula el plano de recorte a partir de la posicion del gizmo. */
+  _syncPlane() {
+    this.gizmo.updateMatrixWorld(true)
+    this.plane.normal.set(0, 0, 1).applyQuaternion(this.gizmo.quaternion)
+    this.plane.constant = -this.gizmo.position.dot(this.plane.normal)
+  }
+
   apply() {
-    this.dispose(false)
+    this._syncPlane()
+    const planes = this.enabled ? this._clippingPlanes : null
+    this._setClipping(planes)
+    if (this.enabled) {
+      this._buildStencil()
+    } else {
+      this._teardownStencil()
+    }
+    this.renderer.localClippingEnabled = true
+  }
 
-    const planes = this.enabled ? this.planes.filter((p) => p.enabled) : []
-    this._clippingPlanes = planes.map((p) => {
-      const plane = new THREE.Plane()
-      const normal = AXES[p.axis].clone()
-      plane.setFromNormalAndCoplanarPoint(normal, normal.clone().multiplyScalar(p.offset))
-      plane.userData = { axis: p.axis, offset: p.offset, label: p.label }
-      return plane
-    })
-
-    // El modelo se recorta con los mismos planos.
+  _setClipping(planes) {
     for (const mesh of this.meshes) {
       const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
       for (const material of list) {
-        material.clippingPlanes = planes.length ? this._clippingPlanes : null
+        material.clippingPlanes = planes
         material.clipShadows = true
         material.needsUpdate = true
       }
     }
-
-    if (!planes.length) {
-      this.renderer.localClippingEnabled = true
-      return
-    }
-
-    planes.forEach((plane, i) => {
-      this.stencilGroup.add(this._stencilGroup(plane, i + 1))
-
-      const others = this._clippingPlanes.filter((p) => p !== plane)
-      const capMaterial = new THREE.MeshStandardMaterial({
-        color: plane.color,
-        metalness: 0.08,
-        roughness: 0.72,
-        side: THREE.DoubleSide,
-        // El capping de este plano deberespectar los demas planos activos,
-        // si no la superficie tapa regiones que ya estan recortadas.
-        clippingPlanes: others,
-        stencilWrite: true,
-        stencilRef: 0,
-        stencilFunc: THREE.NotEqualStencilFunc,
-        stencilFail: THREE.ReplaceStencilOp,
-        stencilZFail: THREE.ReplaceStencilOp,
-        stencilZPass: THREE.ReplaceStencilOp,
-      })
-      const cap = new THREE.Mesh(this.capGeometry, capMaterial)
-      cap.name = `cap-${plane.axis}`
-      cap.renderOrder = i + 1.1
-      cap.onAfterRender = (renderer) => renderer.clearStencil()
-      cap.userData.section = plane
-      this.capGroup.add(cap)
-    })
-
-    this.renderer.localClippingEnabled = true
-    this.active = this._clippingPlanes
-    this._syncCaps()
   }
 
-  _stencilGroup(plane, renderOrder) {
-    const group = new THREE.Group()
+  _buildStencil() {
+    this._teardownStencil()
+
+    const visibleMeshes = this.meshes.filter(
+      (m) => m.visible && !(Array.isArray(m.material) && m.material.some((mat) => mat.visible === false)),
+    )
+    if (!visibleMeshes.length) return
+
     const base = new THREE.MeshBasicMaterial()
     base.depthWrite = false
     base.depthTest = false
@@ -221,109 +221,141 @@ export class SectionTool {
     base.stencilWrite = true
     base.stencilFunc = THREE.AlwaysStencilFunc
 
-    const back = base.clone()
-    back.side = THREE.BackSide
-    back.clippingPlanes = [plane]
-    back.stencilFail = THREE.IncrementWrapStencilOp
-    back.stencilZFail = THREE.IncrementWrapStencilOp
-    back.stencilZPass = THREE.IncrementWrapStencilOp
+    this._stencilBack = base.clone()
+    this._stencilBack.side = THREE.BackSide
+    this._stencilBack.clippingPlanes = this._clippingPlanes
+    this._stencilBack.stencilFail = THREE.IncrementWrapStencilOp
+    this._stencilBack.stencilZFail = THREE.IncrementWrapStencilOp
+    this._stencilBack.stencilZPass = THREE.IncrementWrapStencilOp
 
-    const front = base.clone()
-    front.side = THREE.FrontSide
-    front.clippingPlanes = [plane]
-    front.stencilFail = THREE.DecrementWrapStencilOp
-    front.stencilZFail = THREE.DecrementWrapStencilOp
-    front.stencilZPass = THREE.DecrementWrapStencilOp
+    this._stencilFront = base.clone()
+    this._stencilFront.side = THREE.FrontSide
+    this._stencilFront.clippingPlanes = this._clippingPlanes
+    this._stencilFront.stencilFail = THREE.DecrementWrapStencilOp
+    this._stencilFront.stencilZFail = THREE.DecrementWrapStencilOp
+    this._stencilFront.stencilZPass = THREE.DecrementWrapStencilOp
 
-    for (const mesh of this.meshes) {
-      if (!mesh.visible) continue
-      const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-      if (list.some((m) => m.visible === false)) continue
-      const backMesh = new THREE.Mesh(mesh.geometry, back)
-      backMesh.renderOrder = renderOrder
-      const frontMesh = new THREE.Mesh(mesh.geometry, front)
-      frontMesh.renderOrder = renderOrder
-      group.add(backMesh, frontMesh)
+    for (const mesh of visibleMeshes) {
+      const backMesh = new THREE.Mesh(mesh.geometry, this._stencilBack)
+      backMesh.renderOrder = 1
+      backMesh.raycast = () => {}
+      const frontMesh = new THREE.Mesh(mesh.geometry, this._stencilFront)
+      frontMesh.renderOrder = 1
+      frontMesh.raycast = () => {}
+      this.stencilGroup.add(backMesh, frontMesh)
+      this._stencilMeshes.push(backMesh, frontMesh)
     }
-    return group
-  }
 
-  _syncCaps() {
-    this.active.forEach((plane, i) => {
-      const cap = this.capGroup.children[i]
-      if (!cap) return
-      plane.coplanarPoint(cap.position)
-      cap.lookAt(
-        cap.position.x - plane.normal.x,
-        cap.position.y - plane.normal.y,
-        cap.position.z - plane.normal.z,
-      )
-      cap.updateMatrix()
+    const capMaterial = new THREE.MeshStandardMaterial({
+      color: this.capColor,
+      metalness: 0.08,
+      roughness: 0.72,
+      side: THREE.DoubleSide,
+      stencilWrite: true,
+      stencilRef: 0,
+      stencilFunc: THREE.NotEqualStencilFunc,
+      stencilFail: THREE.ReplaceStencilOp,
+      stencilZFail: THREE.ReplaceStencilOp,
+      stencilZPass: THREE.ReplaceStencilOp,
+      depthWrite: true,
     })
+    this._capMesh = new THREE.Mesh(this._capGeometry, capMaterial)
+    this._capMesh.name = 'section-cap'
+    // Un pelin por delante del plano (hacia +Z local) para ganar la prueba de
+    // profundidad contra la geometria recortada.
+    this._capMesh.position.z = 0.015
+    this._capMesh.renderOrder = 2
+    this._capMesh.raycast = () => {}
+    this._capMesh.onAfterRender = (renderer) => renderer.clearStencil()
+    this.capGroup.add(this._capMesh)
   }
 
-  /** Un punto queda "dentro" si esta del lado positivo de todos los planos. */
+  _teardownStencil() {
+    for (const mesh of this._stencilMeshes) this.stencilGroup.remove(mesh)
+    this._stencilMeshes = []
+    this._stencilBack?.dispose()
+    this._stencilFront?.dispose()
+    this._stencilBack = null
+    this._stencilFront = null
+    if (this._capMesh) {
+      this._capMesh.material.dispose()
+      this.capGroup.remove(this._capMesh)
+      this._capMesh = null
+    }
+  }
+
+  /** Cambio de visibilidad/geometria: reconstruir stencil. */
+  refreshMeshes(meshes) {
+    this.meshes = meshes
+    if (this.enabled) {
+      this._buildStencil()
+    }
+  }
+
+  /** Un punto queda "dentro" si esta del lado positivo de la normal. */
   isPointVisible(point) {
     if (!this.enabled) return true
-    return this._clippingPlanes.every((plane) => plane.distanceToPoint(point) >= 0)
+    this._syncPlane()
+    return this.plane.distanceToPoint(point) >= 0
   }
 
-  distanceToPoint(point) {
-    if (!this.enabled) return Infinity
-    return Math.max(...this._clippingPlanes.map((plane) => -plane.distanceToPoint(point)))
+  /** ¿El plano en su posicion actual roza la caja de la pieza? */
+  planeIntersectsBounds() {
+    if (!this.enabled) return true
+    this._syncPlane()
+    const box = new THREE.Box3()
+    for (const mesh of this.meshes) {
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox()
+      box.union(mesh.geometry.boundingBox)
+    }
+    if (box.isEmpty()) return false
+    return this.plane.intersectsBox(box)
   }
 
   serialize() {
+    this._syncPlane()
+    const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(this.gizmo.quaternion)
     return {
       enabled: this.enabled,
       capColor: `#${this.capColor.toString(16).padStart(6, '0')}`,
-      planes: this.planes.map((p) => ({
-        axis: p.axis,
-        offset: round(p.offset),
-        enabled: p.enabled,
-        label: p.label,
-      })),
+      point: [round(this.gizmo.position.x), round(this.gizmo.position.y), round(this.gizmo.position.z)],
+      normal: [round(normal.x), round(normal.y), round(normal.z)],
+      mode: this.mode,
     }
   }
 
   restore(data) {
-    if (!data) return
-    if (data.capColor) {
+    if (!data || typeof data !== 'object') return
+    if (typeof data.capColor === 'string') {
       const hex = Number.parseInt(String(data.capColor).replace('#', ''), 16)
-      if (Number.isFinite(hex)) this.capColor = hex
+      if (Number.isFinite(hex)) this.setCapColor(hex)
     }
-    if (Array.isArray(data.planes) && data.planes.length) this.configure(data.planes)
-    this.enabled = !!data.enabled
-    this.apply()
+    if (data.point || data.normal) {
+      this.setPlane({ point: data.point, normal: data.normal })
+    }
+    this.setEnabled(!!data.enabled)
+    if (typeof data.mode === 'string') this.setMode(data.mode)
   }
 
-  /**
-   * El plano se situa a `offset` mm del centro de la pieza sobre el eje dado,
-   * y se conserva la mitad hacia +eje. Devuelve true si el plano toca la
-   * geometria, para avisar de que el corte cae fuera de la pieza.
-   */
-  planeIntersectsBounds(axis, offset) {
-    const half = this.size[axis] / 2
-    return offset >= -half && offset <= half
-  }
-
-  dispose(full = true) {
-    this.stencilGroup.traverse((o) => {
-      if (o.isMesh) o.material.dispose()
-    })
-    this.capGroup.traverse((o) => {
-      if (o.isMesh) o.material.dispose()
-    })
-    this.stencilGroup.clear()
-    this.capGroup.clear()
-    this.active = []
-
-    for (const mesh of this.meshes) {
-      const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-      for (const material of list) material.clippingPlanes = null
-    }
-    if (full) this.capGeometry.dispose()
+  dispose() {
+    this.transform.removeEventListener('change', this._onGizmoChange)
+    this.transform.detach()
+    this.transform.dispose?.()
+    if (this._gizmoHelper.parent) this._gizmoHelper.parent.remove(this._gizmoHelper)
+    this._teardownStencil()
+    this._capGeometry.dispose()
+    this.planeMesh.geometry.dispose()
+    this.planeMesh.material.dispose()
+    this.ringMesh.geometry.dispose()
+    this.ringMesh.material.dispose()
+    this.gizmo.removeFromParent()
+    this.stencilGroup.removeFromParent()
   }
 }
 
-export { AXES }
+export { SectionPlaneTool as default }
+
+function round(n, decimals = 4) {
+  const f = 10 ** decimals
+  return Math.round(n * f) / f
+}

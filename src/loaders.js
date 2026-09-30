@@ -244,3 +244,26 @@ export function applyDentalMaterial(meshes, options = {}) {
     }
   }
 }
+
+/**
+ * Prepara los materiales de una exportacion a color SIN recolorearlos:
+ * conserva el color/texturas del GLB/FBX, solo arregla los detalles que
+ * afectan a la revision (doble cara y materiales por defecto virados a un
+ * gris neutro para que se vean sobre fondo blanco).
+ */
+export function prepareMaterialsForReview(meshes) {
+  for (const mesh of meshes) {
+    mesh.castShadow = true
+    mesh.receiveShadow = true
+    mesh.material.clippingPlanes = null
+    const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    for (const material of list) {
+      if (!material.map && 'color' in material && material.color?.getHex() === 0xffffff) {
+        // Material virgen (STL procedural/cad): gris neutro para verlo sobre blanco.
+        material.color.setHex(0xc9c4bc)
+      }
+      material.side = THREE.DoubleSide
+      material.needsUpdate = true
+    }
+  }
+}

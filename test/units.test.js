@@ -93,10 +93,45 @@ test('un documento de anotaciones valido se conserva', () => {
   assert.equal(doc.model, '/casos/1/disyuntor.glb')
   assert.equal(doc.meta.doctor, 'Dra. Perez')
   assert.equal(doc.section.enabled, true)
-  assert.equal(doc.section.planes[0].axis, 'y', 'normaliza el eje a minusculas')
-  assert.equal(doc.section.planes[0].offset, 2.5)
+  // El bloque legacy por ejes se traduce a punto + normal (mitad positiva).
+  assert.deepEqual(doc.section.normal, [0, 1, 0])
+  assert.deepEqual(
+    doc.section.point,
+    [0, 2.5, 0],
+    'el offset legacy se traduce a posicion del plano',
+  )
   assert.equal(doc.measurements[0].note, 'ancho')
   assert.equal(doc.markers[0].kind, 'screw')
+})
+
+test('el nuevo esquema de corte (punto + normal) se conserva', () => {
+  const doc = validateDocument({
+    section: { enabled: true, point: [1, -2, 3], normal: [0.7, 0.7, 0] },
+  })
+  assert.deepEqual(doc.section.point, [1, -2, 3])
+  assert.deepEqual(doc.section.normal, [0.7, 0.7, 0])
+})
+
+test('los marcadores conservan el snapshot de presentacion', () => {
+  const doc = validateDocument({
+    markers: [
+      {
+        position: [1, 2, 3],
+        text: 'paso 1',
+        view: { position: [10, 5, 30], target: [0, 0, 0] },
+        section: { enabled: true, point: [0, 0, 1], normal: [0, 0, 1] },
+      },
+    ],
+  })
+  assert.deepEqual(doc.markers[0].view, { position: [10, 5, 30], target: [0, 0, 0] })
+  assert.equal(doc.markers[0].section.enabled, true)
+  assert.deepEqual(doc.markers[0].section.point, [0, 0, 1])
+})
+
+test('un documento sin snapshot de marcador sigue siendo valido', () => {
+  const doc = validateDocument({ markers: [{ position: [0, 0, 0] }] })
+  assert.equal(doc.markers[0].view, undefined)
+  assert.equal(doc.markers[0].section, undefined)
 })
 
 test('las mediciones invalidas se descartan sin romper el resto', () => {

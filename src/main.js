@@ -11,12 +11,23 @@ const hint = document.getElementById('hint')
 const panel = document.getElementById('panel')
 const sectionEnabled = document.getElementById('section-enabled')
 const capColor = document.getElementById('cap-color')
+const objectsPanel = document.getElementById('objects-panel')
+const objectsCount = document.getElementById('objects-count')
+const objectsList = document.getElementById('objects-list')
+const markersPanel = document.getElementById('markers-panel')
+const markersCount = document.getElementById('markers-count')
+const markersList = document.getElementById('markers-list')
+
+const EYE_ON = '\u{1F441}'
+const EYE_OFF = '\u{1F441}\u{200D}\u{1F5E8}'
 
 const viewer = new DentalViewer(container, { labelLayer })
 const bridge = createBridge({ onCommand: handleHostCommand })
 
 let currentModel = null
 let forcedUnits = null
+/** 'keep' (colores de la exportacion) | 'dental' (material uniforme clasico) */
+let materialMode = 'keep'
 
 // --- Estado ----------------------------------------------------------------
 
@@ -44,29 +55,109 @@ function showUnitsBadge(units) {
     : `Archivo en ${units.units} (max ${units.rawMaxDim.toFixed(3)}), escalado x${units.scale}`
 }
 
+// --- Paneles ---------------------------------------------------------------
+
+function panelVisibility(visible) {
+  panel.hidden = !visible
+  objectsPanel.hidden = !visible
+  markersPanel.hidden = !visible
+}
+
+function togglePanelContent(panelEl, listEl) {
+  panelEl.classList.toggle('is-collapsed')
+  const button = panelEl.querySelector('.panel-toggle')
+  button.textContent = panelEl.classList.contains('is-collapsed') ? '+' : '-'
+}
+
+// --- Corte seccional --------------------------------------------------------
+
 function syncSectionUI() {
   if (!viewer.section) return
   const state = viewer.section.serialize()
   sectionEnabled.checked = state.enabled
-
-  for (const plane of state.planes) {
-    const input = document.querySelector(`input[data-axis="${plane.axis}"]`)
-    const output = document.querySelector(`output[data-axis-output="${plane.axis}"]`)
-    const check = document.querySelector(`input[data-axis-check="${plane.axis}"]`)
-    const row = input?.closest('.axis')
-    if (!input || !output) continue
-    const range = viewer.sectionAxisRange(plane.axis)
-    input.min = range.min.toFixed(2)
-    input.max = range.max.toFixed(2)
-    input.value = String(plane.offset)
-    output.textContent = formatMm(plane.offset, 1)
-    if (check) check.checked = plane.enabled
-    row?.classList.toggle('is-off', !plane.enabled)
+  for (const button of document.querySelectorAll('[data-gizmo]')) {
+    button.setAttribute('aria-pressed', String(viewer.section.getMode() === button.dataset.gizmo))
   }
+  capColor.value = state.capColor
+  const fuera = state.enabled && !viewer.section.planeIntersectsBounds()
+  panel.classList.toggle('is-outside', fuera)
+  if (fuera) showHint('El plano de corte no toca la pieza', 2200)
 }
 
-function panelVisibility(visible) {
-  panel.hidden = !visible
+// --- Lista de objetos --------------------------------------------------------
+
+function renderObjects() {
+  const objects = viewer.listObjects()
+  objectsCount.textContent = objects.length > 1 ? `${objects.length} piezas` : '1 pieza'
+  objectsList.innerHTML = ''
+  objects.forEach((object) => {
+    const li = document.createElement('li')
+    li.className = 'obj-item' + (object.visible ? '' : ' is-hidden')
+
+    const eye = document.createElement('button')
+    eye.type = 'button'
+    eye.className = 'obj-eye' + (object.visible ? '' : ' is-off')
+    eye.textContent = object.visible ? EYE_ON : EYE_OFF
+    eye.title = object.visible ? 'Ocultar' : 'Mostrar'
+    eye.setAttribute('aria-pressed', String(object.visible))
+    eye.addEventListener('click', () => {
+      viewer.setMeshVisible(object.index, !object.visible)
+      renderObjects()
+    })
+
+    const name = document.createElement('span')
+    name.className = 'obj-name'
+    name.textContent = object.name
+
+    const tris = document.createElement('span')
+    tris.className = 'obj-tris'
+    tris.textContent = `${object.triangles.toLocaleString('es')} tri`
+
+    li.append(eye, name, tris)
+    objectsList.append(li)
+  })
+}
+
+// --- Presentacion (marcadores) --------------------------------------------
+
+function renderMarkers() {
+  const markers = viewer.doc.markers ?? []
+  markersCount.textContent = markers.length ? `${markers.length}` : ''
+  markersList.innerHTML = ''
+  markers.forEach((marker, index) => {
+    const li = document.createElement('li')
+    li.className = 'marker-item'
+    li.dataset.kind = marker.kind
+    li.title = 'Pulsa para mostrar el caso en el estado guardado'
+
+    const idx = document.createElement('span')
+    idx.className = 'marker-idx'
+    idx.textContent = String(index + 1)
+
+    const text = document.createElement('span')
+    text.className = 'marker-text' + (marker.text ? '' : ' is-empty')
+    text.textContent = marker.text || `Paso ${index + 1}`
+
+    li.append(idx, text)
+
+    const del = document.createElement('button')
+    del.type = 'button'
+    del.className = 'marker-delete'
+    del.textContent = '\u00d7'
+    del.title = 'Eliminar marcador'
+    del.addEventListener('click', () => {
+      viewer.removeMarker(marker.id)
+      renderMarkers()
+    })
+    li.append(del)
+
+    li.addEventListener('click', (event) => {
+      if (event.target.closest('.marker-delete')) return
+      const result = viewer.focusMarker(marker.id)
+      if (result) showHint(`Paso ${index + 1}${result.text ? `: ${result.text}` : ''}`, 3200)
+    })
+    markersList.append(li)
+  })
 }
 
 // --- Eventos del visor -----------------------------------------------------
@@ -80,12 +171,19 @@ viewer.on('loaded', (info) => {
     `${info.stats.triangles.toLocaleString('es')} tri · ${x} × ${y} × ${z} mm`,
   )
   syncSectionUI()
+  renderObjects()
+  renderMarkers()
   bridge.loaded(info)
 })
 
 viewer.on('changed', (doc) => {
   bridge.changed(doc)
+  renderMarkers()
 })
+
+viewer.on('markers', () => renderMarkers())
+
+viewer.on('objects', () => renderObjects())
 
 viewer.on('progress', ({ fraction, phase }) => {
   if (phase === 'loading' && Number.isFinite(fraction)) {
@@ -93,15 +191,7 @@ viewer.on('progress', ({ fraction, phase }) => {
   }
 })
 
-viewer.on('section', (state) => {
-  syncSectionUI()
-  const fuera = state.planes.filter(
-    (plane) => plane.enabled && !viewer.section.planeIntersectsBounds(plane.axis, plane.offset),
-  )
-  if (fuera.length) {
-    showHint(`El corte ${fuera.map((p) => p.axis.toUpperCase()).join(', ')} cae fuera de la pieza`, 2200)
-  }
-})
+viewer.on('section', () => syncSectionUI())
 
 viewer.on('measure-pick', () => showHint('Segundo punto para completar la medida', 4000))
 
@@ -115,7 +205,12 @@ viewer.on('error', (error) => {
 async function loadModel(url, options = {}) {
   setStatus('Cargando modelo…')
   forcedUnits = options.forcedUnits ?? forcedUnits
-  const info = await viewer.load(url, { forcedUnits, merge: options.merge ?? true })
+  if (typeof options.material === 'string') materialMode = options.material
+  const info = await viewer.load(url, {
+    forcedUnits,
+    merge: options.merge ?? false,
+    keepMaterials: materialMode !== 'dental',
+  })
   if (options.annotations) await applyAnnotations(options.annotations)
   return info
 }
@@ -173,7 +268,7 @@ function toggleMarkerTool() {
   }
   container.classList.toggle('is-marking', markerMode)
   document.querySelector('[data-action="add-marker"]')?.setAttribute('aria-pressed', String(markerMode))
-  showHint(markerMode ? 'Marcador: pulsa un punto de la pieza' : '')
+  showHint(markerMode ? 'Marcador: pulsa un punto de la pieza (guarda vista y corte actuales)' : '')
 }
 
 function addMarkerAt(event) {
@@ -187,30 +282,35 @@ function addMarkerAt(event) {
   const kindInput = (window.prompt("Clase del marcador: 'note', 'warning' o 'screw':", 'note') ?? '').trim()
   const kind = ['warning', 'screw'].includes(kindInput) ? kindInput : 'note'
   viewer.addMarker({ position: hit.point.toArray(), text, kind })
-  showHint('Marcador añadido' + (text ? `: ${text}` : ''))
+  showHint('Paso guardado' + (text ? `: ${text}` : ''))
 }
 
 // --- Comandos del webclip --------------------------------------------------
 
 const ACTIONS = {
-  async load({ model, annotations, units, merge }) {
+  async load({ model, annotations, units, merge, material }) {
     forcedUnits = units ?? null
-    await loadModel(model, { annotations, forcedUnits: units, merge })
+    await loadModel(model, { annotations, forcedUnits: units, merge, material })
   },
   async annotations(payload) {
     await applyAnnotations(payload.annotations ?? payload)
   },
   section(payload) {
-    viewer.setSection(payload)
+    viewer.setSection(payload ?? {})
+    syncSectionUI()
+  },
+  sectionPlane({ enabled, point, normal, mode }) {
+    viewer.setSectionMode?.(mode)
+    viewer.setSection({ enabled, plane: { point, normal } })
     syncSectionUI()
   },
   sectionAxis({ axis, offset }) {
     viewer.setSectionAxis(axis, offset, { enable: true })
     syncSectionUI()
   },
-  sectionAxisEnabled({ axis, enabled }) {
-    viewer.setSectionAxisEnabled(axis, enabled)
-    syncSectionUI()
+  sectionAxisEnabled() {},
+  objects({ index, visible }) {
+    viewer.setMeshVisible(Number(index), !!visible)
   },
   tool({ tool }) {
     toggleMeasure()
@@ -234,12 +334,21 @@ const ACTIONS = {
   clearMeasurements() {
     viewer.measure?.clear()
   },
-  marker({ position, text, kind }) {
+  marker({ position, text, kind, snapshot }) {
     if (!Array.isArray(position)) throw new Error('marker: falta position (array de 3)')
-    return viewer.addMarker({ position, text, kind })
+    return viewer.addMarker({ position, text, kind, snapshot: snapshot === true || snapshot === undefined })
   },
   clearMarkers() {
     viewer.clearMarkers()
+    renderMarkers()
+  },
+  focusMarker({ id }) {
+    const result = viewer.focusMarker(String(id))
+    if (result) {
+      syncSectionUI()
+      bridge.post('markers', { markers: viewer.doc.markers, focused: id })
+    }
+    return result
   },
   getAnnotations() {
     bridge.post('annotations', { annotations: viewer.getAnnotations() })
@@ -281,23 +390,32 @@ document.getElementById('toolbar').addEventListener('click', (event) => {
     case 'measure':
       toggleMeasure()
       break
-    case 'clear-measurements':
-      viewer.measure?.clear()
-      showHint('Medidas borradas')
-      break
     case 'add-marker':
       toggleMarkerTool()
       break
     case 'clear-markers':
       viewer.clearMarkers()
+      renderMarkers()
       showHint('Marcadores borrados')
+      break
+    case 'clear-measurements':
+      viewer.measure?.clear()
+      showHint('Medidas borradas')
       break
     case 'export':
       exportAnnotations()
       break
     case 'toggle-panel':
-      panel.classList.toggle('is-collapsed')
-      button.textContent = panel.classList.contains('is-collapsed') ? '+' : '–'
+      togglePanelContent(panel)
+      break
+    case 'toggle-objects':
+      togglePanelContent(objectsPanel)
+      break
+    case 'toggle-markers':
+      togglePanelContent(markersPanel)
+      break
+    case 'section-reset':
+      viewer.resetSectionPlane()
       break
   }
 })
@@ -306,53 +424,30 @@ sectionEnabled.addEventListener('change', () => {
   viewer.setSection({ enabled: sectionEnabled.checked })
   showHint(
     sectionEnabled.checked
-      ? 'Corte seccional activo'
-      : 'Corte seccional desactivado (se conservan las posiciones)',
+      ? 'Corte activo: mueve/rota el plano con el gizmo'
+      : 'Corte desactivado (se conserva la posicion del plano)',
   )
 })
+
+for (const button of document.querySelectorAll('[data-gizmo]')) {
+  button.addEventListener('click', () => {
+    viewer.setSectionMode(button.dataset.gizmo)
+    syncSectionUI()
+    showHint(button.dataset.gizmo === 'rotate' ? 'Gizmo en modo rotar: gira el plano' : 'Gizmo en modo mover: arrastra el plano')
+  })
+}
 
 capColor.addEventListener('input', () => {
   viewer.setCapColor(Number.parseInt(capColor.value.slice(1), 16))
 })
 
-for (const input of document.querySelectorAll('input[data-axis]')) {
-  input.addEventListener('input', () => {
-    const axis = input.dataset.axis
-    const offset = Number(input.value)
-    document.querySelector(`output[data-axis-output="${axis}"]`).textContent = formatMm(offset, 1)
-    viewer.setSectionAxis(axis, offset, { enable: true })
-    if (!sectionEnabled.checked) {
-      sectionEnabled.checked = true
-      viewer.setSection({ enabled: true })
-    }
-  })
-}
-
-for (const check of document.querySelectorAll('input[data-axis-check]')) {
-  check.addEventListener('change', () => {
-    const axis = check.dataset.axisCheck
-    viewer.setSectionAxisEnabled(axis, check.checked)
-    // Si es el ultimo eje activo, activar el corte general: el interruptor
-    // global refleja "hay algun corte encendido".
-    const anyActive = viewer.section.planes.some((plane) => plane.enabled)
-    if (anyActive && !sectionEnabled.checked) {
-      sectionEnabled.checked = true
-      viewer.setSection({ enabled: true })
-    }
-    if (!anyActive && sectionEnabled.checked) {
-      sectionEnabled.checked = false
-      viewer.setSection({ enabled: false })
-    }
-  })
-}
-
 container.addEventListener('pointerdown', (event) => {
-  if (markerMode && !event.target.closest('.panel, #toolbar')) {
+  if (markerMode && !event.target.closest('.panel, #toolbar, #toolbars')) {
     addMarkerAt(event)
     return
   }
   if (!viewer.measure?.enabled) return
-  if (event.target.closest('.panel, #toolbar')) return
+  if (event.target.closest('.panel, #toolbar, #toolbars')) return
   viewer.handleMeasureClick(event)
 })
 
@@ -367,6 +462,9 @@ window.addEventListener('keydown', (event) => {
     case 'm':
       toggleMeasure()
       break
+    case 'k':
+      toggleMarkerTool()
+      break
     case 'f':
       viewer.frameModel()
       break
@@ -377,9 +475,6 @@ window.addEventListener('keydown', (event) => {
       if (viewer.measure?.enabled) toggleMeasure()
       if (markerMode) toggleMarkerTool()
       break
-    case 'k':
-      toggleMarkerTool()
-      break
   }
 })
 
@@ -388,12 +483,9 @@ window.addEventListener('keydown', (event) => {
 async function boot() {
   const params = new URLSearchParams(window.location.search)
   forcedUnits = params.get('units') || null
+  materialMode = params.get('material') === 'dental' ? 'dental' : 'keep'
 
   if (params.has('background')) viewer.setBackground(params.get('background'))
-  if (params.get('embed') === '1') {
-    document.getElementById('toolbar').hidden = true
-    panelVisibility(false)
-  }
 
   const model = params.get('model')
   const annotations = params.get('annotations')
@@ -402,7 +494,7 @@ async function boot() {
     await loadModel(model, { annotations })
   } else {
     viewer.doc = createDocument()
-    panelVisibility(true)
+    panelVisibility(false)
     setStatus('Esperando modelo. Usa ?model=... o el comando postMessage "load".')
   }
 
@@ -412,6 +504,7 @@ async function boot() {
     if (axis && Number.isFinite(Number(value))) {
       viewer.setSection({ enabled: true })
       viewer.setSectionAxis(axis.toLowerCase(), Number(value))
+      syncSectionUI()
     }
   }
 

@@ -177,51 +177,60 @@ check(
 )
 check('la geometria tiene triangulos', info.triangles > 3000, `${info.triangles} tri`)
 
-// Corte seccional + capping
+// Corte seccional + capping (plano unico con gizmo)
 const section = await evaluate(`
   (() => {
     const v = window.dentalViewer
-    v.setSection({ enabled: true, planes: [{ axis: 'z', offset: 0, enabled: true }] })
+    v.setSection({ enabled: true, plane: { point: [0, 0, 0], normal: [0, 0, 1] } })
     v.renderer.render(v.scene, v.camera)
     const caps = v.section.capGroup.children.length
-    const stencils = v.section.stencilGroup.children.reduce((n, g) => n + g.children.length, 0)
+    const stencils = v.section.stencilGroup.children.length
     const planes = v.model.meshes[0].material.clippingPlanes?.length ?? 0
-    const capWrite = v.section.capGroup.children[0].material.stencilWrite
-    const stencilWrite = v.section.stencilGroup.children[0].children[0].material.stencilWrite
-    return { caps, stencils, planes, capWrite, stencilWrite, active: v.section.active.length }
+    const capWrite = v.section.capGroup.children[0]?.material.stencilWrite
+    const stencilWrite = v.section.stencilGroup.children[0]?.material.stencilWrite
+    return { enabled: v.section.enabled, caps, stencils, planes, capWrite, stencilWrite }
   })()
 `)
-check('el corte seccional se activa', section.active === 1)
-check('genera una superficie de corte por plano', section.caps === 1, `${section.caps} cap`)
+check('el corte seccional se activa', section.enabled === true)
+check('genera una superficie de corte', section.caps === 1, `${section.caps} cap`)
 check('genera el grupo de stencil (caras traseras y delanteras)', section.stencils >= 2, `${section.stencils} mallas`)
 check('los materiales recortan con el plano', section.planes === 1)
-check('stencil activo en el capping y en los grupos', section.capWrite === true && section.stencilWrite === true)
+check('stencil activo en el capping y en los strokes', section.capWrite === true && section.stencilWrite === true)
 
-// Varios planos a la vez
-const multi = await evaluate(`
+// Manipulacion del plano: mover y rotar la normal
+const planeManipulation = await evaluate(`
   (() => {
     const v = window.dentalViewer
-    v.setSection({
-      enabled: true,
-      planes: [
-        { axis: 'y', offset: 0, enabled: true },
-        { axis: 'z', offset: 0, enabled: true },
-      ],
-    })
+    // Plano por el centro con normal +Z: se conserva z >= 0.
+    const originOut = v.section.isPointVisible({ x: 0, y: 0, z: 5 })
+    const behindHidden = v.section.isPointVisible({ x: 0, y: 0, z: -5 })
+
+    // Mover el plano a y=10 lo interpreta el helper de ejes (compatibilidad):
+    // normal +y, punto (0,10,0): se conserva y >= 10.
+    v.setSectionAxis('y', 10)
     v.renderer.render(v.scene, v.camera)
-    const caps = v.section.capGroup.children.length
-    // El lado conservado es +eje en cada plano: el origen esta dentro de ambos.
-    const atOrigin = v.section.isPointVisible({ x: 0, y: 0, z: 0 })
-    const beyondZ = v.section.isPointVisible({ x: 0, y: 0, z: -5 })
-    const beyondY = v.section.isPointVisible({ x: 0, y: -5, z: 0 })
-    v.setSection({ enabled: true, planes: [{ axis: 'y', offset: 0, enabled: true }] })
-    return { caps, atOrigin, beyondZ, beyondY }
+    const lifted = {
+      visibleAbove: v.section.isPointVisible({ x: 0, y: 15, z: 0 }),
+      hiddenBelow: v.section.isPointVisible({ x: 0, y: 5, z: 0 }),
+    }
+
+    // Rotar la normal del plano (gizmo en modo rotar): gira al eje x.
+    v.section.setPlane({ normal: [1, 0, 0] })
+    v.renderer.render(v.scene, v.camera)
+    const rotated = {
+      rightVisible: v.section.isPointVisible({ x: 5, y: 0, z: 0 }),
+      leftHidden: v.section.isPointVisible({ x: -5, y: 0, z: 0 }),
+    }
+    v.setSection({ enabled: false })
+    return { originOut, behindHidden, lifted, rotated }
   })()
 `)
-check('soporta dos planos simultaneos', multi.caps === 2, `${multi.caps} caps`)
-check('el origen queda dentro de los dos cortes', multi.atOrigin === true)
-check('un punto detras del plano sagital se descarta', multi.beyondZ === false)
-check('un punto detras del plano axial se descarta', multi.beyondY === false)
+check('el centro de la pieza queda del lado conservado', planeManipulation.originOut === true)
+check('un punto detras del plano se descarta', planeManipulation.behindHidden === false)
+check('al subir el plano la mitad superior permanece', planeManipulation.lifted.visibleAbove === true)
+check('al subir el plano la mitad inferior desaparece', planeManipulation.lifted.hiddenBelow === false)
+check('rotar la normal al eje x conserva la mitad derecha', planeManipulation.rotated.rightVisible === true)
+check('rotar la normal al eje x descarta la izquierda', planeManipulation.rotated.leftHidden === false)
 
 // Mediciones
 const measure = await evaluate(`
@@ -261,13 +270,12 @@ check('cada nodo tiene su material', measure.lineMaterials >= 7, `${measure.line
 check('la etiqueta se proyecta en pantalla', Boolean(measure.transform) && measure.displayed !== 'none', measure.transform)
 
 // Las etiquetas se ocultan cuando el corte elimina la pieza.
-// La pieza va de y = -3.6 a y = +3.6, asi que un plano axial en y = 40 no
-// deja nada visible; el lado conservado es y >= offset.
+// La pieza va de y = -3.6 a y = +3.6: un plano en y = 40 no deja nada visible.
 const hidden = await evaluate(`
   (() => {
     const v = window.dentalViewer
-    v.setSection({ enabled: true, planes: [{ axis: 'y', offset: 0, enabled: true }] })
-    v.setSectionAxis('y', 40)   // muy por encima de la pieza: no queda nada visible
+    v.setSection({ enabled: true, plane: { point: [0, 0, 0], normal: [0, 1, 0] } })
+    v.setSectionAxis('y', 40)   // muy por encima de la pieza
     v.renderer.render(v.scene, v.camera)
     v.measure.update()
     const visible = v.measure.labels.filter((l) => l.el.style.display !== 'none').length
@@ -313,45 +321,70 @@ check('las mallas quedan con transformacion identidad', transformsClean, `${cent
 check('el bounding box del modelo esta centrado en el origen', originCentered,
   centering.boundsCenter.map((n) => n.toFixed(4)).join(', '))
 
-// --- Ejes independientes: activar un eje no enciende los otros -------------
-// Semantica: setSectionAxis activa por defecto (enable:true); mover un eje
-// NO debe encender el coronal, y los interruptores por eje son independientes.
-const axisIsolation = await evaluate(`
+// --- La lista de objetos respeta el ojo (visibilidad) ----------------------
+const objectsListTest = await evaluate(`
   (() => {
     const v = window.dentalViewer
-    // Estado determinista: solo el eje sagital encendido.
-    v.setSection({
-      enabled: true,
-      planes: [
-        { axis: 'y', offset: 0, enabled: false },
-        { axis: 'z', offset: 0, enabled: true },
-        { axis: 'x', offset: 0, enabled: false },
-      ],
-    })
-    const onlyZ = {
-      active: v.section.active.length,
-      caps: v.section.capGroup.children.map((c) => c.name),
-    }
-    // Mover el slider axial: enciende el eje axial sin tocar el coronal.
-    v.setSectionAxis('y', 1.5)
-    const state = v.section.serialize()
-    const active = v.section.active.length
-    const capAxes = v.section.capGroup.children.map((c) => c.name)
-    const axialOn = v.section.planes.find((p) => p.axis === 'y').enabled
-    const sagittalOn = v.section.planes.find((p) => p.axis === 'z').enabled
-    const coronalOn = v.section.planes.find((p) => p.axis === 'x').enabled
-    v.setSection({ enabled: false })
-    return { onlyZ, state, active, capAxes, axialOn, sagittalOn, coronalOn }
+    const before = v.listObjects()
+    v.setMeshVisible(0, false)
+    const after = v.listObjects()
+    v.renderer.render(v.scene, v.camera)
+    const stencilWithOne = v.enabled ? 0 : v.section.stencilGroup.children.length
+    v.setMeshVisible(0, true)
+    const restored = v.listObjects()
+    return { before: before[0], hidden: after[0], restored: restored[0], stencilWithOne: stencilWithOne }
   })()
 `)
-check('ningun corte se enciende de mas', axisIsolation.onlyZ.active === 1,
-  `caps tras arranque: ${axisIsolation.onlyZ.caps.join(', ')}`)
-check('mover el eje axial no activa el coronal',
-  axisIsolation.axialOn === true && axisIsolation.sagittalOn === true && axisIsolation.coronalOn === false,
-  `axial=${axisIsolation.axialOn} sagital=${axisIsolation.sagittalOn} coronal=${axisIsolation.coronalOn}`)
-check('hay una superficie de corte por eje encendido',
-  axisIsolation.active === 2 && axisIsolation.capAxes.includes('cap-y') && axisIsolation.capAxes.includes('cap-z'),
-  `caps: ${axisIsolation.capAxes.join(', ')}`)
+check('la lista de objetos lista la pieza', objectsListTest.before.name.length > 0, objectsListTest.before.name)
+check('el ojo oculta y muestra la pieza', objectsListTest.hidden.visible === false && objectsListTest.restored.visible === true)
+
+// --- Presentacion: marcadores con snapshot de vista+corte ------------------
+const markerFlow = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    v.setSection({ enabled: false })
+    v.measure.clear()
+    // Estado "preparado": camara en (30, 3, 3) mirando a (1, 2, 0) y corte en y=2.
+    v.camera.position.set(30, 3, 3)
+    v.controls.target.set(1, 2, 0)
+    v.controls.update()
+    v.setSection({ enabled: true, plane: { point: [0, 2, 0], normal: [0, 1, 0] } })
+    const marker = v.addMarker({ position: [2, 0, 0], text: 'paso test', kind: 'warning' })
+    const saved = {
+      hasView: !!marker.view,
+      hasSection: !!marker.section,
+      sectionEnabled: marker.section?.enabled,
+      viewCaptured:
+        marker.view &&
+        Math.abs(marker.view.position[0] - 30) < 1e-2 &&
+        Math.abs(marker.view.target[1] - 2) < 1e-2,
+    }
+    // Cambiar el estado y restaurar como haria el doctor al pulsar el paso.
+    v.camera.position.set(80, 80, 80)
+    v.controls.target.set(0, 0, 0)
+    v.controls.update()
+    v.setSection({ enabled: false })
+    const doc = v.applyAnnotations(JSON.parse(JSON.stringify(v.getAnnotations())))
+    v.focusMarker(marker.id)
+    const restored = {
+      cameraRestored: Math.abs(v.camera.position.x - 30) < 1e-1,
+      targetRestored: Math.abs(v.controls.target.y - 2) < 1e-1,
+      sectionRestored: v.section.enabled,
+      planoRestoredPosicion: Math.abs(v.section.gizmo.position.y - 2) < 1e-1,
+      markerLabels: v.measure.labels.filter((l) => String(l.id).startsWith('marker:')).length,
+    }
+    v.removeMarker(marker.id)
+    v.setSection({ enabled: false })
+    return { saved, restored, markersAfterRemove: v.doc.markers.length }
+  })()
+`)
+check('el marcador guarda vista y corte del momento',
+  markerFlow.saved.hasView && markerFlow.saved.hasSection && markerFlow.saved.sectionEnabled && markerFlow.saved.viewCaptured)
+check('pulsar el marcador restaura vista, objetivo y corte',
+  markerFlow.restored.cameraRestored && markerFlow.restored.targetRestored &&
+  markerFlow.restored.sectionRestored && markerFlow.restored.planoRestoredPosicion)
+check('el marcador restaura su etiqueta en la pieza', markerFlow.restored.markerLabels >= 1)
+check('los marcadores se pueden borrar', markerFlow.markersAfterRemove === 0)
 
 // --- Round-trip de anotaciones ---------------------------------------------
 const roundTrip = await evaluate(`
@@ -360,7 +393,7 @@ const roundTrip = await evaluate(`
     const box = v.model.bounds
     const a = box.min.clone(), b = box.max.clone()
     v.measure.add(a, b, 'ancho total')
-    v.setSection({ enabled: true, planes: [{ axis: 'z', offset: 1.5, enabled: true }] })
+    v.setSection({ enabled: true, plane: { point: [0, 0, 1.5], normal: [0, 0, 1] } })
     const json = JSON.stringify(v.getAnnotations())
     v.measure.clear()
     v.setSection({ enabled: false })
@@ -370,7 +403,8 @@ const roundTrip = await evaluate(`
       cleared,
       restoredMeasurements: v.measure.measurements.length,
       restoredSection: v.section.enabled,
-      offset: v.section.planes.find((p) => p.axis === 'z')?.offset,
+      keepsPositiveSide: v.section.isPointVisible({ x: 0, y: 0, z: 3 }),
+      slicesPastPlane: v.section.isPointVisible({ x: 0, y: 0, z: 0 }),
       note: doc.measurements[0]?.note,
       units: doc.units,
     }
@@ -378,7 +412,9 @@ const roundTrip = await evaluate(`
 `)
 check('las anotaciones se pueden borrar', roundTrip.cleared === 0)
 check('se restauran las mediciones desde JSON', roundTrip.restoredMeasurements === 1)
-check('se restaura el corte seccional', roundTrip.restoredSection === true && roundTrip.offset === 1.5)
+check('se restaura el corte seccional', roundTrip.restoredSection === true)
+check('el plano restaurado conserva su mitad (z >= 1.5)',
+  roundTrip.keepsPositiveSide === true && roundTrip.slicesPastPlane === false)
 check('se conserva la nota de la medicion', roundTrip.note === 'ancho total')
 check('las anotaciones se guardan en mm', roundTrip.units === 'mm')
 
@@ -410,7 +446,7 @@ const capping = await evaluate(`
     v.measure.clear()
     v.setSection({ enabled: false })
     const before = litPixels()
-    v.setSection({ enabled: true, planes: [{ axis: 'z', offset: 0, enabled: true }] })
+    v.setSection({ enabled: true, plane: { point: [0, 0, 0], normal: [0, 0, 1] } })
     const after = litPixels()
     v.setSection({ enabled: false })
     return { before, after }

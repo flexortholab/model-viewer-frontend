@@ -443,6 +443,10 @@ document.addEventListener('click', (event) => {
       viewer.resetSectionPlane()
       showHint('Plano centrado en la pieza, perpendicular a la vista actual')
       break
+    case 'section-orient':
+      viewer.orientSectionPlane()
+      showHint('Plano reorientado (perpendicular a la vista) en su posicion actual')
+      break
     case 'marker-unfocus':
       viewer.exitMarkerFocus()
       activeMarkerId = null

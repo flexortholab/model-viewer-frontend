@@ -341,6 +341,13 @@ export class DentalViewer {
     this.emit('section', this.section.serialize())
   }
 
+  /** Reorienta el plano en su posicion actual para cortarlo de frente. */
+  orientSectionPlane() {
+    this.section?.orientToCamera(this.camera)
+    this._syncDoc()
+    this.emit('section', this.section.serialize())
+  }
+
   // --- Lista de objetos -------------------------------------------------------
 
   listObjects() {

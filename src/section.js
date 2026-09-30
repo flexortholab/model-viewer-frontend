@@ -203,6 +203,19 @@ export class SectionPlaneTool {
     this.onChange?.()
   }
 
+  /** Solo reorienta (perpendicular a la vista) sin mover la posicion actual. */
+  orientToCamera(camera) {
+    const cam = camera ?? this.camera
+    const viewDir = new THREE.Vector3()
+    cam.getWorldDirection(viewDir)
+    this.gizmo.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      viewDir.clone().normalize(),
+    )
+    if (this.enabled) this.apply()
+    this.onChange?.()
+  }
+
   /** Recalcula el plano de recorte a partir de la posicion del gizmo. */
   _syncPlane() {
     this.gizmo.updateMatrixWorld(true)

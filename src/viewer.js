@@ -478,6 +478,18 @@ export class DentalViewer {
     return true
   }
 
+  /** Edita el texto/clase de un marcador existente (doble clic en la lista). */
+  updateMarker(id, { text, kind } = {}) {
+    const marker = this.doc.markers.find((m) => m.id === id)
+    if (!marker) return null
+    if (typeof text === 'string') marker.text = text
+    if (['note', 'warning', 'screw'].includes(kind)) marker.kind = kind
+    this._renderMarkers()
+    this._syncDoc()
+    this.emit('markers', this.doc.markers)
+    return marker
+  }
+
   /** Muestra el caso como estaba cuando se creo el marcador. */
   focusMarker(id) {
     const marker = this.doc.markers.find((m) => m.id === id)

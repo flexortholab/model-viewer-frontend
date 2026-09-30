@@ -4,12 +4,12 @@ Visor web 3D tipo Autodesk Viewer para compartir diseños dentales con clientes 
 Pensado para **disyuntores sinterizados con anclaje esquelético** diseñados en Blender, pero acepta cualquier modelo 3D estático.
 
 - unidades en **milímetros** con detección automática
-- **cortes seccionales** en 3 ejes con capping sólido (stencil buffer)
+- **corte seccional** con plano único y gizmo (mover+rotar), capping sólido por pieza (stencil buffer) con anillo de contorno
 -  estilo plano de taller con etiquetas proyectadas
 - **anotaciones** exportables como sidecar JSON
 - embebible en un **webclip / iframe** vía `postMessage`, o por enlace directo
 
-Estado actual: **v0.2.0** funcional (tema claro, plano de corte unico con gizmo, lista de objetos y presentacion con marcadores). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta.
+Estado actual: **v0.3.0** funcional (plano de corte unico con gizmo mover+rotar, capping por pieza con anillo de contorno, lista de objetos con foco y corte por pieza, presentacion con marcadores editables, medidas editables con drag y snap, cifras en sprite 3D). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
 > **Demo desplegada (GitHub Pages, rama gh-pages):** https://rms1982.github.io/dental-viewer/
 > **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/disyuntor-4-pilares.stl&section=y=0
 > La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.
@@ -82,7 +82,7 @@ Sin `?model=`, el visor queda a la espera de un comando `load` por `postMessage`
 
 ## Unidades (mm)
 
-`src/units.js` no confía en el archivo: mide el bounding box crudo y prueba escalas ×1, ×10, ×1000 (nunca reduce). Un archivo es plausible como está si su dimensión máxima queda entre **4 y 160 mm** (de un pilar ~5 mm a una arcada con anclaje ~130 mm).
+`src/units.js` no confía en el archivo: mide el bounding box crudo y prueba escalas ×1, ×10, ×1000 (nunca reduce). Un archivo es plausible como está si su dimensión máxima queda entre **4 y 200 mm** (de un pilar ~5 mm a una arcada con cráneo y modelo de escayola, p. ej. 171 mm).
 
 - Falla dentro del rango → se respeta tal cual (`confidence` alta) y se listan `alternatives`.
 - Solo plausible tras ×1000 (típico glTF/Blender en metros) → escala ×1000.
@@ -91,7 +91,9 @@ Sin `?model=`, el visor queda a la espera de un comando `load` por `postMessage`
 
 ## Corte seccional
 
-Tres planos independientes (axial Y, sagital Z, coronal X) con offset deslizante por el tamaño real del modelo. La técnica usa:
+Un plano único anclado al modelo, colocado con gizmo (flechas para mover, anillos para
+rotar, ambos visibles a la vez). Botones **Alinear con la vista** y **Girar 90 grados**.
+La técnica usa:
 
 - `localClippingEnabled` + `clippingPlanes` por material
 - **stencil capping**: caras traseras/frente escriben stencil con operaciones opuestas y un quad coplanar tapa el hueco con `stencilFunc NotEqual 0` — el corte se ve **sólido**, no hueco
@@ -161,7 +163,7 @@ Seguridad: solo se aceptan mensajes de `window.parent`/`window` y con origen en 
 | Borrar medidas | limpia todas las cotas | — |
 | Exportar | descarga `annotations.json` | `E` |
 
-**Panel Corte seccional** (derecha, plegable): switch general, por eje checkbox + slider (rango dinámico ±tamaño/2, paso 0.1 mm) y color de la superficie de corte.
+**Panel Corte seccional** (derecha, plegable): switch general, botones Alinear con la vista y Girar 90 grados. El plano se mueve/rota con el gizmo sobre la pieza.
 
 **Barra de estado** (abajo): unidades detectadas/forzadas con alerta si la confianza es baja, triángulos y dimensiones en mm.
 
@@ -212,12 +214,21 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 7. `npm test` arreglado para Windows: `node --test test/*.test.js` (el comodin no resuelve la carpeta en Node 22).
 8. CI con GitHub Actions (tests + build + smoke en cada push/PR) y LICENSE MIT.
 
+**Sesión del 30/09–01/10/2026 (smoke 42/42, unitarios 18/18):**
+
+1. Fusionado el trabajo de la sesión paralela (plano único con gizmo mover+rotar,
+   capping por pieza con anillo de contorno, medidas con drag + snap + sprite 3D,
+   foco de objetos con corte por pieza, botón Girar 90°, vistas Izquierda/Derecha/Inferior).
+2. `units.js`: rango plausible [4, 200] mm (los casos reales traen cráneo y escayola).
+3. Marcadores editables: renombrar con doble clic + comando bridge `updateMarker`;
+   corregido `activePopupId` (quedaba el paso sin resaltar).
+4. GLB/FBX reales de Blender verificados en navegador (B1, Final1, Mario FBX).
+5. Limpieza de carpetas duplicadas accidentales (`src/src`, `scripts/scripts`, …).
+
 **Pendiente:**
 
-1. Marcadores (`addMarker`) solo por API/bridge, sin flujo de UI todavia.
-2. Decodificadores Draco/Basis duplicados entre el bundle de Vite y `public/` — optimizacion, no bloqueante.
-3. FBX/GLB reales exportados de Blender sin probar todavia (solo STL procedural).
-4. Sin backend ni despliegue productivo: la demo es estatica (Pages).
+1. Decodificadores Draco/Basis duplicados entre el bundle de Vite y `public/` — optimizacion, no bloqueante.
+2. Sin backend ni despliegue productivo: la demo es estatica (Pages).
 
 Nota sobre el smoke: en un Chromium headless con SwiftShader los triángulos se emiten (3418, sin errores GL) pero los pixeles no llegan al canvas compuesto; por eso los checks visuales del capping se basan en conteo de pixeles y se omiten si el entorno no rasteriza.
 

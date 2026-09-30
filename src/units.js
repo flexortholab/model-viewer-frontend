@@ -12,12 +12,14 @@ export const UNIT_FACTORS = { mm: 1, cm: 10, m: 1000, um: 0.001, in: 25.4 }
 
 // Dimensiones plausibles en mm para una pieza de protesis dental: desde un
 // abutment (~5 mm) hasta una arcada completa con anclaje esqueletico (~130 mm).
+// El margen llega a 200 mm porque los casos reales traen craneo y modelo de
+// escayola junto a la arcada (p. ej. Final1.glb: 171 mm).
 export const PLAUSIBLE_MIN = 4
-export const PLAUSIBLE_MAX = 160
+export const PLAUSIBLE_MAX = 200
 
-// Solo se consideran escalas >= 1. Un archivo que llega mas pequeno que 1 mm
+// Solo se consideran escalas >= 1. Un archivo que llega mas pequeno que 4 mm
 // viene en metros (es lo que produce el exportador glTF de Blender); uno que
-// llega mas grande de 160 mm viene mal exportado, y reescalar a la baja solo
+// llega mas grande de 200 mm viene mal exportado, y reescalar a la baja solo
 // aria danar una geometria que ya era correcta.
 const CANDIDATES = [
   { units: 'mm', scale: 1 },

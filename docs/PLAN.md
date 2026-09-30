@@ -58,11 +58,15 @@ Estado del plan: **implementado en su totalidad**. Lo restante está en la hoja 
 
 ### Medio plazo (flujo Blender real)
 
-- [ ] Probar GLB real exportado de Blender (Draco + KTX2) y FBX de escena completa
+- [x] Probar GLB real exportado de Blender y FBX de escena completa (01/10/2026:
+      `B1.glb` 8 piezas mm auto 0.99, `Final1.glb` 7 piezas mm auto 0.99, FBX de la
+      misma escena en cm — usar `?units=cm`, como ya hace `Iniciar-Visor.bat`.
+      Rango plausible ampliado a [4, 200] mm por cráneo + modelo de escayola.)
 - [x] Avisar cuando el corte cae fuera de la geometría (`planeIntersectsBounds` ya existe,
       falta cablear el aviso)
 - [x] Botones para vistas `lingual` y `isometrica`
-- [ ] Marcadores editables con UI (hoy solo `addMarker` por bridge/API)
+- [x] Marcadores editables con UI (toolbar + `K`, renombrar con doble clic,
+      comando bridge `updateMarker`, foco con `marker-unfocus`)
 - [ ] Limpieza de decodificadores Draco/Basis duplicados en el bundle
 
 ### Más adelante (distribución)

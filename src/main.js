@@ -134,6 +134,14 @@ function renderMarkers() {
     const text = document.createElement('span')
     text.className = 'marker-text' + (marker.text ? '' : ' is-empty')
     text.textContent = marker.text || `Paso ${index + 1}`
+    text.title = 'Doble clic para editar el texto'
+    text.addEventListener('dblclick', (event) => {
+      event.stopPropagation()
+      const next = window.prompt('Texto del marcador:', marker.text ?? '')
+      if (next === null) return
+      viewer.updateMarker(marker.id, { text: next.trim() })
+      renderMarkers()
+    })
 
     li.append(idx, text)
 
@@ -145,7 +153,10 @@ function renderMarkers() {
     del.textContent = '\u00d7'
     del.title = 'Eliminar marcador'
     del.addEventListener('click', () => {
-      if (viewer._preservingMeasures) viewer.exitMarkerFocus()
+      if (marker.id === activeMarkerId) {
+        viewer.exitMarkerFocus()
+        activeMarkerId = null
+      } else if (viewer._preservingMeasures) viewer.exitMarkerFocus()
       viewer.removeMarker(marker.id)
       renderMarkers()
     })
@@ -155,7 +166,8 @@ function renderMarkers() {
       if (event.target.closest('.marker-delete')) return
       const result = viewer.focusMarker(marker.id)
       if (result) {
-        activePopupId = marker.id
+        activeMarkerId = marker.id
+        renderMarkers()
         showHint(`Paso ${index + 1}${result.text ? `: ${result.text}` : ''}`, 3200)
       }
     })
@@ -358,6 +370,11 @@ const ACTIONS = {
   clearMarkers() {
     viewer.clearMarkers()
     renderMarkers()
+  },
+  updateMarker({ id, text, kind }) {
+    const marker = viewer.updateMarker(String(id), { text, kind })
+    if (marker) renderMarkers()
+    return marker
   },
   focusMarker({ id }) {
     const result = viewer.focusMarker(String(id))

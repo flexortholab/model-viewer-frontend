@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Visor de disyuntores sinterizados</title>
-    <script type="module" crossorigin src="./assets/index-B9r9cZ77.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-ieJ6L-lN.css">
+    <script type="module" crossorigin src="./assets/index-Czh_w4nl.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DOlsgnEM.css">
   </head>
   <body>
     <div id="app">
@@ -63,17 +63,18 @@
               <span>Activar corte</span>
             </label>
 
-            <div class="gizmo-modes" role="group" aria-label="Modo del gizmo">
-              <button type="button" data-gizmo="translate" aria-pressed="true">Mover</button>
-              <button type="button" data-gizmo="rotate" aria-pressed="false">Rotar</button>
-            </div>
-
             <label class="field">
-              <span>Color de la superficie de corte</span>
-              <input type="color" id="cap-color" value="#c0554a" />
+              <span>Superficie de corte</span>
+              <select id="cap-color-mode">
+                <option value="auto" selected>Color de cada pieza</option>
+                <option value="dental">Neutro dental</option>
+                <option value="rojo">Rojo ficha técnica</option>
+              </select>
             </label>
 
-            <button type="button" class="wide" data-action="section-reset">Centrar plano</button>
+            <button type="button" class="wide" data-action="section-reset" title="Coloca el plano en el centro de la pieza, perpendicular a la vista actual">
+              Alinear con la vista
+            </button>
           </div>
         </div>
 
@@ -99,8 +100,11 @@
             </button>
           </div>
           <div class="panel-body">
+            <button type="button" class="wide" data-action="marker-unfocus">
+              Vista libre (salir del paso)
+            </button>
             <ul id="markers-list" class="marker-list"></ul>
-            <p class="panel-note">Cada marcador guarda vista, corte y punto. Pulsa uno para mostrarlo.</p>
+            <p class="panel-note">Pulsa un paso: restaura vista, corte y medidas guardadas. ✂ en Objetos centra el corte en una pieza.</p>
           </div>
         </div>
       </div>

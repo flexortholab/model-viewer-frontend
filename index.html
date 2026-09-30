@@ -4,24 +4,28 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Visor de disyuntores sinterizados</title>
-    <script type="module" crossorigin src="./assets/index-Czh_w4nl.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DOlsgnEM.css">
+    <script type="module" crossorigin src="./assets/index-Dmu5s-FP.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BZRkOJmm.css">
   </head>
   <body>
     <div id="app">
       <div id="viewport">
         <div id="labels" aria-live="polite"></div>
-        <div id="toolbars">
+        <div id="leftbar" class="col">
         <div id="toolbar" role="toolbar" aria-label="Herramientas del visor">
           <div class="tb-group">
             <button type="button" data-action="frame" title="Encuadrar (F)">Encuadrar</button>
-            <button type="button" data-view="frontal" title="Vista frontal">Frontal</button>
+            <button type="button" data-view="frontal" title="Vista frontal (anterior)">Frontal</button>
             <button type="button" data-view="superior" title="Vista superior (oclusal)">Superior</button>
-            <button type="button" data-view="lateral" title="Vista lateral">Lateral</button>
-            <button type="button" data-view="lingual" title="Vista lingual (palatina)">Lingual</button>
+            <button type="button" data-view="inferior" title="Vista inferior">Inferior</button>
+            <button type="button" data-view="izquierda" title="Vista lateral izquierda">Izquierda</button>
+            <button type="button" data-view="derecha" title="Vista lateral derecha">Derecha</button>
             <button type="button" data-view="isometrica" title="Vista isométrica">Isométrica</button>
           </div>
           <div class="tb-group">
+            <button type="button" data-action="move" aria-pressed="false" title="Volver a la cámara libre (mover la pieza)">
+              Mover
+            </button>
             <button type="button" data-action="measure" aria-pressed="false" title="Medir (M)">
               Medir
             </button>
@@ -45,11 +49,7 @@
 
         <div id="hint" class="hint"></div>
 
-        <div id="status" class="status">
-          <span id="status-units" class="badge" hidden></span>
-          <span id="status-info"></span>
-        </div>
-
+        <div id="rightbar" class="col">
         <div id="panel" class="panel" hidden>
           <div class="panel-head">
             <strong>Corte seccional</strong>
@@ -61,15 +61,6 @@
             <label class="switch">
               <input type="checkbox" id="section-enabled" />
               <span>Activar corte</span>
-            </label>
-
-            <label class="field">
-              <span>Superficie de corte</span>
-              <select id="cap-color-mode">
-                <option value="auto" selected>Color de cada pieza</option>
-                <option value="dental">Neutro dental</option>
-                <option value="rojo">Rojo ficha técnica</option>
-              </select>
             </label>
 
             <button type="button" class="wide" data-action="section-reset" title="Coloca el plano en el centro de la pieza, perpendicular a la vista actual">
@@ -106,6 +97,7 @@
             <ul id="markers-list" class="marker-list"></ul>
             <p class="panel-note">Pulsa un paso: restaura vista, corte y medidas guardadas. ✂ en Objetos centra el corte en una pieza.</p>
           </div>
+        </div>
         </div>
       </div>
     </div>

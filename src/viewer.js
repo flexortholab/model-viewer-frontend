@@ -655,12 +655,12 @@ export class DentalViewer {
         superior: [0, 1, 0.001],
         inferior: [0, -1, 0.001],
         // Izquierda y derecha referidos a la vista frontal del paciente.
-        izquierda: [-1, 0.05, 0.02],
-        derecha: [1, 0.05, 0.02],
+        derecha: [-1, 0.05, 0.02],
+        izquierda: [1, 0.05, 0.02],
         isometrica: [0.42, 0.36, 0.83],
         // Alias del bridge antiguo.
-        lateral: [1, 0.05, 0.02],
-        lingual: [-1, 0.05, 0.02],
+        lateral: [-1, 0.05, 0.02],
+        lingual: [1, 0.05, 0.02],
       }
       const dir = views[view]
       if (!dir) return

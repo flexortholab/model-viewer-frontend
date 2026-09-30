@@ -302,34 +302,71 @@ export class SectionPlaneTool {
       this.capGroup.userData.pieceCaps = this.capGroup.userData.pieceCaps || []
       this.capGroup.userData.pieceCaps.push({ mesh, cap })
 
-      // Contorno del corte por pieza: malla "hull invertida" (caras traseras)
-      // engrandecida un pelin: queda visible solo como ribete en el borde
-      // del corte y en la silueta exterior de la pieza.
+      // --- Contorno del perimetro COMPLETO por pieza ---------------------
+      // Doble hull invertido por stencil: outer hull (caras traseras
+      // engrandecidas) suma +1, inner hull (engrandecimiento menor) resta -1
+      // y un quad pinta (Equal 1) solo el anillo: ~growth de grosor alrededor
+      // del perimetro EXTERIOR y del perimetro del CORTE (la curva donde el
+      // plano cruza la pieza). Persiste con la camera y el gizmo.
       if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox()
       const mBox = mesh.geometry.boundingBox
       const mCenter = mBox.getCenter(new THREE.Vector3())
       const mRadius = Math.max(mBox.getSize(new THREE.Vector3()).length() / 2, 1)
-      const growth = Math.max(this.radius * 1.5385 * 0.0035, 0.4) // radius ≈ diag*0.65
-      const factor = 1 + growth / mRadius
-      const outlineColor = (this._pieceColor(mesh) ?? new THREE.Color(this._seedColor)).multiplyScalar(0.62)
-      const outline = new THREE.Mesh(
-        mesh.geometry,
-        new THREE.MeshBasicMaterial({
-          color: outlineColor,
+      const diag = this.radius * 1.5385 // radius ≈ diag*0.65
+      const growthOuter = Math.max(diag * 0.009, 1.0)
+      const growthInner = growthOuter * 0.45
+
+      const hull = (growth, op, order) => {
+        const factor = 1 + growth / mRadius
+        const material = new THREE.MeshBasicMaterial({
+          colorWrite: false,
+          depthWrite: false,
           side: THREE.BackSide,
           clippingPlanes: this._clippingPlanes,
+          stencilWrite: true,
+          stencilFunc: THREE.AlwaysStencilFunc,
+          stencilFail: op,
+          stencilZFail: op,
+          stencilZPass: op,
+        })
+        const hullMesh = new THREE.Mesh(mesh.geometry, material)
+        hullMesh.position.copy(mCenter).multiplyScalar(1 - factor)
+        hullMesh.scale.setScalar(factor)
+        hullMesh.updateMatrix()
+        hullMesh.matrixAutoUpdate = false
+        hullMesh.renderOrder = order
+        hullMesh.raycast = () => {}
+        return hullMesh
+      }
+      const hulls = [hull(growthOuter, THREE.IncrementWrapStencilOp, order + 2), hull(growthInner, THREE.DecrementWrapStencilOp, order + 3)]
+      for (const hullMesh of hulls) {
+        this.stencilGroup.add(hullMesh)
+        this._stencilMeshes.push(hullMesh)
+      }
+
+      // Anillo pintado: quad con stencil Equal 1 (solo la banda) y depthTest
+      // off para que la linea naca pierda contra la pieza.
+      const ringColor = (this._pieceColor(mesh) ?? new THREE.Color(this._seedColor)).multiplyScalar(0.45)
+      const ring = new THREE.Mesh(
+        this._capGeometry,
+        new THREE.MeshBasicMaterial({
+          color: ringColor,
+          depthTest: false,
+          depthWrite: false,
+          stencilWrite: true,
+          stencilRef: 1,
+          stencilFunc: THREE.EqualStencilFunc,
+          stencilFail: THREE.ReplaceStencilOp,
+          stencilZFail: THREE.ReplaceStencilOp,
+          stencilZPass: THREE.ReplaceStencilOp,
         }),
       )
-      // Escalar la pieza sobre su propio centro (matrixAutoUpdate off).
-      outline.position.copy(mCenter).multiplyScalar(1 - factor)
-      outline.scale.setScalar(factor)
-      outline.quaternion.identity()
-      outline.updateMatrix()
-      outline.matrixAutoUpdate = false
-      outline.renderOrder = order - 1
-      outline.raycast = () => {}
-      this.stencilGroup.add(outline)
-      this._stencilMeshes.push(outline)
+      ring.position.z = 0.02
+      ring.renderOrder = order + 4
+      ring.raycast = () => {}
+      ring.onAfterRender = (renderer) => renderer.clearStencil()
+      this.capGroup.add(ring)
+      this._stencilMeshes.push(ring)
     })
   }
 

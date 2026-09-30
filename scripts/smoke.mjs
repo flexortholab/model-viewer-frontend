@@ -183,16 +183,18 @@ const section = await evaluate(`
     const v = window.dentalViewer
     v.setSection({ enabled: true, plane: { point: [0, 0, 0], normal: [0, 0, 1] } })
     v.renderer.render(v.scene, v.camera)
-    const caps = v.section.capGroup.children.length
+    const caps = v.section.capGroup.children.filter((c) => String(c.name).startsWith('cap-')).length
+    const rings = v.section.capGroup.children.filter((c) => !String(c.name).startsWith('cap-')).length
     const stencils = v.section.stencilGroup.children.length
     const planes = v.model.meshes[0].material.clippingPlanes?.length ?? 0
-    const capWrite = v.section.capGroup.children[0]?.material.stencilWrite
+    const capWrite = v.section.capGroup.children.filter((c) => String(c.name).startsWith('cap-'))[0]?.material.stencilWrite
     const stencilWrite = v.section.stencilGroup.children[0]?.material.stencilWrite
-    return { enabled: v.section.enabled, caps, stencils, planes, capWrite, stencilWrite }
+    return { enabled: v.section.enabled, caps, rings, stencils, planes, capWrite, stencilWrite }
   })()
 `)
 check('el corte seccional se activa', section.enabled === true)
 check('genera una superficie de corte', section.caps === 1, `${section.caps} cap`)
+check('genera el anillo de contorno por pieza (doble hull)', section.rings === 1, `${section.rings} ring`)
 check('genera el grupo de stencil (caras traseras y delanteras)', section.stencils >= 2, `${section.stencils} mallas`)
 check('los materiales recortan con el plano', section.planes === 1)
 check('stencil activo en el capping y en los strokes', section.capWrite === true && section.stencilWrite === true)

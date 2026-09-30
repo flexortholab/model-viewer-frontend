@@ -153,14 +153,24 @@ body {
 #toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 6px;
+  gap: 6px;
+  padding: 8px;
   border-radius: var(--radius);
   background: var(--panel);
   border: 1px solid var(--border);
   backdrop-filter: blur(8px);
   max-width: min(420px, calc(100vw - 24px));
   box-shadow: 0 1px 8px rgba(20, 22, 26, 0.08);
+}
+
+/* Botones de toolbar con el mismo lenguaje que los botones de los paneles */
+#toolbar button {
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+#toolbar button:hover {
+  border-color: var(--accent);
 }
 
 .tb-group {

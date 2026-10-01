@@ -257,9 +257,9 @@ export function applyDentalMaterial(meshes, options = {}) {
 
 /**
  * Prepara los materiales de una exportacion a color SIN recolorearlos:
- * conserva el color/texturas del GLB/FBX, solo arregla los detalles que
- * afectan a la revision (doble cara y materiales por defecto virados a un
- * gris neutro para que se vean sobre fondo blanco).
+ * conserva el color/texturas del GLB/FBX, pero con acabado MATE y solido
+ * (metalness 0, rugosidad alta): es un visor de revision, no un render de
+ * belleza. Tambien arregla doble cara y materiales virgenes.
  */
 export function prepareMaterialsForReview(meshes) {
   for (const mesh of meshes) {
@@ -272,6 +272,8 @@ export function prepareMaterialsForReview(meshes) {
         // Material virgen (STL procedural/cad): gris neutro para verlo sobre blanco.
         material.color.setHex(0xc9c4bc)
       }
+      if ('metalness' in material) material.metalness = 0
+      if ('roughness' in material) material.roughness = Math.max(material.roughness, 0.8)
       material.side = THREE.DoubleSide
       material.needsUpdate = true
     }

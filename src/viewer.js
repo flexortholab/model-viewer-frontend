@@ -220,6 +220,7 @@ export class DentalViewer {
       camera: this.camera,
       controls: this.controls,
       onChange: () => this._syncDoc(),
+      _frameTick: () => this.requestRender(),
     })
 
     this.measure = new MeasureTool({
@@ -714,9 +715,10 @@ export class DentalViewer {
         trasera: [0, 0.12, -1],
         superior: [0, 1, 0.001],
         inferior: [0, -1, 0.001],
-        // Izquierda y derecha referidos a la vista frontal del paciente.
-        derecha: [-1, 0.05, 0.02],
+        // Izquierda/derecha anatomicas del paciente (FDI): su derecha
+        // esta en -X y su izquierda en +X; la camara se coloca de ese lado.
         izquierda: [1, 0.05, 0.02],
+        derecha: [-1, 0.05, 0.02],
         isometrica: [0.42, 0.36, 0.83],
         // Alias del bridge antiguo.
         lateral: [-1, 0.05, 0.02],
@@ -772,6 +774,8 @@ export class DentalViewer {
   }
 
   _loop() {
+    // El atenuado del gizmo pide frames mientras transiciona.
+    if (this.section?.updateGizmoFade?.()) this._dirty = true
     // controls.update() devuelve true mientras la camara se mueve (arrastre
     // o inercia): esos frames se pintan. Lo demas, solo si algo lo pidio,
     // mas una cola de 30 frames para rematar inercias y transiciones.

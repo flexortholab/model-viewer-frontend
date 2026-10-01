@@ -13,24 +13,16 @@
         <div id="leftbar" class="col">
         <div id="views-bar" class="toolbar" role="toolbar" aria-label="Vistas">
           <span class="tb-title">Vistas</span>
-          <div class="tb-group views-group">
-            <button type="button" data-action="frame" title="Encuadrar (F)">Encuadrar</button>
-            <button type="button" data-view="frontal" title="Vista frontal (anterior)">Frontal</button>
+          <div class="tb-group views-cross">
             <button type="button" data-view="superior" title="Vista superior (oclusal)">Superior</button>
-            <button type="button" data-view="inferior" title="Vista inferior">Inferior</button>
             <button type="button" data-view="izquierda" title="Vista lateral izquierda">Izquierda</button>
+            <button type="button" data-view="frontal" title="Vista frontal (anterior)">Frontal</button>
             <button type="button" data-view="derecha" title="Vista lateral derecha">Derecha</button>
-            <button type="button" data-view="isometrica" title="Vista isométrica">Isométrica</button>
+            <button type="button" data-view="inferior" title="Vista inferior">Inferior</button>
           </div>
-          <div id="viewcube" title="Cubo de vistas: pulsa una cara para ir a esa vista">
-            <div id="viewcube-inner">
-              <button type="button" class="cube-face face-frontal" data-cube="frontal">Frontal</button>
-              <button type="button" class="cube-face face-trasera" data-cube="trasera">Trasera</button>
-              <button type="button" class="cube-face face-izquierda" data-cube="izquierda">Izq.</button>
-              <button type="button" class="cube-face face-derecha" data-cube="derecha">Der.</button>
-              <button type="button" class="cube-face face-superior" data-cube="superior">Sup.</button>
-              <button type="button" class="cube-face face-inferior" data-cube="inferior">Inf.</button>
-            </div>
+          <div class="tb-group views-extra">
+            <button type="button" data-action="frame" title="Encuadrar (F)">Encuadrar</button>
+            <button type="button" data-view="isometrica" title="Vista isométrica">Isométrica</button>
           </div>
         </div>
         <div id="tools-bar" class="toolbar" role="toolbar" aria-label="Herramientas del visor">
@@ -61,6 +53,16 @@
         </div>
 
         <div id="hint" class="hint"></div>
+        <div id="viewcube" title="Cubo de vistas: pulsa una cara para ir a esa vista">
+          <div id="viewcube-inner">
+            <button type="button" class="cube-face face-frontal" data-cube="frontal">Frontal</button>
+            <button type="button" class="cube-face face-trasera" data-cube="trasera">Trasera</button>
+            <button type="button" class="cube-face face-izquierda" data-cube="izquierda">Izq.</button>
+            <button type="button" class="cube-face face-derecha" data-cube="derecha">Der.</button>
+            <button type="button" class="cube-face face-superior" data-cube="superior">Sup.</button>
+            <button type="button" class="cube-face face-inferior" data-cube="inferior">Inf.</button>
+          </div>
+        </div>
         <img id="brand-logo" src="./logo.png" alt="Logotipo del laboratorio" />
 
         <div id="rightbar" class="col">

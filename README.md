@@ -9,7 +9,7 @@ Pensado para **disyuntores sinterizados con anclaje esquelético** diseñados en
 - **anotaciones** exportables como sidecar JSON
 - embebible en un **webclip / iframe** vía `postMessage`, o por enlace directo
 
-Estado actual: **v0.3.2** funcional (plano de corte unico con gizmo mover+rotar, capping por pieza con curva de corte exacta por objeto, lista de objetos con foco y corte por pieza, presentacion con marcadores editables, medidas compactas en mm con 1 decimal, cubo de vistas clicable, paneles separados Vistas/Herramientas, logo propio con acento corporativo teal, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
+Estado actual: **v0.3.3** funcional (plano de corte unico con gizmo mover+rotar atenuado, capping por pieza con curva de corte exacta por objeto, lista de objetos con foco y corte por pieza, presentacion con marcadores editables, medidas compactas de una en una en mm con 1 decimal, cubo de vistas clicable en la esquina, paneles separados Vistas (en cruz) y Herramientas, logo propio con acento corporativo teal, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
 > **Demo desplegada (GitHub Pages, rama gh-pages):** https://rms1982.github.io/dental-viewer/
 > **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/disyuntor-4-pilares.stl&section=y=0
 > La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.
@@ -227,6 +227,17 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
    corregido `activePopupId` (quedaba el paso sin resaltar).
 4. GLB/FBX reales de Blender verificados en navegador (B1, Final1, Mario FBX).
 5. Limpieza de carpetas duplicadas accidentales (`src/src`, `scripts/scripts`, …).
+
+**Sesión del 01/10/2026 (mediodía; smoke 46/46, unitarios 24/24):**
+
+1. Cubo a la esquina inferior izquierda; caras izquierda/derecha anatómicas
+   (FDI: derecha −X, izquierda +X) y panel Vistas en cruz con Frontal al centro.
+2. Materiales mate y sólidos (metalness 0, rugosidad ≥0.8, mismos colores).
+3. Gizmo atenuado al 15% sin el ratón encima (vuelve solo al pasar o arrastrar;
+   respeta el `_opacity` interno de TransformControls).
+4. Medidas de una en una: al completar vuelve a cámara libre (hay que pulsar
+   Medir para la siguiente).
+5. Smoke robusto al readback congelado de SwiftShader (salta, no falla).
 
 **Sesión del 01/10/2026 (tarde; smoke 48/48, unitarios 24/24):**
 

@@ -208,7 +208,7 @@ function updateViewCube() {
   const ax = Math.abs(dx)
   const ay = Math.abs(dy)
   const az = Math.abs(dz)
-  const current = ax >= ay && ax >= az ? (dx > 0 ? 'derecha' : 'izquierda')
+  const current = ax >= ay && ax >= az ? (dx > 0 ? 'izquierda' : 'derecha')
     : ay >= az ? (dy > 0 ? 'superior' : 'inferior')
       : dz > 0 ? 'frontal' : 'trasera'
   for (const face of cubeFaces) {
@@ -252,10 +252,11 @@ viewer.on('section', () => syncSectionUI())
 
 viewer.on('measure-pick', () => showHint('Segundo punto para completar la medida', 4000))
 
-viewer.on('measure-add', () => {
-  // Medida creada: devolver el modelo a la camara libre (era la queja: el
-  // modo cotas bloqueaba la orbita indefinidamente).
-  showHint('Medida creada', 2600)
+viewer.on('measure-add', (measurement) => {
+  // Una a una: al completar la medida se vuelve solo a camara libre.
+  // Hay que pedir Medir otra vez para la siguiente.
+  if (viewer.measure?.enabled) toggleMeasure()
+  showHint(`Medida creada${measurement?.label ? `: ${measurement.label}` : ''}`, 2600)
 })
 
 viewer.on('error', (error) => {
@@ -319,7 +320,7 @@ function toggleMeasure() {
   if (active && markerMode) toggleMarkerTool()
   showHint(
     active
-      ? 'Medir: pulsa dos puntos sobre la pieza. Doble clic en la cifra para borrar.'
+      ? 'Medir: pulsa dos puntos sobre la pieza (al completar vuelve a camara libre).'
       : 'Cámara libre: pulsa Medir para cotar otra vez',
   )
   return active
@@ -531,12 +532,12 @@ sectionEnabled.addEventListener('change', () => {
 
 
 container.addEventListener('pointerdown', (event) => {
-  if (markerMode && !event.target.closest('.panel, .toolbar')) {
+  if (markerMode && !event.target.closest('.panel, .toolbar, #viewcube')) {
     addMarkerAt(event)
     return
   }
   if (!viewer.measure?.enabled) return
-  if (event.target.closest('.panel, .toolbar')) return
+  if (event.target.closest('.panel, .toolbar, #viewcube')) return
   viewer.handleMeasureClick(event)
 })
 

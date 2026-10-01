@@ -154,8 +154,8 @@ body {
 #views-bar,
 #tools-bar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 6px;
   padding: 8px;
   border-radius: var(--radius);
@@ -177,7 +177,7 @@ body {
 }
 
 .tb-title {
-  flex: 0 0 100%;
+  flex: none;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -518,13 +518,45 @@ select {
   z-index: 5;
 }
 
+/* Cruz de vistas: superior/arriba, inferior/abajo, laterales y frontal al centro */
+.views-cross {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  grid-template-areas:
+    '. sup .'
+    'izq fro der'
+    '. inf .';
+  gap: 4px;
+  justify-content: center;
+}
+
+.views-cross [data-view='superior'] { grid-area: sup; }
+.views-cross [data-view='izquierda'] { grid-area: izq; }
+.views-cross [data-view='frontal'] {
+  grid-area: fro;
+  font-weight: 700;
+  border-color: var(--accent);
+}
+.views-cross [data-view='derecha'] { grid-area: der; }
+.views-cross [data-view='inferior'] { grid-area: inf; }
+
+.views-extra {
+  display: flex;
+  gap: 4px;
+}
+
+.views-extra button {
+  flex: 1;
+}
+
 /* Cubo de vistas: orientacion actual + navegacion por caras */
 #viewcube {
-  flex: 0 0 100%;
-  display: flex;
-  justify-content: center;
-  padding: 6px 0 2px;
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  padding: 6px;
   perspective: 480px;
+  z-index: 5;
 }
 
 #viewcube-inner {
@@ -575,7 +607,5 @@ select {
   #views-bar,
   #tools-bar {
     max-width: min(420px, calc(100vw - 24px));
-    overflow-x: auto;
-    flex-wrap: nowrap;
   }
 }

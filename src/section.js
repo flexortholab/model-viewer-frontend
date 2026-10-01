@@ -118,6 +118,21 @@ export class SectionPlaneTool {
     this._linesDirty = false
     this._lastVisible = []
 
+    // Atenuado del gizmo: a plena vista al arrastrar o al pasar el raton,
+    // casi transparente en reposo. Sin raton no hay hover (tactil): se
+    // muestra al tocar/arrastrar igualmente.
+    this._fadeMats = null
+    this._fadeLevel = 1
+    this._pointerInside = false
+    renderer.domElement.addEventListener('pointerenter', () => {
+      this._pointerInside = true
+      this._frameTick?.()
+    })
+    renderer.domElement.addEventListener('pointerleave', () => {
+      this._pointerInside = false
+      this._frameTick?.()
+    })
+
     // Dos gizmos sobre el mismo plano: flechas (mover) y anillos (rotar)
     // siempre visibles; mientras se arrastra uno, el otro queda bloqueado
     // para que la orbita no capture el gesto.
@@ -176,6 +191,47 @@ export class SectionPlaneTool {
     this.transformR.enabled = visible
     this._helperT.visible = visible
     this._helperR.visible = visible
+  }
+
+  /**
+   * Atenua el gizmo y el visual del plano cuando el raton no esta encima.
+   * Devuelve true mientras la transicion sigue en curso (el visor le da
+   * frames hasta que se asienta). Solo opacidades: nada del pipeline cambia.
+   */
+  updateGizmoFade() {
+    if (!this._fadeMats) {
+      this._fadeMats = []
+      const collect = (root) => {
+        root.traverse((node) => {
+          const list = Array.isArray(node.material) ? node.material : [node.material]
+          for (const material of list) {
+            if (!material || this._fadeMats.some((e) => e.material === material)) continue
+            material.transparent = true
+            this._fadeMats.push({ material, base: material.opacity })
+          }
+        })
+      }
+      collect(this._helperT)
+      collect(this._helperR)
+      collect(this.planeMesh)
+      collect(this.ringMesh)
+    }
+    const hovering = this._pointerInside &&
+      (this.transformT.axis != null || this.transformR.axis != null)
+    const dragging = this.transformT.dragging || this.transformR.dragging
+    const target = !this.enabled ? 1 : (hovering || dragging ? 1 : 0.15)
+    const next = this._fadeLevel + (target - this._fadeLevel) * 0.25
+    const settled = Math.abs(next - target) < 0.01
+    this._fadeLevel = settled ? target : next
+    for (const { material, base } of this._fadeMats) {
+      // _opacity: el propio TransformControls restaura la opacidad de sus
+      // asas en cada updateMatrixWorld; hay que escribir ahi tambien o el
+      // atenuado no se ve. El resaltado del eje bajo el cursor (opacity 1)
+      // sigue funcionando porque al pasar el raton el objetivo es 1.
+      material.opacity = base * this._fadeLevel
+      if ('_opacity' in material) material._opacity = base * this._fadeLevel
+    }
+    return !settled
   }
 
   setCapColor(hex) {

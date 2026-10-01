@@ -9,7 +9,7 @@ Pensado para **disyuntores sinterizados con anclaje esquelético** diseñados en
 - **anotaciones** exportables como sidecar JSON
 - embebible en un **webclip / iframe** vía `postMessage`, o por enlace directo
 
-Estado actual: **v0.3.0** funcional (plano de corte unico con gizmo mover+rotar, capping por pieza con anillo de contorno, lista de objetos con foco y corte por pieza, presentacion con marcadores editables, medidas editables con drag y snap, cifras en sprite 3D). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
+Estado actual: **v0.3.1** funcional (plano de corte unico con gizmo mover+rotar, capping por pieza con curva de corte exacta por objeto, lista de objetos con foco y corte por pieza, presentacion con marcadores editables, medidas editables con drag y snap, cifras en sprite 3D, paneles separados Vistas/Herramientas, logo propio, render bajo demanda para no cargar la GPU en reposo). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
 > **Demo desplegada (GitHub Pages, rama gh-pages):** https://rms1982.github.io/dental-viewer/
 > **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/disyuntor-4-pilares.stl&section=y=0
 > La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.
@@ -93,7 +93,10 @@ Sin `?model=`, el visor queda a la espera de un comando `load` por `postMessage`
 
 Un plano único anclado al modelo, colocado con gizmo (flechas para mover, anillos para
 rotar, ambos visibles a la vez). Botones **Alinear con la vista** y **Girar 90 grados**.
-La técnica usa:
+La superficie del corte se tapa en solido (stencil) y su perimetro se dibuja con la
+curva exacta de interseccion plano↔malla por pieza (calculada en CPU al activar el
+corte y al soltar el gizmo; durante el arrastre solo se mueve el capping para no
+tironear). La técnica usa:
 
 - `localClippingEnabled` + `clippingPlanes` por material
 - **stencil capping**: caras traseras/frente escriben stencil con operaciones opuestas y un quad coplanar tapa el hueco con `stencilFunc NotEqual 0` — el corte se ve **sólido**, no hueco
@@ -224,6 +227,19 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
    corregido `activePopupId` (quedaba el paso sin resaltar).
 4. GLB/FBX reales de Blender verificados en navegador (B1, Final1, Mario FBX).
 5. Limpieza de carpetas duplicadas accidentales (`src/src`, `scripts/scripts`, …).
+
+**Sesión del 01/10/2026 (smoke 43/43, unitarios 23/23):**
+
+1. Curva de corte exacta por pieza (`cutPlaneSegments` en `section.js`, con tests):
+   sustituye al anillo por hull, que pintaba tambien la silueta exterior y dejaba
+   hueco. Solo el perimetro del corte, pegado a la superficie por construccion.
+2. Paneles separados **Vistas** y **Herramientas** (antes una sola toolbar).
+3. Logo del laboratorio (`public/logo.png`) en la esquina inferior derecha.
+4. Render bajo demanda: la GPU descansa en reposo (bucle con `controls.update()`,
+   cola de 30 frames y pintado al mover el raton). Sin cambios de materiales,
+   sombras ni pipeline: el mismo render de siempre, solo menos veces.
+5. `loaded` incluye la GPU detectada (`WEBGL_debug_renderer_info`) para
+   diagnosticar integrada vs dedicada en cada equipo.
 
 **Pendiente:**
 

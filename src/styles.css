@@ -150,9 +150,11 @@ body {
   align-items: stretch;
 }
 
-#toolbar {
+#views-bar,
+#tools-bar {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
   padding: 8px;
   border-radius: var(--radius);
@@ -164,13 +166,22 @@ body {
 }
 
 /* Botones de toolbar con el mismo lenguaje que los botones de los paneles */
-#toolbar button {
+.toolbar button {
   border: 1px solid var(--border);
   background: #fff;
 }
 
-#toolbar button:hover {
+.toolbar button:hover {
   border-color: var(--accent);
+}
+
+.tb-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 2px;
 }
 
 .tb-group {
@@ -487,12 +498,26 @@ select {
   opacity: 1;
 }
 
+/* Logotipo del laboratorio, esquina inferior derecha */
+#brand-logo {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  box-shadow: 0 2px 10px rgba(20, 22, 26, 0.25);
+  pointer-events: none;
+  z-index: 5;
+}
+
 @media (max-width: 640px) {
   .panel {
     width: min(240px, calc(100vw - 132px));
   }
 
-  #toolbar {
+  #views-bar,
+  #tools-bar {
     max-width: min(420px, calc(100vw - 24px));
     overflow-x: auto;
     flex-wrap: nowrap;

@@ -484,12 +484,12 @@ sectionEnabled.addEventListener('change', () => {
 
 
 container.addEventListener('pointerdown', (event) => {
-  if (markerMode && !event.target.closest('.panel, #toolbar, #toolbars')) {
+  if (markerMode && !event.target.closest('.panel, .toolbar')) {
     addMarkerAt(event)
     return
   }
   if (!viewer.measure?.enabled) return
-  if (event.target.closest('.panel, #toolbar, #toolbars')) return
+  if (event.target.closest('.panel, .toolbar')) return
   viewer.handleMeasureClick(event)
 })
 

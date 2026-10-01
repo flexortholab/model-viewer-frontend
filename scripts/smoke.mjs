@@ -184,17 +184,34 @@ const section = await evaluate(`
     v.setSection({ enabled: true, plane: { point: [0, 0, 0], normal: [0, 0, 1] } })
     v.renderer.render(v.scene, v.camera)
     const caps = v.section.capGroup.children.filter((c) => String(c.name).startsWith('cap-')).length
-    const rings = v.section.capGroup.children.filter((c) => !String(c.name).startsWith('cap-')).length
     const stencils = v.section.stencilGroup.children.length
     const planes = v.model.meshes[0].material.clippingPlanes?.length ?? 0
     const capWrite = v.section.capGroup.children.filter((c) => String(c.name).startsWith('cap-'))[0]?.material.stencilWrite
     const stencilWrite = v.section.stencilGroup.children[0]?.material.stencilWrite
-    return { enabled: v.section.enabled, caps, rings, stencils, planes, capWrite, stencilWrite }
+    return { enabled: v.section.enabled, caps, stencils, planes, capWrite, stencilWrite }
   })()
 `)
 check('el corte seccional se activa', section.enabled === true)
 check('genera una superficie de corte', section.caps === 1, `${section.caps} cap`)
-check('genera el anillo de contorno por pieza (doble hull)', section.rings === 1, `${section.rings} ring`)
+// La curva del corte: plano transversal al eje largo de la barra (50 mm en
+// X) para cruzar muchos triangulos; todos los puntos dentro de la pieza.
+const cut = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    v.setSection({ enabled: true, plane: { point: [0, 0, 0], normal: [1, 0, 0] } })
+    v.renderer.render(v.scene, v.camera)
+    const lines = v.section.cutGroup.children
+    let segments = 0
+    let maxAbs = 0
+    for (const l of lines) {
+      segments += l.userData?.segments ?? 0
+      maxAbs = Math.max(maxAbs, l.userData?.maxAbs ?? 0)
+    }
+    return { cuts: lines.length, segments, maxAbs }
+  })()
+`)
+check('dibuja la curva del corte por pieza (interseccion exacta)', cut.cuts === 1 && cut.segments > 10, `${cut.cuts} curva, ${cut.segments} segmentos`)
+check('la curva vive sobre la pieza (sin lineas fugadas)', cut.maxAbs < 60, `max |xyz| = ${cut.maxAbs.toFixed(1)} mm`)
 check('genera el grupo de stencil (caras traseras y delanteras)', section.stencils >= 2, `${section.stencils} mallas`)
 check('los materiales recortan con el plano', section.planes === 1)
 check('stencil activo en el capping y en los strokes', section.capWrite === true && section.stencilWrite === true)

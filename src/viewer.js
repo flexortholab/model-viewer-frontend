@@ -63,8 +63,34 @@ export class DentalViewer {
     window.addEventListener('resize', this._onResize)
     this.resize()
 
+    // Render bajo demanda: la GPU descansa cuando no hay cambios (los
+    // controles con inercia siguen pidiendo frames via controls.update()).
+    // Cola de 30 frames tras cada cambio + frame al mover el raton: margen
+    // de sobra para que ninguna vista se quede sin pintar en ningun equipo.
+    this._dirty = true
+    this._tail = 0
     this._loop = this._loop.bind(this)
     this.renderer.setAnimationLoop(this._loop)
+    this.renderer.domElement.addEventListener('pointermove', () => {
+      this.requestRender()
+    })
+  }
+
+  /** Marca un frame pendiente (llamar tras cualquier cambio visual). */
+  requestRender() {
+    this._dirty = true
+  }
+
+  /** Que GPU ejecuta el WebGL (para diagnosticar integrada vs dedicada). */
+  gpuInfo() {
+    try {
+      const gl = this.renderer.getContext()
+      const ext = gl.getExtension('WEBGL_debug_renderer_info')
+      const raw = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)
+      return String(raw ?? 'desconocida')
+    } catch {
+      return 'desconocida'
+    }
   }
 
   on(event, fn) {
@@ -112,6 +138,8 @@ export class DentalViewer {
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(width, height, false)
     this.measure?.setResolution(width, height)
+    this.section?.setResolution?.(width, height)
+    this.requestRender()
     this.emit('resize', { width, height })
   }
 
@@ -177,6 +205,7 @@ export class DentalViewer {
       },
       stats: result.stats,
       objects: this.listObjects(),
+      gpu: this.gpuInfo(),
     }
     this.emit('loaded', info)
     return info
@@ -234,6 +263,7 @@ export class DentalViewer {
     }
     // Al reenquadrar solo se recentra la camara; los planos conservan su
     // posicion para no perder el corte que el doctor estaba revisando.
+    this.requestRender()
     this.emit('framed', { center, radius })
   }
 
@@ -249,6 +279,7 @@ export class DentalViewer {
     } else {
       this.scene.background = new THREE.Color(value)
     }
+    this.requestRender()
   }
 
   setWireframe(enabled) {
@@ -256,6 +287,7 @@ export class DentalViewer {
       const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
       for (const material of list) material.wireframe = !!enabled
     }
+    this.requestRender()
   }
 
   setModelOpacity(value) {
@@ -268,12 +300,14 @@ export class DentalViewer {
         material.needsUpdate = true
       }
     }
+    this.requestRender()
   }
 
   /** Activa el modo medicion y devuelve el estado. */
   setTool(tool) {
     const enabled = tool === 'measure' ? this.measure.setEnabled(true) : this.measure?.setEnabled(false)
     this.controls.enabled = !enabled
+    this.requestRender()
     this.emit('tool', { tool: enabled ? 'measure' : 'orbit' })
     return enabled ? 'measure' : 'orbit'
   }
@@ -406,6 +440,7 @@ export class DentalViewer {
     }
     this.emit('framed', { center, radius, object: index })
     this.emit('objects', this.listObjects())
+    this.requestRender()
     return { center, radius }
   }
 
@@ -513,6 +548,7 @@ export class DentalViewer {
     // Pulso visual en la etiqueta del marcador.
     this.measure?.pulse?.(`marker:${id}`)
     this.emit('markers', this.doc.markers)
+    this.requestRender()
     return marker
   }
 
@@ -596,6 +632,7 @@ export class DentalViewer {
       this.doc.measurements = this.measure.serialize()
     }
     this.doc.units = 'mm'
+    this.requestRender()
     this.emit('changed', this.doc)
   }
 
@@ -641,6 +678,7 @@ export class DentalViewer {
     const measurement = this.measure.add(this._pendingPoint, snapped ?? hit.point)
     this._pendingPoint = null
     this.measure.setPending(null)
+    this.requestRender()
     this.emit('measure-add', measurement)
     return measurement
   }
@@ -661,6 +699,7 @@ export class DentalViewer {
     if (!hit || !this.measure?.enabled) return
     if (this._pendingPoint) {
       this.measure.setPending(hit.point)
+      this.requestRender()
       this.emit('measure-hover', { point: hit.point.clone() })
     }
   }
@@ -689,6 +728,7 @@ export class DentalViewer {
       this.camera.position.copy(center).add(d)
       this.controls.target.copy(center)
       this.controls.update()
+      this.requestRender()
       this.emit('view', view)
       return
     }
@@ -696,6 +736,7 @@ export class DentalViewer {
       this.camera.position.fromArray(view.position)
       this.controls.target.fromArray(view.target)
       this.controls.update()
+      this.requestRender()
     }
   }
 
@@ -729,7 +770,14 @@ export class DentalViewer {
   }
 
   _loop() {
-    this.controls.update()
+    // controls.update() devuelve true mientras la camara se mueve (arrastre
+    // o inercia): esos frames se pintan. Lo demas, solo si algo lo pidio,
+    // mas una cola de 30 frames para rematar inercias y transiciones.
+    const moved = this.controls.update()
+    if (!moved && !this._dirty && this._tail <= 0) return
+    const wasDirty = this._dirty
+    this._dirty = false
+    this._tail = moved || wasDirty ? 30 : this._tail - 1
     this.renderer.render(this.scene, this.camera)
     this.measure?.update()
   }

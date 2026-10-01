@@ -35,6 +35,9 @@ export class MeasureTool {
     this.labels = []
     this._nextId = 1
     this._pending = null
+    this._selectedId = null
+    this._preview = null
+    this._snap = null
     this._hover = null
     this._tmp = new THREE.Vector3()
   }
@@ -52,7 +55,7 @@ export class MeasureTool {
     for (const material of this.lineMaterials) material.resolution.set(width, height)
   }
 
-  _makeLine(points, { color = 0x2563eb, width = 2, dashed = false } = {}) {
+  _makeLine(points, { color = 0x111111, width = 2, dashed = false } = {}) {
     const geometry = new LineGeometry()
     geometry.setPositions(points)
     const material = new LineMaterial({
@@ -102,6 +105,7 @@ export class MeasureTool {
   remove(id) {
     const index = this.measurements.findIndex((m) => m.id === id)
     if (index === -1) return false
+    if (this._selectedId === id) this._selectedId = null
     this._dispose(this.measurements[index])
     this.measurements.splice(index, 1)
     this.onChange?.(this.serialize())
@@ -111,6 +115,8 @@ export class MeasureTool {
   clear() {
     for (const measurement of this.measurements) this._dispose(measurement)
     this.measurements = []
+    this._selectedId = null
+    this.clearPreview()
     this.onChange?.(this.serialize())
   }
 
@@ -133,6 +139,7 @@ export class MeasureTool {
   _build(measurement) {
     const nodes = this._entry(measurement)
     const { a, b } = measurement
+    const selected = measurement.id === this._selectedId
 
     // Direccion de la linea de cota: perpendicular al segmento, en el plano
     // que mas se aleja de la camara para que la cifra quede legible.
@@ -167,9 +174,9 @@ export class MeasureTool {
     const a2 = a.clone().add(offset)
     const b2 = b.clone().add(offset)
 
-    nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 3.4 })
-    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 2, color: 0x9aa2b1 })
-    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 2, color: 0x9aa2b1 })
+    nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 3.4, color: selected ? 0x1b8aa3 : 0x111111 })
+    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 2, color: selected ? 0x1b8aa3 : 0x111111 })
+    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 2, color: selected ? 0x1b8aa3 : 0x111111 })
 
     // Tildes oblicuas en los extremos, estilo plano de taller.
     const tickDir = direction.clone().add(best).normalize().multiplyScalar(TICK)
@@ -190,9 +197,12 @@ export class MeasureTool {
       if (nodes[key]) this.group.add(nodes[key])
     }
 
+    // Segmento visible (linea de cota) para el hit-test de seleccion.
+    measurement._seg = { a: a2.clone(), b: b2.clone() }
+
     // La cifra en mm es un sprite 3D con el texto horneado en canvas: se ve
     // SIEMPRE en cualquier navegador (independiente del z-order del DOM).
-    nodes.value = this._makeValueSprite(measurement.label)
+    nodes.value = this._makeValueSprite(this.displayLabel(measurement))
     this.group.add(nodes.value)
     nodes.value.position.copy(new THREE.Vector3().addVectors(a2, b2).multiplyScalar(0.5))
 
@@ -206,7 +216,7 @@ export class MeasureTool {
     })
   }
 
-  _makePoint(point, color = 0xffd479) {
+  _makePoint(point, color = 0x111111) {
     const geometry = new THREE.BufferGeometry().setFromPoints([point, point])
     const material = new THREE.PointsMaterial({
       color,
@@ -254,7 +264,7 @@ export class MeasureTool {
     c.beginPath()
     c.roundRect(2, 2, canvas.width - 4, canvas.height - 4, 9)
     c.fill()
-    c.strokeStyle = '#1b8aa3'
+    c.strokeStyle = '#63bbd4'
     c.lineWidth = 2
     c.stroke()
     c.fillStyle = '#101828'
@@ -276,8 +286,82 @@ export class MeasureTool {
       nodes.value.material.map?.dispose()
       nodes.value.material.dispose()
     }
-    nodes.value = this._makeValueSprite(measurement.label)
+    nodes.value = this._makeValueSprite(this.displayLabel(measurement))
     this.group.add(nodes.value)
+  }
+
+  /** Texto del sprite: cifra + nota opcional en la misma pastilla. */
+  displayLabel(measurement) {
+    const note = (measurement.note ?? '').trim()
+    return note ? `${measurement.label} · ${note}` : measurement.label
+  }
+
+  /** Cambia la nota de una medida y repinta su cifra. */
+  setNote(id, note) {
+    const measurement = this.measurements.find((m) => m.id === id)
+    if (!measurement) return null
+    measurement.note = String(note ?? '')
+    this._refreshValueSprite(measurement)
+    this.onChange?.(this.serialize())
+    return measurement
+  }
+
+  /** Selecciona una medida (resalta en teal) o null para soltar. */
+  select(id) {
+    const next = id ?? null
+    if (this._selectedId === next) return this.selected()
+    const prevId = this._selectedId
+    this._selectedId = next
+    for (const measurement of this.measurements) {
+      if (measurement.id === prevId || measurement.id === next) {
+        this._dispose(measurement)
+        this._build(measurement)
+      }
+    }
+    return this.selected()
+  }
+
+  selected() {
+    return this.measurements.find((m) => m.id === this._selectedId) ?? null
+  }
+
+  /**
+   * Medida bajo el cursor (linea de cota o extremos), para seleccionar,
+   * editar la nota o borrar con Supr. Radio en px de pantalla.
+   */
+  findMeasurement(clientX, clientY, tolerance = 10) {
+    const rect = this.container.getBoundingClientRect()
+    const px = clientX - rect.left
+    const py = clientY - rect.top
+    const width = this.container.clientWidth || 1
+    const height = this.container.clientHeight || 1
+    const toPx = (v) => {
+      this._tmp.copy(v).project(this.camera)
+      if (this._tmp.z > 1) return null
+      return [(this._tmp.x * 0.5 + 0.5) * width, (-this._tmp.y * 0.5 + 0.5) * height]
+    }
+    const distSeg = (p, q) => {
+      if (!p || !q) return Infinity
+      const dx = q[0] - p[0]
+      const dy = q[1] - p[1]
+      const lenSq = dx * dx + dy * dy
+      let t = lenSq > 0 ? ((px - p[0]) * dx + (py - p[1]) * dy) / lenSq : 0
+      t = Math.max(0, Math.min(1, t))
+      return Math.hypot(px - (p[0] + dx * t), py - (p[1] + dy * t))
+    }
+    let best = null
+    let bestDist = tolerance
+    for (const measurement of this.measurements) {
+      const seg = measurement._seg
+      const a = toPx(seg?.a ?? measurement.a)
+      const b = toPx(seg?.b ?? measurement.b)
+      const dist = Math.min(distSeg(a, b), distSeg(a, a), distSeg(b, b))
+      if (dist < bestDist) {
+        bestDist = dist
+        best = measurement
+      }
+    }
+    return best
   }
 
   _dispose(measurement) {
@@ -476,7 +560,7 @@ export class MeasureTool {
     c.beginPath()
     c.roundRect(2, 2, canvas.width - 4, canvas.height - 4, 9)
     c.fill()
-    c.strokeStyle = '#1b8aa3'
+    c.strokeStyle = '#63bbd4'
     c.lineWidth = 2
     c.stroke()
     c.fillStyle = '#101828'

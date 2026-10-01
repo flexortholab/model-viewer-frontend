@@ -9,7 +9,7 @@ Pensado para **disyuntores sinterizados con anclaje esquelético** diseñados en
 - **anotaciones** exportables como sidecar JSON
 - embebible en un **webclip / iframe** vía `postMessage`, o por enlace directo
 
-Estado actual: **v0.3.3** funcional (plano de corte unico con gizmo mover+rotar atenuado, capping por pieza con curva de corte exacta por objeto, lista de objetos con foco y corte por pieza, presentacion con marcadores editables, medidas compactas de una en una en mm con 1 decimal, cubo de vistas clicable en la esquina, paneles separados Vistas (en cruz) y Herramientas, logo propio con acento corporativo teal, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
+Estado actual: **v0.3.4** funcional (plano de corte unico con gizmo mover+rotar atenuado, capping por pieza con curva de corte exacta por objeto, lista de objetos con iconos propios y corte por pieza, presentacion con marcadores editables, medidas compactas de una en una en mm con 1 decimal, seleccion y nota de medidas, cubo de vistas clicable en la esquina con las caras bien orientadas, giro libre sin topes, paneles separados Vistas (en cruz) y Herramientas, logo oficial del laboratorio con su teal y gris de marca, titulo del caso sin marco, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
 > **Demo desplegada (GitHub Pages, rama gh-pages):** https://rms1982.github.io/dental-viewer/
 > **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/disyuntor-4-pilares.stl&section=y=0
 > La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.
@@ -252,7 +252,7 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 1. Panel **Objetos desplegado por defecto**; panel **Vistas** con wrap corregido y
    **cubo de navegación** (6 caras clicables, rota con la cámara, resalta la vista
    activa; verificado cara por cara).
-2. Logo más pequeño (72 px) y **acento corporativo teal `#5ABCD2`** (botones,
+2. Logo más pequeño (72 px) y acento corporativo teal (botones,
    checkbox, iconos, bordes de cifra, marcador de tornillo).
 3. Medidas compactas (~1/3 menos): cifra 3D, líneas y puntos reducidos.
 4. **Precisión 0.1 mm** (`formatMm` a 1 decimal por defecto).
@@ -274,12 +274,41 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
    sustituye al anillo por hull, que pintaba tambien la silueta exterior y dejaba
    hueco. Solo el perimetro del corte, pegado a la superficie por construccion.
 2. Paneles separados **Vistas** y **Herramientas** (antes una sola toolbar).
-3. Logo del laboratorio (`public/logo.png`) en la esquina inferior derecha.
+3. Logo del laboratorio en la esquina inferior derecha (el fichero en `public/logo.svg`
+   se sustituyo mas adelante por el lockup horizontal oficial).
 4. Render bajo demanda: la GPU descansa en reposo (bucle con `controls.update()`,
    cola de 30 frames y pintado al mover el raton). Sin cambios de materiales,
    sombras ni pipeline: el mismo render de siempre, solo menos veces.
 5. `loaded` incluye la GPU detectada (`WEBGL_debug_renderer_info`) para
    diagnosticar integrada vs dedicada en cada equipo.
+
+**Sesión del 01/10/2026 (noche; smoke 64/64, unitarios 24/24):**
+
+1. **Logo oficial** (`public/logo.svg`, lockup horizontal `flex ortholab` +
+   LABORATORIO DIGITAL): sale el PNG circular. Se recorta el `viewBox` al contenido
+   real (el original traía un perfil ICC de 1 MB incrustado) y se aplica el halo
+   blanco suave para que se lea sobre la pieza.
+2. **Acento de interfaz = el del logo**: `--accent: #63bbd4` exacto para iconos,
+   bordes, relleno del cubo activo y anillo del loader. Se añaden `--accent-strong`
+   (`#1b8aa3`) y `--accent-ink` (`#0f6b80`) para los puntos donde el teal claro no
+   tenga contraste (texto pequeño, checkbox, cifras 3D sobre la pieza) y
+   `--brand-ink` (`#666767`), el gris de la tipografía del logo.
+3. **Título del caso** sin globo: 22 px, peso 700, en `--brand-ink`, solo con sombra
+   blanca de legibilidad.
+4. **Iconos de la lista de objetos** en SVG con el mismo trazo (1.5 px) que las barras:
+   ojo, ojo tachado y tijeras. Se sustituyen los emojis 👁/✂, que cambiaban de aspecto
+   según el sistema. Los botones ya no llevan pastilla de "pulsado".
+5. **Cubo de vistas corregido**: la matriz era una conjugación espejada, así que el
+   cubo se veía del revés y las caras laterales salían intercambiadas. Ahora es la
+   rotación inversa de la cámara, sin espejar, y cada cara mira hacia donde se sitúa
+   la cámara en esa vista (`izquierda` = +X, `superior` = +Y). Verificado cara por cara
+   en las seis vistas.
+6. **Giro libre garantizado**: los controles no fijan `min/maxPolarAngle` ni
+   `min/maxAzimuthAngle`. Se añade cobertura en el smoke con arrastre real de ratón
+   (bandeja horizontal, vista desde debajo con polar 180° y vueltas completas) para
+   que nadie reintroduzca topes.
+7. Loader y título: el loader se enciende de forma síncrona al pedir la carga (ya no
+   dependía de un `setTimeout` para detectarlo en headless).
 
 **Pendiente:**
 

@@ -18,9 +18,22 @@ const objectsList = document.getElementById('objects-list')
 const markersPanel = document.getElementById('markers-panel')
 const markersCount = document.getElementById('markers-count')
 const markersList = document.getElementById('markers-list')
+const docTitle = document.getElementById('doc-title')
+const loader = document.getElementById('loader')
+const loaderText = document.getElementById('loader-text')
 
-const EYE_ON = '\u{1F441}'
-const EYE_OFF = '\u{1F441}\u{200D}\u{1F5E8}'
+// Iconos de la interfaz: mismo trazo teal que las barras, sin emojis del sistema.
+const ICON_EYE =
+  '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.6 8s2.4-4.3 6.4-4.3S14.4 8 14.4 8s-2.4 4.3-6.4 4.3S1.6 8 1.6 8z"/><circle cx="8" cy="8" r="1.9"/></svg>'
+const ICON_EYE_OFF =
+  '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.6 8s2.4-4.3 6.4-4.3c1.2 0 2.3.3 3.2.8M14.4 8s-2.4 4.3-6.4 4.3c-1.1 0-2.1-.3-3-.7"/><path d="M2.4 2.4l11.2 11.2"/></svg>'
+const ICON_CUT =
+  '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4" cy="4" r="2.2"/><circle cx="4" cy="12" r="2.2"/><path d="M5.8 5.8 14 14M5.8 10.2 14 2"/></svg>'
+
+function setIcon(element, markup) {
+  element.innerHTML = markup
+  return element
+}
 
 const viewer = new DentalViewer(container, { labelLayer })
 const bridge = createBridge({ onCommand: handleHostCommand })
@@ -77,7 +90,7 @@ function renderObjects() {
     const eye = document.createElement('button')
     eye.type = 'button'
     eye.className = 'obj-eye' + (object.visible ? '' : ' is-off')
-    eye.textContent = object.visible ? EYE_ON : EYE_OFF
+    setIcon(eye, object.visible ? ICON_EYE : ICON_EYE_OFF)
     eye.title = object.visible ? 'Ocultar' : 'Mostrar'
     eye.setAttribute('aria-pressed', String(object.visible))
     eye.addEventListener('click', () => {
@@ -89,14 +102,10 @@ function renderObjects() {
     name.className = 'obj-name'
     name.textContent = object.name
 
-    const tris = document.createElement('span')
-    tris.className = 'obj-tris'
-    tris.textContent = `${object.triangles.toLocaleString('es')} tri`
-
     const cut = document.createElement('button')
     cut.type = 'button'
     cut.className = 'obj-cut'
-    cut.textContent = '\u2702'
+    setIcon(cut, ICON_CUT)
     cut.title = 'Centrar la vista y activar el corte en esta pieza'
     cut.addEventListener('click', () => {
       viewer.focusObject(object.index, { withPlane: true })
@@ -106,7 +115,7 @@ function renderObjects() {
 
     const row = document.createElement('span')
     row.className = 'obj-row'
-    row.append(eye, name, tris, cut)
+    row.append(eye, name, cut)
     li.dataset.index = object.index
     row.addEventListener('click', (event) => {
       if (event.target.closest('button')) return
@@ -190,15 +199,11 @@ const cubeFaces = [...document.querySelectorAll('#viewcube-inner [data-cube]')]
 function updateViewCube() {
   if (!cubeInner) return
   const camera = viewer.camera
+  // El cubo gira con la camara (rotacion inversa, sin espejar): la cara cuya
+  // normal apunta a la camara es exactamente la que se ve del modelo.
   _cuboQ.copy(camera.quaternion).invert()
   _cuboM.makeRotationFromQuaternion(_cuboQ)
-  // Conjugar por C=diag(1,-1,1): negar fila 1 y columna 1 (elementos 1, 4, 6
-  // y 9 en columna-mayor). Los demas se quedan igual.
   const e = _cuboM.elements
-  e[1] = -e[1]
-  e[4] = -e[4]
-  e[6] = -e[6]
-  e[9] = -e[9]
   cubeInner.style.transform = `matrix3d(${e.map((n) => n.toFixed(5)).join(',')})`
 
   // Cara dominante segun de donde mira la camara (posicion - objetivo).
@@ -223,6 +228,14 @@ viewer.on('frame', updateViewCube)
 viewer.on('loaded', (info) => {
   currentModel = info
   panelVisibility(true)
+  // Titulo: nombre del archivo sin extension.
+  const base = String(info.name ?? '').split('/').pop().split('?')[0].split('#')[0]
+  const title = base.includes('.') ? base.slice(0, base.lastIndexOf('.')) : base
+  if (docTitle) {
+    docTitle.textContent = title || 'Visor dental'
+    docTitle.hidden = false
+  }
+  if (loader) loader.hidden = true
   const { x, y, z } = info.sizeMm
   setStatus(
     `${info.stats.triangles.toLocaleString('es')} tri · ${x} × ${y} × ${z} mm`,
@@ -243,8 +256,14 @@ viewer.on('markers', () => renderMarkers())
 viewer.on('objects', () => renderObjects())
 
 viewer.on('progress', ({ fraction, phase }) => {
-  if (phase === 'loading' && Number.isFinite(fraction)) {
-    setStatus(`Cargando ${Math.round(fraction * 100)}%`)
+  if (phase === 'loading') {
+    if (loader) {
+      loader.hidden = false
+      if (loaderText && Number.isFinite(fraction)) {
+        loaderText.textContent = `Cargando modelo… ${Math.round(fraction * 100)}%`
+      }
+    }
+    if (Number.isFinite(fraction)) setStatus(`Cargando ${Math.round(fraction * 100)}%`)
   }
 })
 
@@ -260,6 +279,7 @@ viewer.on('measure-add', (measurement) => {
 })
 
 viewer.on('error', (error) => {
+  if (loader) loader.hidden = true
   setStatus(error.message)
   bridge.error(error)
 })
@@ -268,6 +288,10 @@ viewer.on('error', (error) => {
 
 async function loadModel(url, options = {}) {
   setStatus('Cargando modelo…')
+  if (loader) {
+    loader.hidden = false
+    if (loaderText) loaderText.textContent = 'Cargando modelo…'
+  }
   forcedUnits = options.forcedUnits ?? forcedUnits
   if (typeof options.material === 'string') materialMode = options.material
   const info = await viewer.load(url, {
@@ -407,6 +431,14 @@ const ACTIONS = {
   clearMeasurements() {
     viewer.measure?.clear()
   },
+  removeMeasurement({ id }) {
+    return viewer.measure?.remove(String(id)) ?? false
+  },
+  setMeasurementNote({ id, note }) {
+    const measurement = viewer.measure?.setNote(String(id), note ?? '')
+    if (measurement) viewer.measure?.select(String(id))
+    return measurement
+  },
   marker({ position, text, kind, snapshot }) {
     if (!Array.isArray(position)) throw new Error('marker: falta position (array de 3)')
     return viewer.addMarker({ position, text, kind, snapshot: snapshot === true || snapshot === undefined })
@@ -537,9 +569,31 @@ container.addEventListener('pointerdown', (event) => {
     addMarkerAt(event)
     return
   }
-  if (!viewer.measure?.enabled) return
   if (event.target.closest('.panel, .toolbar, #viewcube')) return
-  viewer.handleMeasureClick(event)
+  if (viewer.measure?.enabled) {
+    viewer.handleMeasureClick(event)
+    return
+  }
+  // Modo libre: clic selecciona una medida (clic en vacio suelta).
+  if (event.button === 0 && event.target === viewer.renderer.domElement) {
+    const found = viewer.measure?.findMeasurement(event.clientX, event.clientY)
+    const selected = viewer.measure?.select(found?.id ?? null)
+    if (selected) {
+      showHint(`${selected.label} · clic en vacío para soltar, doble clic para la nota, Supr para borrar`, 3200)
+    }
+  }
+})
+
+container.addEventListener('dblclick', (event) => {
+  if (viewer.measure?.enabled || markerMode) return
+  if (event.target.closest('.panel, .toolbar, #viewcube')) return
+  const found = viewer.measure?.findMeasurement(event.clientX, event.clientY)
+  if (!found) return
+  viewer.measure.select(found.id)
+  const next = window.prompt('Nota de la medida (vacío para quitarla):', found.note ?? '')
+  if (next === null) return
+  viewer.measure.setNote(found.id, next.trim())
+  showHint(next.trim() ? 'Nota guardada' : 'Nota quitada')
 })
 
 container.addEventListener('pointermove', (event) => {
@@ -556,7 +610,7 @@ container.addEventListener('pointerup', () => {
 })
 
 window.addEventListener('keydown', (event) => {
-  if (event.target.matches('input, textarea')) return
+  if (event.target?.matches?.('input, textarea')) return
   switch (event.key.toLowerCase()) {
     case 'm':
       toggleMeasure()
@@ -573,7 +627,17 @@ window.addEventListener('keydown', (event) => {
     case 'escape':
       if (viewer.measure?.enabled) toggleMeasure()
       if (markerMode) toggleMarkerTool()
+      viewer.measure?.select(null)
       break
+    case 'delete':
+    case 'backspace': {
+      const selected = viewer.measure?.selected()
+      if (selected) {
+        viewer.measure.remove(selected.id)
+        showHint('Medida borrada')
+      }
+      break
+    }
   }
 })
 

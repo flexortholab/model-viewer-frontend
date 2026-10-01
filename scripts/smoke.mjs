@@ -391,6 +391,67 @@ const hidden = await evaluate(`
 check('las etiquetas se ocultan con la pieza recortada', hidden.visible === 0)
 check('vuelven a verse al retirar el corte', hidden.visibleAfter === 1)
 
+// Edicion de medidas: seleccionar, nota y Supr (sin prompt, apto headless).
+// OJO: este bloque deja cero medidas; lo que venga despues no debe contarlas.
+const edit = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    // Camara frontal conocida: el hit-test se mide en pixeles de pantalla.
+    v.camera.position.set(0, 0, 80)
+    v.controls.target.set(0, 0, 0)
+    v.controls.update()
+    v.camera.updateMatrixWorld()
+    const a = v.model.bounds.getCenter(new (v.camera.position.constructor)())
+    const b = a.clone(); b.x += 12.3456
+    const m = v.measure.add(a, b)
+    const mid = m._seg.a.clone().add(m._seg.b).multiplyScalar(0.5).project(v.camera)
+    const rect = v.renderer.domElement.getBoundingClientRect()
+    const x = (mid.x * 0.5 + 0.5) * rect.width + rect.left
+    const y = (-mid.y * 0.5 + 0.5) * rect.height + rect.top
+    const found = v.measure.findMeasurement(x, y)
+    v.measure.select(found?.id ?? null)
+    // Estado de la seleccion ANTES de borrar la medida.
+    const selectedId = v.measure.selected()?.id ?? null
+    const dimColor = m.__nodes.dim.material.color.getHexString()
+    v.measure.setNote(m.id, 'ancho')
+    const shown = v.measure.displayLabel(m)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }))
+    return {
+      foundId: found?.id ?? null,
+      selectedId,
+      dimColor,
+      shown,
+      remaining: v.measure.measurements.length,
+    }
+  })()
+`)
+check('clic selecciona la medida (hit-test en pantalla)', edit.foundId !== null && edit.selectedId === edit.foundId,
+  `${edit.foundId} / ${edit.selectedId}`)
+check('seleccionada se tiñe de teal', edit.dimColor === '1b8aa3', `#${edit.dimColor}`)
+check('la nota aparece en la cifra', edit.shown.includes('ancho'), edit.shown)
+check('Supr borra la medida seleccionada', edit.remaining === 0)
+
+// Titulo con el nombre del archivo y loader durante la carga.
+const chrome2 = await evaluate(`
+  (async () => {
+    const v = window.dentalViewer
+    const p = v.load('samples/disyuntor-4-pilares-metros.stl')
+    // El loader se enciende de forma sincrona al pedir la carga.
+    const during = document.getElementById('loader').hidden === false
+    await p
+    const out = {
+      during,
+      after: document.getElementById('loader').hidden === true,
+      title: document.getElementById('doc-title').textContent,
+    }
+    await v.load('samples/disyuntor-4-pilares.stl')
+    return out
+  })()
+`)
+check('loader visible durante la carga', chrome2.during === true)
+check('loader oculto al terminar', chrome2.after === true)
+check('titulo con el nombre sin extension', chrome2.title === 'disyuntor-4-pilares-metros', chrome2.title)
+
 // --- Centrado: la normalizacion debe dejar las mallas sin transformaciones --
 const centering = await evaluate(`
   (() => {
@@ -486,6 +547,115 @@ check('pulsar el marcador restaura vista, objetivo y corte',
   markerFlow.restored.sectionRestored && markerFlow.restored.planoRestoredPosicion)
 check('el marcador restaura su etiqueta en la pieza', markerFlow.restored.markerLabels >= 1)
 check('los marcadores se pueden borrar', markerFlow.markersAfterRemove === 0)
+
+// --- Giro libre de la camara (sin limites polares ni de acimut) ---------------
+// Arrastre real de raton sobre el lienzo: la pieza debe poder girar en
+// cualquier direccion, incluidas vueltas completas y vistas desde debajo.
+const limits = await evaluate(`
+  (() => {
+    const c = window.dentalViewer.controls
+    // Infinity no viaja en JSON: se normaliza a null para comparar.
+    const big = (v) => (v === Infinity || v === -Infinity ? null : v)
+    return {
+      minPolar: c.minPolarAngle,
+      maxPolar: c.maxPolarAngle,
+      minAzim: big(c.minAzimuthAngle),
+      maxAzim: big(c.maxAzimuthAngle),
+      rotate: c.enableRotate,
+    }
+  })()
+`)
+check('sin limites de giro (polar 0..PI y acimut libre)',
+  limits.minPolar === 0 && limits.maxPolar === Math.PI &&
+  limits.minAzim === null && limits.maxAzim === null && limits.rotate === true,
+  JSON.stringify(limits))
+
+const orbitBefore = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    v.setSection({ enabled: false })
+    v.measure.clear()
+    v.setTool('orbit')
+    v.camera.position.set(60, 25, 60)
+    v.controls.target.set(0, 0, 0)
+    v.controls.update()
+    const r = v.renderer.domElement.getBoundingClientRect()
+    return { pos: v.camera.position.toArray(), cx: r.left + r.width / 2, cy: r.top + r.height / 2, h: r.height }
+  })()
+`)
+
+const drag = async (x0, y0, x1, y1, steps = 12) => {
+  await send('Input.dispatchMouseEvent',
+    { type: 'mousePressed', x: x0, y: y0, button: 'left', buttons: 1, clickCount: 1 }, sessionId)
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps
+    await send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: Math.round(x0 + (x1 - x0) * t),
+      y: Math.round(y0 + (y1 - y0) * t),
+      button: 'left',
+      buttons: 1,
+    }, sessionId)
+  }
+  await send('Input.dispatchMouseEvent',
+    { type: 'mouseReleased', x: x1, y: y1, button: 'left', buttons: 0, clickCount: 1 }, sessionId)
+  await sleep(400)
+}
+
+// Barrido horizontal amplio (mas de media vuelta) y arrastre vertical hacia
+// arriba para pasar por debajo del plano de la mesa.
+await drag(orbitBefore.cx - 300, orbitBefore.cy, orbitBefore.cx + 300, orbitBefore.cy + 30)
+const giro = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    return { pos: v.camera.position.toArray(), polar: v.controls.getPolarAngle() }
+  })()
+`)
+const movido = Math.hypot(
+  giro.pos[0] - orbitBefore.pos[0],
+  giro.pos[1] - orbitBefore.pos[1],
+  giro.pos[2] - orbitBefore.pos[2],
+)
+check('arrastrar en horizontal gira la camara', movido > 5, `${movido.toFixed(1)} unidades`)
+
+await drag(orbitBefore.cx, orbitBefore.cy + orbitBefore.h * 0.35, orbitBefore.cx, orbitBefore.cy - orbitBefore.h * 0.35)
+const debajo = await evaluate(`(() => {
+  const v = window.dentalViewer
+  return { polar: v.controls.getPolarAngle(), y: v.camera.position.y, targetY: v.controls.target.y }
+})()`)
+check('se puede mirar la pieza desde debajo (polar > 90 grados)',
+  debajo.polar > Math.PI / 2 + 0.05 && debajo.y < debajo.targetY,
+  `polar ${(debajo.polar * 180 / Math.PI).toFixed(0)} grados`)
+
+// Vueltas completas alrededor del modelo: nada debe frenar el giro.
+const vueltas = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    const c = v.controls
+    const Vector3 = v.camera.position.constructor
+    const radio = v.camera.position.distanceTo(c.target)
+    let minPolar = Infinity
+    for (let giro = 0; giro < 8; giro++) {
+      v.camera.position.set(c.target.x + radio, c.target.y, c.target.z)
+      c.update()
+      v.camera.position.sub(c.target).applyAxisAngle(new Vector3(0, 1, 0), Math.PI / 4).add(c.target)
+      c.update()
+      minPolar = Math.min(minPolar, c.getPolarAngle())
+    }
+    return { minPolar, radio }
+  })()
+`)
+check('giro completo alrededor sin topes', vueltas.minPolar <= Math.PI / 2 + 0.05,
+  `polar min ${(vueltas.minPolar * 180 / Math.PI).toFixed(1)} grados`)
+
+await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    v.camera.position.set(60, 25, 60)
+    v.controls.target.set(0, 0, 0)
+    v.controls.update()
+  })()
+`)
 
 // --- Round-trip de anotaciones ---------------------------------------------
 const roundTrip = await evaluate(`

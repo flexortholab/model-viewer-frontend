@@ -4,9 +4,13 @@
   --border: rgba(20, 22, 26, 0.14);
   --text: #1c1e22;
   --muted: #5a6068;
-  --accent: #1b8aa3;
-  --accent-soft: rgba(90, 188, 210, 0.16);
+  /* Teal exacto del logo (#63bbd4) para toda la interfaz. */
+  --accent: #63bbd4;
+  --accent-soft: rgba(99, 187, 212, 0.18);
+  /* Variante oscura del mismo teal: texto pequeno y rellenos con letra clara. */
   --accent-ink: #0f6b80;
+  --accent-strong: #1b8aa3;
+  --brand-ink: #666767;
   --danger: #dc4437;
   --radius: 10px;
   color-scheme: light;
@@ -43,7 +47,7 @@ body {
 #viewport.is-measuring canvas,
 #viewport.is-marking canvas {
   cursor:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26'%3E%3Cg stroke='%231b8aa3' stroke-width='1.8'%3E%3Cpath d='M13 1v8M13 17v8M1 13h8M17 13h8'/%3E%3C/g%3E%3Ccircle cx='13' cy='13' r='4' fill='none' stroke='%231b8aa3' stroke-width='1.8'/%3E%3Ccircle cx='13' cy='13' r='1.4' fill='%231b8aa3'/%3E%3C/svg%3E")
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26'%3E%3Cg stroke='%2363bbd4' stroke-width='1.8'%3E%3Cpath d='M13 1v8M13 17v8M1 13h8M17 13h8'/%3E%3C/g%3E%3Ccircle cx='13' cy='13' r='4' fill='none' stroke='%2363bbd4' stroke-width='1.8'/%3E%3Ccircle cx='13' cy='13' r='1.4' fill='%2363bbd4'/%3E%3C/svg%3E")
       13 13,
     crosshair;
 }
@@ -179,6 +183,26 @@ body {
   border-color: var(--accent);
 }
 
+/* Iconos minimalistas teal delante del texto */
+.toolbar button,
+.panel-body button.wide {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.toolbar button svg,
+.panel-body button.wide svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .tb-title {
   flex: none;
   font-size: 11px;
@@ -294,9 +318,9 @@ button.wide {
   color: var(--muted);
 }
 
-/* Corte seccional */
+/* Corte seccional: relleno con teal oscuro para que la marca siga viendose */
 #panel input[type='checkbox'] {
-  accent-color: var(--accent);
+  accent-color: var(--accent-strong);
 }
 
 .switch,
@@ -353,8 +377,22 @@ select {
   width: 26px;
   height: 22px;
   padding: 0;
-  font-size: 13px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.obj-cut svg,
+.obj-eye svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .obj-cut:hover {
@@ -392,8 +430,7 @@ select {
   background: rgba(20, 22, 26, 0.05);
 }
 
-.obj-item.is-hidden .obj-name,
-.obj-item.is-hidden .obj-tris {
+.obj-item.is-hidden .obj-name {
   opacity: 0.4;
 }
 
@@ -402,15 +439,34 @@ select {
   width: 26px;
   height: 22px;
   padding: 0;
-  font-size: 13px;
   line-height: 1;
+  color: var(--accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.obj-eye.is-off {
+button.obj-eye.is-off {
   color: var(--muted);
+}
+
+/* Los botones de la lista no llevan pastilla de "pulsado": solo el icono.
+   Se sube la especificidad para ganar a button[aria-pressed='true']. */
+button.obj-eye,
+button.obj-cut {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent);
+}
+
+button.obj-eye:hover,
+button.obj-cut:hover {
+  background: rgba(20, 22, 26, 0.06);
+  border-color: var(--border);
+}
+
+button.obj-cut:hover {
+  color: var(--accent-strong);
 }
 
 .obj-name {
@@ -419,12 +475,6 @@ select {
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
-}
-
-.obj-tris {
-  font-size: 11px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
 }
 
 /* Lista de marcadores (presentacion preparada) */
@@ -508,15 +558,69 @@ select {
   opacity: 1;
 }
 
-/* Logotipo del laboratorio, esquina inferior derecha */
+/* Titulo del caso: nombre del archivo arriba centrado, sin marco */
+.doc-title {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  color: var(--brand-ink);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9), 0 0 10px rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+  max-width: min(640px, 70vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Carga de la escena: anillo teal girando en el centro */
+.loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(2px);
+  font-size: 13px;
+  color: var(--muted);
+  z-index: 20;
+}
+
+.loader[hidden] {
+  display: none;
+}
+
+.loader-ring {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 4px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  animation: loader-spin 0.9s linear infinite;
+}
+
+@keyframes loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Logotipo del laboratorio, esquina inferior derecha (lockup horizontal) */
 #brand-logo {
   position: absolute;
-  right: 14px;
-  bottom: 14px;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  box-shadow: 0 2px 10px rgba(20, 22, 26, 0.25);
+  right: 16px;
+  bottom: 12px;
+  width: 148px;
+  height: auto;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.9));
   pointer-events: none;
   z-index: 5;
 }
@@ -605,16 +709,18 @@ select {
 
 .cube-face.is-current {
   background: var(--accent);
-  border-color: var(--accent-ink);
-  color: #fff;
+  border-color: var(--accent-strong);
+  color: var(--text);
 }
 
+/* Cada cara mira a donde se situa la camara en esa vista: la normal de la cara
+   es el sentido del vector camara - objetivo (izq. = +X, sup. = +Y...). */
 .face-frontal { transform: translateZ(44px); }
 .face-trasera { transform: rotateY(180deg) translateZ(44px); }
-.face-izquierda { transform: rotateY(-90deg) translateZ(44px); }
-.face-derecha { transform: rotateY(90deg) translateZ(44px); }
-.face-superior { transform: rotateX(90deg) translateZ(44px); }
-.face-inferior { transform: rotateX(-90deg) translateZ(44px); }
+.face-izquierda { transform: rotateY(90deg) translateZ(44px); }
+.face-derecha { transform: rotateY(-90deg) translateZ(44px); }
+.face-superior { transform: rotateX(-90deg) translateZ(44px); }
+.face-inferior { transform: rotateX(90deg) translateZ(44px); }
 
 @media (max-width: 640px) {
   .panel {

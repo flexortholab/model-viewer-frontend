@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
-import { loadModel, normalizeModel, applyDentalMaterial, prepareMaterialsForReview, isSupported } from './loaders.js'
+import { loadModel, normalizeModel, applyDentalMaterial, prepareMaterialsForReview, isSupported, extensionOf } from './loaders.js'
 import { SectionPlaneTool } from './section.js'
 import { MeasureTool } from './measure.js'
 import { createDocument, validateDocument } from './annotations.js'
@@ -163,6 +163,7 @@ export class DentalViewer {
     const result = normalizeModel(root, {
       forcedUnits: options.forcedUnits ?? null,
       merge: options.merge ?? false,
+      format: extensionOf(url),
     })
 
     // Limpieza del modelo anterior.
@@ -593,7 +594,7 @@ export class DentalViewer {
     for (const marker of this.doc.markers) {
       anchor.fromArray(marker.position)
       const color =
-        marker.kind === 'warning' ? 0xff6b5a : marker.kind === 'screw' ? 0x8fc7ff : 0xffd479
+        marker.kind === 'warning' ? 0xff6b5a : marker.kind === 'screw' ? 0x5abcd2 : 0xffd479
 
       const group = new THREE.Group()
       group.userData.isMarker = true
@@ -710,6 +711,7 @@ export class DentalViewer {
     if (typeof view === 'string') {
       const views = {
         frontal: [0, 0.12, 1],
+        trasera: [0, 0.12, -1],
         superior: [0, 1, 0.001],
         inferior: [0, -1, 0.001],
         // Izquierda y derecha referidos a la vista frontal del paciente.
@@ -780,6 +782,7 @@ export class DentalViewer {
     this._tail = moved || wasDirty ? 30 : this._tail - 1
     this.renderer.render(this.scene, this.camera)
     this.measure?.update()
+    this.emit('frame')
   }
 
   dispose() {

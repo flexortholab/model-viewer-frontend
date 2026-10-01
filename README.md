@@ -9,7 +9,7 @@ Pensado para **disyuntores sinterizados con anclaje esquelético** diseñados en
 - **anotaciones** exportables como sidecar JSON
 - embebible en un **webclip / iframe** vía `postMessage`, o por enlace directo
 
-Estado actual: **v0.3.1** funcional (plano de corte unico con gizmo mover+rotar, capping por pieza con curva de corte exacta por objeto, lista de objetos con foco y corte por pieza, presentacion con marcadores editables, medidas editables con drag y snap, cifras en sprite 3D, paneles separados Vistas/Herramientas, logo propio, render bajo demanda para no cargar la GPU en reposo). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
+Estado actual: **v0.3.2** funcional (plano de corte unico con gizmo mover+rotar, capping por pieza con curva de corte exacta por objeto, lista de objetos con foco y corte por pieza, presentacion con marcadores editables, medidas compactas en mm con 1 decimal, cubo de vistas clicable, paneles separados Vistas/Herramientas, logo propio con acento corporativo teal, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
 > **Demo desplegada (GitHub Pages, rama gh-pages):** https://rms1982.github.io/dental-viewer/
 > **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/disyuntor-4-pilares.stl&section=y=0
 > La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.
@@ -106,7 +106,7 @@ Color de tapa configurable (por defecto `#c0554a`, terracota). Desactivar el cor
 
 ## Mediciones
 
-Dos clics sobre la superficie (raycast contra las mallas visibles; los puntos ocultos tras un corte se descartan). Cada cota es geometría 3D en mm: línea de cota `Line2` (grosor constante en pantalla), líneas de extensión, tildes y puntos, más etiqueta HTML con la cifra (`12.35 mm`).
+Dos clics sobre la superficie (raycast contra las mallas visibles; los puntos ocultos tras un corte se descartan). Cada cota es geometría 3D en mm con 1 decimal: línea de cota `Line2` (grosor constante en pantalla), líneas de extensión, tildes y puntos, más cifra en sprite 3D (`20.0 mm`).
 
 - La cota se desplaza al lado más legible respecto a la cámara.
 - **Doble clic en la cifra** borra la medición.
@@ -227,6 +227,19 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
    corregido `activePopupId` (quedaba el paso sin resaltar).
 4. GLB/FBX reales de Blender verificados en navegador (B1, Final1, Mario FBX).
 5. Limpieza de carpetas duplicadas accidentales (`src/src`, `scripts/scripts`, …).
+
+**Sesión del 01/10/2026 (tarde; smoke 48/48, unitarios 24/24):**
+
+1. Panel **Objetos desplegado por defecto**; panel **Vistas** con wrap corregido y
+   **cubo de navegación** (6 caras clicables, rota con la cámara, resalta la vista
+   activa; verificado cara por cara).
+2. Logo más pequeño (72 px) y **acento corporativo teal `#5ABCD2`** (botones,
+   checkbox, iconos, bordes de cifra, marcador de tornillo).
+3. Medidas compactas (~1/3 menos): cifra 3D, líneas y puntos reducidos.
+4. **Precisión 0.1 mm** (`formatMm` a 1 decimal por defecto).
+5. **Mm siempre sin `?units=`**: pista por formato (FBX→cm como sale de Blender,
+   resto→mm); la salida sigue siendo mm y `?units=` mantiene prioridad.
+6. Render bajo demanda ya activo (la GPU descansa en reposo).
 
 **Sesión del 01/10/2026 (smoke 43/43, unitarios 23/23):**
 

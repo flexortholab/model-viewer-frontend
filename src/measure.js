@@ -165,21 +165,21 @@ export class MeasureTool {
     const a2 = a.clone().add(offset)
     const b2 = b.clone().add(offset)
 
-    nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 3.2 })
-    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 1.8, color: 0x9aa2b1 })
-    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 1.8, color: 0x9aa2b1 })
+    nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 2.2 })
+    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 1.2, color: 0x9aa2b1 })
+    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 1.2, color: 0x9aa2b1 })
 
     // Tildes oblicuas en los extremos, estilo plano de taller.
     const tickDir = direction.clone().add(best).normalize().multiplyScalar(TICK)
     nodes.tickA = this._makeLine(
       [a2.x - tickDir.x, a2.y - tickDir.y, a2.z - tickDir.z,
        a2.x + tickDir.x, a2.y + tickDir.y, a2.z + tickDir.z],
-      { width: 3.2 },
+      { width: 2.2 },
     )
     nodes.tickB = this._makeLine(
       [b2.x - tickDir.x, b2.y - tickDir.y, b2.z - tickDir.z,
        b2.x + tickDir.x, b2.y + tickDir.y, b2.z + tickDir.z],
-      { width: 3.2 },
+      { width: 2.2 },
     )
 
     nodes.pointA = this._makePoint(a)
@@ -208,7 +208,7 @@ export class MeasureTool {
     const geometry = new THREE.BufferGeometry().setFromPoints([point, point])
     const material = new THREE.PointsMaterial({
       color: 0xffd479,
-      size: 5,
+      size: 3.5,
       sizeAttenuation: false,
       depthTest: false,
     })
@@ -220,26 +220,26 @@ export class MeasureTool {
     return points
   }
 
-  /** Texto "12.35 mm" horneado en una textura de canvas (sprite siempre visible). */
+  /** Texto "12.3 mm" horneado en una textura de canvas (sprite siempre visible). */
   _makeValueSprite(text) {
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
-    const font = '600 34px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+    const font = '600 24px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
     ctx.font = font
     const textWidth = Math.ceil(ctx.measureText(text).width)
-    const padding = 18
+    const padding = 12
     canvas.width = textWidth + padding * 2
-    canvas.height = 64
+    canvas.height = 46
     const ctx2 = canvas.getContext('2d')
     ctx2.scale(1, 1)
-    // Fondo blanco con borde azul CAD: maxima legibilidad sobre any fondo.
+    // Fondo blanco con borde teal corporativo: maxima legibilidad sobre fondo.
     ctx2.fillStyle = 'rgba(255,255,255,0.96)'
-    const r = 14
+    const r = 10
     ctx2.beginPath()
     ctx2.roundRect(2, 2, canvas.width - 4, canvas.height - 4, r)
     ctx2.fill()
-    ctx2.strokeStyle = '#2563eb'
-    ctx2.lineWidth = 2.5
+    ctx2.strokeStyle = '#1b8aa3'
+    ctx2.lineWidth = 2
     ctx2.stroke()
     ctx2.fillStyle = '#101828'
     ctx2.font = font
@@ -257,7 +257,7 @@ export class MeasureTool {
       sizeAttenuation: false,
     })
     const sprite = new THREE.Sprite(material)
-    const heightFraction = 0.075
+    const heightFraction = 0.05
     sprite.scale.set((canvas.width / canvas.height) * heightFraction, heightFraction, 1)
     sprite.center.set(0.5, -0.35)
     sprite.renderOrder = 1001

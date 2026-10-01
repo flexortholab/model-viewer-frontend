@@ -73,11 +73,27 @@ test('los extremos del rango plausible no se reescalan', () => {
   assert.ok(grande.confidence < 0.5)
 })
 
-test('formatMm redondea a 2 decimales por defecto', () => {
-  assert.equal(formatMm(12.3456), '12.35 mm')
-  assert.equal(formatMm(12.3456, 1), '12.3 mm')
+test('formatMm redondea a 1 decimal por defecto (precision 0.1 mm)', () => {
+  assert.equal(formatMm(12.3456), '12.3 mm')
+  assert.equal(formatMm(12.3456, 2), '12.35 mm')
   assert.equal(formatMm(8, 0), '8 mm')
   assert.equal(round(1.23456, 3), 1.235)
+})
+
+test('la pista de formato desempata lecturas ambiguas (FBX de Blender en cm)', () => {
+  // 9.27 unidades: 9.27 mm o 92.7 mm. El STL (fresadora) prefiere mm...
+  const stl = detectUnits(9.2705, null, 'stl')
+  assert.equal(stl.units, 'mm')
+  assert.equal(stl.scale, 1)
+  assert.ok(stl.confidence < 0.9)
+  assert.ok(stl.alternatives.some((a) => a.units === 'cm'))
+  // ...y el FBX (exporta Blender en cm) prefiere cm: sale en mm sin ?units=.
+  const fbx = detectUnits(9.2705, null, 'fbx')
+  assert.equal(fbx.units, 'cm')
+  assert.equal(fbx.scale, 10)
+  assert.ok(Math.abs(fbx.maxDimMm - 92.7) < 0.01)
+  // ?units= sigue mandando sobre la pista.
+  assert.equal(detectUnits(9.2705, 'mm', 'fbx').scale, 1)
 })
 
 test('un documento de anotaciones valido se conserva', () => {

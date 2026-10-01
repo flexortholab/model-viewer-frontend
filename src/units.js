@@ -27,6 +27,16 @@ const CANDIDATES = [
   { units: 'm', scale: 1000 },
 ]
 
+// Preferencia de entrada por formato cuando varias lecturas son plausibles:
+// cada formato "habla" su unidad nativa (glTF metros por spec, FBX cm como
+// sale de Blender, STL/OBJ/3MF mm de fresadora y CAD). La salida siempre es
+// mm y ?units= sigue mandando sobre todo. La ambiguedad real (p. ej. un FBX
+// de 9.27 = 9.27 mm o 92.7 mm) baja la confianza a 0.65 y lista alternatives.
+const FORMAT_PREFERENCE = {
+  fbx: ['cm', 'mm', 'm'],
+}
+const DEFAULT_PREFERENCE = ['mm', 'cm', 'm']
+
 function evaluate(maxDimRaw) {
   return CANDIDATES.map((candidate) => {
     const maxDimMm = maxDimRaw * candidate.scale
@@ -41,10 +51,11 @@ function evaluate(maxDimRaw) {
 /**
  * @param {number} maxDimRaw dimension maxima del bounding box en unidades del archivo
  * @param {string|null} [forced] 'mm' | 'cm' | 'm' | 'um' | 'in' para forzar
+ * @param {string|null} [format] extension del archivo ('fbx', 'stl', ...) como pista
  * @returns {{scale:number, units:string, source:string, confidence:number,
  *            maxDimRaw:number, maxDimMm:number, alternatives:Array}}
  */
-export function detectUnits(maxDimRaw, forced = null) {
+export function detectUnits(maxDimRaw, forced = null, format = null) {
   if (forced) {
     const key = String(forced).toLowerCase()
     const scale = UNIT_FACTORS[key]
@@ -76,7 +87,17 @@ export function detectUnits(maxDimRaw, forced = null) {
 
   const ranked = evaluate(maxDimRaw)
   const plausible = ranked.filter((c) => c.plausible)
-  const best = plausible[0] ?? ranked[0]
+  let best = plausible[0] ?? ranked[0]
+  if (plausible.length > 1) {
+    const preference = FORMAT_PREFERENCE[String(format ?? '').toLowerCase()] ?? DEFAULT_PREFERENCE
+    for (const units of preference) {
+      const candidate = plausible.find((c) => c.units === units)
+      if (candidate) {
+        best = candidate
+        break
+      }
+    }
+  }
 
   // Si el tamano en mm ya cae dentro del rango, no tocamos nada y estamos
   // seguros. Si no, escalamos y la confianza baja segun quantas lecturas
@@ -96,7 +117,7 @@ export function detectUnits(maxDimRaw, forced = null) {
     maxDimRaw,
     maxDimMm: best.maxDimMm,
     alternatives: plausible
-      .slice(1)
+      .filter((c) => c !== best)
       .map((c) => ({ units: c.units, scale: c.scale, maxDimMm: round(c.maxDimMm) })),
   }
 }
@@ -106,8 +127,8 @@ export function round(n, decimals = 3) {
   return Math.round(n * f) / f
 }
 
-/** Formatea un valor en mm con el formato habitual de diseno dental. */
-export function formatMm(value, decimals = 2) {
+/** Formatea un valor en mm con precision de diseno dental (0.1 mm). */
+export function formatMm(value, decimals = 1) {
   const v = round(value, decimals)
   return `${decimals === 0 ? v.toFixed(0) : v.toFixed(decimals)} mm`
 }

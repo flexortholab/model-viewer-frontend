@@ -228,6 +228,25 @@ const gizmo = await evaluate(`
 `)
 check('el gizmo muestra mover y rotar simultaneamente', gizmo.helpers === true && gizmo.modes.join(',') === 'translate,rotate')
 
+// Cubo de vistas: 6 caras, clic navega y resalta la vista activa
+const cubeFaces = await evaluate(`
+  [...document.querySelectorAll('#viewcube-inner [data-cube]')].map((b) => b.dataset.cube).sort().join(',')
+`)
+check('el cubo tiene las 6 caras', cubeFaces === 'derecha,frontal,inferior,izquierda,superior,trasera', cubeFaces)
+await evaluate(`document.querySelector('#viewcube-inner [data-cube="superior"]').click()`)
+await sleep(600)
+const cube = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    const above = v.camera.position.y > v.controls.target.y
+    const current = document.querySelector('#viewcube-inner [data-cube="superior"]').classList.contains('is-current')
+    const matrix = document.getElementById('viewcube-inner').style.transform.startsWith('matrix3d(')
+    return { above, current, matrix }
+  })()
+`)
+check('clic en el cubo navega a la vista', cube.above === true)
+check('el cubo resalta la vista activa y rota con la camara', cube.current === true && cube.matrix === true)
+
 // Manipulacion del plano: mover y rotar la normal
 const planeManipulation = await evaluate(`
   (() => {
@@ -290,7 +309,7 @@ const measure = await evaluate(`
   })()
 `)
 check('crea una medicion', measure.count === 1, measure.id)
-check('la distancia se expresa en mm', measure.label === '12.35 mm', measure.label)
+check('la distancia se expresa en mm con 1 decimal', measure.label === '12.3 mm', measure.label)
 // dim, extA, extB, tickA, tickB, pointA, pointB, value (sprite con la cifra)
 check(
   'dibuja linea de cota, extensiones, tildes, puntos y cifra en sprite',

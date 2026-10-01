@@ -218,7 +218,8 @@ export class SectionPlaneTool {
     const viewDir = new THREE.Vector3()
     cam.getWorldDirection(viewDir)
     this.gizmo.position.set(0, 0, 0)
-    // La normal (Z local) apunta HACIA la camara: conservamos la mitad cercana.
+    // La normal (Z local) sigue la direccion de vista: se recorta la mitad
+    // cercana y se conserva la lejana (cutaway estandar).
     this.gizmo.quaternion.setFromUnitVectors(
       new THREE.Vector3(0, 0, 1),
       viewDir.clone().normalize(),

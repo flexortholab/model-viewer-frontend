@@ -1,7 +1,11 @@
+import * as THREE from 'three'
 import { DentalViewer } from './viewer.js'
 import { createBridge } from './bridge.js'
 import { download, suggestedFilename, createDocument } from './annotations.js'
 import { formatMm } from './units.js'
+
+const _cuboQ = new THREE.Quaternion()
+const _cuboM = new THREE.Matrix4()
 
 const container = document.getElementById('viewport')
 const labelLayer = document.getElementById('labels')
@@ -174,6 +178,45 @@ function renderMarkers() {
     markersList.append(li)
   })
 }
+
+// --- Cubo de vistas --------------------------------------------------------
+// Rota con la camara y resalta la cara dominante. Solo se actualiza en
+// frames pintados. La matriz la calcula three (cuaternion invertido
+// conjugado por diag(1,-1,1): de ejes GL con Y arriba a ejes CSS con Y
+// abajo); aqui solo se vuelca a CSS.
+const cubeInner = document.getElementById('viewcube-inner')
+const cubeFaces = [...document.querySelectorAll('#viewcube-inner [data-cube]')]
+
+function updateViewCube() {
+  if (!cubeInner) return
+  const camera = viewer.camera
+  _cuboQ.copy(camera.quaternion).invert()
+  _cuboM.makeRotationFromQuaternion(_cuboQ)
+  // Conjugar por C=diag(1,-1,1): negar fila 1 y columna 1 (elementos 1, 4, 6
+  // y 9 en columna-mayor). Los demas se quedan igual.
+  const e = _cuboM.elements
+  e[1] = -e[1]
+  e[4] = -e[4]
+  e[6] = -e[6]
+  e[9] = -e[9]
+  cubeInner.style.transform = `matrix3d(${e.map((n) => n.toFixed(5)).join(',')})`
+
+  // Cara dominante segun de donde mira la camara (posicion - objetivo).
+  const dx = camera.position.x - viewer.controls.target.x
+  const dy = camera.position.y - viewer.controls.target.y
+  const dz = camera.position.z - viewer.controls.target.z
+  const ax = Math.abs(dx)
+  const ay = Math.abs(dy)
+  const az = Math.abs(dz)
+  const current = ax >= ay && ax >= az ? (dx > 0 ? 'derecha' : 'izquierda')
+    : ay >= az ? (dy > 0 ? 'superior' : 'inferior')
+      : dz > 0 ? 'frontal' : 'trasera'
+  for (const face of cubeFaces) {
+    face.classList.toggle('is-current', face.dataset.cube === current)
+  }
+}
+
+viewer.on('frame', updateViewCube)
 
 // --- Eventos del visor -----------------------------------------------------
 
@@ -417,6 +460,10 @@ document.addEventListener('click', (event) => {
 
   if (button.dataset.view) {
     viewer.setView(button.dataset.view)
+    return
+  }
+  if (button.dataset.cube) {
+    viewer.setView(button.dataset.cube)
     return
   }
   switch (button.dataset.action) {

@@ -131,7 +131,7 @@ export function normalizeAttributes(geometry) {
  *   - centrado en el origen
  * Devuelve los metadatos de unidades y las estadisticas.
  */
-export function normalizeModel(root, { forcedUnits = null, merge = false } = {}) {
+export function normalizeModel(root, { forcedUnits = null, merge = false, format = null } = {}) {
   root.updateMatrixWorld(true)
 
   const meshes = []
@@ -159,7 +159,7 @@ export function normalizeModel(root, { forcedUnits = null, merge = false } = {})
   const maxDimRaw = Math.max(rawSize.x, rawSize.y, rawSize.z)
 
   // 3. Detectar unidades y escalar a mm.
-  const units = detectUnits(maxDimRaw, forcedUnits)
+  const units = detectUnits(maxDimRaw, forcedUnits, format)
   if (units.scale !== 1) {
     for (const mesh of meshes) mesh.geometry.scale(units.scale, units.scale, units.scale)
   }

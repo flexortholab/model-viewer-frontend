@@ -4,49 +4,77 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Visor de disyuntores sinterizados</title>
-    <script type="module" crossorigin src="./assets/index-DoMQCMk_.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CrEt9cti.css">
+    <script type="module" crossorigin src="./assets/index-hhtNVgmY.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-ksHvR_5r.css">
   </head>
   <body>
     <div id="app">
       <div id="viewport">
         <div id="labels" aria-live="polite"></div>
+        <div id="doc-title" class="doc-title" hidden></div>
+        <div id="loader" class="loader" hidden>
+          <span class="loader-ring" aria-hidden="true"></span>
+          <span id="loader-text">Cargando modelo…</span>
+        </div>
         <div id="leftbar" class="col">
         <div id="views-bar" class="toolbar" role="toolbar" aria-label="Vistas">
           <span class="tb-title">Vistas</span>
           <div class="tb-group views-cross">
-            <button type="button" data-view="superior" title="Vista superior (oclusal)">Superior</button>
-            <button type="button" data-view="izquierda" title="Vista lateral izquierda">Izquierda</button>
-            <button type="button" data-view="frontal" title="Vista frontal (anterior)">Frontal</button>
-            <button type="button" data-view="derecha" title="Vista lateral derecha">Derecha</button>
-            <button type="button" data-view="inferior" title="Vista inferior">Inferior</button>
+            <button type="button" data-view="superior" title="Vista superior (oclusal)">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13.5v-9m0 0L5 7.5M8 4.5l3 3"/></svg>
+              Superior
+            </button>
+            <button type="button" data-view="izquierda" title="Vista lateral izquierda">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8h-9m0 0 3-3m-3 3 3 3"/></svg>
+              Izquierda
+            </button>
+            <button type="button" data-view="frontal" title="Vista frontal (anterior)">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1.5"/></svg>
+              Frontal
+            </button>
+            <button type="button" data-view="derecha" title="Vista lateral derecha">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h9m0 0-3-3m3 3-3 3"/></svg>
+              Derecha
+            </button>
+            <button type="button" data-view="inferior" title="Vista inferior">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v9m0 0 3-3M8 11.5 5 8.5"/></svg>
+              Inferior
+            </button>
           </div>
           <div class="tb-group views-extra">
-            <button type="button" data-action="frame" title="Encuadrar (F)">Encuadrar</button>
-            <button type="button" data-view="isometrica" title="Vista isométrica">Isométrica</button>
+            <button type="button" data-action="frame" title="Encuadrar (F)">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2H2v4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>
+              Encuadrar
+            </button>
+            <button type="button" data-view="isometrica" title="Vista isométrica">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13.5 5v6L8 14.2 2.5 11V5z"/><path d="M8 1.8V8m0 0 5.5-3M8 8 2.5 5"/></svg>
+              Isométrica
+            </button>
           </div>
         </div>
         <div id="tools-bar" class="toolbar" role="toolbar" aria-label="Herramientas del visor">
           <span class="tb-title">Herramientas</span>
           <div class="tb-group">
-            <button type="button" data-action="move" aria-pressed="false" title="Volver a la cámara libre (mover la pieza)">
-              Mover
-            </button>
             <button type="button" data-action="measure" aria-pressed="false" title="Medir (M)">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5 12.5 2.5l1.8 1.8-2 2-1.8-1.8-1.2 1.2 1.8 1.8-2 2-1.8-1.8-1.2 1.2 1.8 1.8-2.1 2.1-2.3-2.3z"/></svg>
               Medir
             </button>
+            <button type="button" data-action="clear-measurements" title="Borrar medidas">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5 9 6l2.5 2.5L5 15H2.5v-2.5z"/><path d="M11.5 1.5l3 3m0-3-3 3"/></svg>
+              Borrar medidas
+            </button>
             <button type="button" data-action="add-marker" aria-pressed="false" title="Añadir marcador (K)">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.5S3.8 10.2 3.8 6.9A4.2 4.2 0 0 1 8 2.7a4.2 4.2 0 0 1 4.2 4.2c0 3.3-4.2 7.6-4.2 7.6z"/><circle cx="8" cy="6.9" r="1.5"/></svg>
               Marcador
             </button>
             <button type="button" data-action="clear-markers" title="Borrar todos los marcadores">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.5S3.8 10.2 3.8 6.9A4.2 4.2 0 0 1 8 2.7a4.2 4.2 0 0 1 4.2 4.2c0 3.3-4.2 7.6-4.2 7.6z"/><path d="M11.5 1.5l3 3m0-3-3 3"/></svg>
               Borrar marcadores
-            </button>
-            <button type="button" data-action="clear-measurements" title="Borrar medidas">
-              Borrar medidas
             </button>
           </div>
           <div class="tb-group">
             <button type="button" data-action="export" title="Descargar anotaciones (E)">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v8m0 0L5.2 6.7M8 9.5l2.8-2.8"/><path d="M2.5 11.5v3h11v-3"/></svg>
               Exportar
             </button>
           </div>
@@ -64,7 +92,7 @@
             <button type="button" class="cube-face face-inferior" data-cube="inferior">Inf.</button>
           </div>
         </div>
-        <img id="brand-logo" src="./logo.png" alt="Logotipo del laboratorio" />
+        <img id="brand-logo" src="./logo.svg" alt="Flex Ortholab, laboratorio digital" />
 
         <div id="rightbar" class="col">
         <div id="panel" class="panel" hidden>
@@ -76,13 +104,16 @@
           </div>
           <div class="panel-body">
             <button type="button" class="wide" id="section-toggle" data-action="section-toggle" aria-pressed="false" title="Activa o desactiva el corte seccional">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4" cy="4" r="2.2"/><circle cx="4" cy="12" r="2.2"/><path d="M5.8 5.8 14 14M5.8 10.2 14 2"/></svg>
               Activar corte
             </button>
 
             <button type="button" class="wide" data-action="section-reset" title="Coloca el plano en el centro de la pieza, perpendicular a la vista actual">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/></svg>
               Alinear con la vista
             </button>
             <button type="button" class="wide" data-action="section-orient" title="Rota el plano 90 grados en el sitio (de frente a perfil y viceversa)">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-2-4.2"/><path d="M13.5 1.5v4h-4"/></svg>
               Girar 90 grados
             </button>
           </div>

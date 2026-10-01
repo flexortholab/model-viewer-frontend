@@ -104,12 +104,13 @@ export class DentalViewer {
   }
 
   _setupLights() {
-    const hemi = new THREE.HemisphereLight(0xdfe8ff, 0x2a2622, 1.6)
-    const key = new THREE.DirectionalLight(0xffffff, 2.6)
+    // Luz suave y difusa de estudio: legible sin brillos cromados.
+    const hemi = new THREE.HemisphereLight(0xdfe8ff, 0x2a2622, 1.25)
+    const key = new THREE.DirectionalLight(0xffffff, 1.9)
     key.position.set(60, 80, 70)
-    const fill = new THREE.DirectionalLight(0xbcd0ff, 0.9)
+    const fill = new THREE.DirectionalLight(0xbcd0ff, 0.7)
     fill.position.set(-70, 20, -40)
-    const rim = new THREE.DirectionalLight(0xffd9b0, 0.7)
+    const rim = new THREE.DirectionalLight(0xffd9b0, 0.55)
     rim.position.set(20, -40, -60)
     this.scene.add(hemi, key, fill, rim)
     this.keyLight = key
@@ -322,8 +323,13 @@ export class DentalViewer {
     if (enabled !== undefined) {
       this.section.setEnabled(enabled)
       if (enabled) {
-        // Sin posicion guardada: centrar el plano de cara a la camara.
-        if (!plane && !this.section.gizmo.position.lengthSq()) this.section.reset(this.camera)
+        // Sin posicion guardada: centrar el plano de cara a la camara y
+        // girarlo 90 grados (de frente a perfil): asi se ve el corte nada
+        // mas activarlo, en vez de un plano de cara que tapa la vista.
+        if (!plane && !this.section.gizmo.position.lengthSq()) {
+          this.section.reset(this.camera)
+          this.section.orientToCamera(this.camera)
+        }
       }
     } else {
       this.section.apply()

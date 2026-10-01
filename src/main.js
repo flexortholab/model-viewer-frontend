@@ -11,7 +11,7 @@ const container = document.getElementById('viewport')
 const labelLayer = document.getElementById('labels')
 const hint = document.getElementById('hint')
 const panel = document.getElementById('panel')
-const sectionEnabled = document.getElementById('section-enabled')
+const sectionToggle = document.getElementById('section-toggle')
 const objectsPanel = document.getElementById('objects-panel')
 const objectsCount = document.getElementById('objects-count')
 const objectsList = document.getElementById('objects-list')
@@ -58,7 +58,7 @@ function togglePanelContent(panelEl) {
 function syncSectionUI() {
   if (!viewer.section) return
   const state = viewer.section.serialize()
-  sectionEnabled.checked = state.enabled
+  sectionToggle?.setAttribute('aria-pressed', String(state.enabled))
   const fuera = state.enabled && !viewer.section.planeIntersectsBounds()
   panel.classList.toggle('is-outside', fuera)
 }
@@ -512,6 +512,17 @@ document.addEventListener('click', (event) => {
       viewer.orientSectionPlane()
       showHint('Plano girado 90 grados en su sitio', 2200)
       break
+    case 'section-toggle': {
+      const enabled = !viewer.section?.enabled
+      viewer.setSection({ enabled })
+      syncSectionUI()
+      showHint(
+        enabled
+          ? 'Corte activo: mueve/rota el plano con el gizmo'
+          : 'Corte desactivado (se conserva la posicion del plano)',
+      )
+      break
+    }
     case 'marker-unfocus':
       viewer.exitMarkerFocus()
       activeMarkerId = null
@@ -520,16 +531,6 @@ document.addEventListener('click', (event) => {
       break
   }
 })
-
-sectionEnabled.addEventListener('change', () => {
-  viewer.setSection({ enabled: sectionEnabled.checked })
-  showHint(
-    sectionEnabled.checked
-      ? 'Corte activo: mueve/rota el plano con el gizmo'
-      : 'Corte desactivado (se conserva la posicion del plano)',
-  )
-})
-
 
 container.addEventListener('pointerdown', (event) => {
   if (markerMode && !event.target.closest('.panel, .toolbar, #viewcube')) {

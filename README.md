@@ -252,6 +252,14 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
    resto→mm); la salida sigue siendo mm y `?units=` mantiene prioridad.
 6. Render bajo demanda ya activo (la GPU descansa en reposo).
 
+**Sesión del 01/10/2026 (tarde-2; smoke 48/48, unitarios 24/24):**
+
+1. Cotas reequilibradas: globo más pequeño, líneas/tildes/puntos más visibles.
+2. Frontal sin destacar en Vistas; Herramientas en columna vertical.
+3. Al activar el corte sin posición guardada arranca girado 90° (de perfil).
+4. "Activar corte" es un botón con estado (resaltado = activo).
+5. Mate en todos los materiales (Standard/Phong/FBX/clearcoat) + luz suavizada.
+
 **Sesión del 01/10/2026 (smoke 43/43, unitarios 23/23):**
 
 1. Curva de corte exacta por pieza (`cutPlaneSegments` en `section.js`, con tests):

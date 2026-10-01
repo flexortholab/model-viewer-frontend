@@ -235,8 +235,8 @@ export function countStats(meshes) {
 export function applyDentalMaterial(meshes, options = {}) {
   const {
     color = 0xd9d5cc,
-    roughness = 0.42,
-    metalness = 0.05,
+    roughness = 0.6,
+    metalness = 0,
     side = THREE.DoubleSide,
   } = options
 
@@ -256,10 +256,23 @@ export function applyDentalMaterial(meshes, options = {}) {
 }
 
 /**
+ * Acabado mate y solido sobre cualquier material estandar de three
+ * (Standard de glTF, Phong de FBX, Physical con clearcoat): sin metal,
+ * sin brillos especulares. Puro retoque de parametros, sin shaders raros.
+ */
+export function matteFinish(material) {
+  if ('metalness' in material) material.metalness = 0
+  if ('roughness' in material) material.roughness = Math.max(material.roughness, 0.8)
+  if ('clearcoat' in material) material.clearcoat = 0
+  if ('shininess' in material) material.shininess = 0
+  if ('specular' in material && material.specular?.isColor) material.specular.setHex(0x1a1a1a)
+}
+
+/**
  * Prepara los materiales de una exportacion a color SIN recolorearlos:
  * conserva el color/texturas del GLB/FBX, pero con acabado MATE y solido
- * (metalness 0, rugosidad alta): es un visor de revision, no un render de
- * belleza. Tambien arregla doble cara y materiales virgenes.
+ * (ver matteFinish): es un visor de revision, no un render de belleza.
+ * Tambien arregla doble cara y materiales virgenes.
  */
 export function prepareMaterialsForReview(meshes) {
   for (const mesh of meshes) {
@@ -272,8 +285,7 @@ export function prepareMaterialsForReview(meshes) {
         // Material virgen (STL procedural/cad): gris neutro para verlo sobre blanco.
         material.color.setHex(0xc9c4bc)
       }
-      if ('metalness' in material) material.metalness = 0
-      if ('roughness' in material) material.roughness = Math.max(material.roughness, 0.8)
+      matteFinish(material)
       material.side = THREE.DoubleSide
       material.needsUpdate = true
     }

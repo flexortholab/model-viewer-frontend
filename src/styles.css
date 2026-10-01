@@ -532,11 +532,7 @@ select {
 
 .views-cross [data-view='superior'] { grid-area: sup; }
 .views-cross [data-view='izquierda'] { grid-area: izq; }
-.views-cross [data-view='frontal'] {
-  grid-area: fro;
-  font-weight: 700;
-  border-color: var(--accent);
-}
+.views-cross [data-view='frontal'] { grid-area: fro; }
 .views-cross [data-view='derecha'] { grid-area: der; }
 .views-cross [data-view='inferior'] { grid-area: inf; }
 
@@ -549,20 +545,38 @@ select {
   flex: 1;
 }
 
+/* Herramientas en vertical: una columna de botones a todo ancho */
+#tools-bar .tb-group {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+#tools-bar .tb-group button {
+  width: 100%;
+  text-align: left;
+}
+
+#tools-bar .tb-group + .tb-group {
+  border-left: none;
+  padding-left: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
 /* Cubo de vistas: orientacion actual + navegacion por caras */
 #viewcube {
   position: absolute;
-  left: 14px;
-  bottom: 14px;
+  left: 26px;
+  bottom: 26px;
   padding: 6px;
-  perspective: 480px;
+  perspective: 420px;
   z-index: 5;
 }
 
 #viewcube-inner {
   position: relative;
-  width: 104px;
-  height: 104px;
+  width: 88px;
+  height: 88px;
   transform-style: preserve-3d;
 }
 
@@ -592,12 +606,12 @@ select {
   color: #fff;
 }
 
-.face-frontal { transform: translateZ(52px); }
-.face-trasera { transform: rotateY(180deg) translateZ(52px); }
-.face-izquierda { transform: rotateY(-90deg) translateZ(52px); }
-.face-derecha { transform: rotateY(90deg) translateZ(52px); }
-.face-superior { transform: rotateX(90deg) translateZ(52px); }
-.face-inferior { transform: rotateX(-90deg) translateZ(52px); }
+.face-frontal { transform: translateZ(44px); }
+.face-trasera { transform: rotateY(180deg) translateZ(44px); }
+.face-izquierda { transform: rotateY(-90deg) translateZ(44px); }
+.face-derecha { transform: rotateY(90deg) translateZ(44px); }
+.face-superior { transform: rotateX(90deg) translateZ(44px); }
+.face-inferior { transform: rotateX(-90deg) translateZ(44px); }
 
 @media (max-width: 640px) {
   .panel {

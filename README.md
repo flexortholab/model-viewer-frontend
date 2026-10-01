@@ -285,9 +285,10 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 **Sesión del 01/10/2026 (noche; smoke 64/64, unitarios 24/24):**
 
 1. **Logo oficial** (`public/logo.svg`, lockup horizontal `flex ortholab` +
-   LABORATORIO DIGITAL): sale el PNG circular. Se recorta el `viewBox` al contenido
-   real (el original traía un perfil ICC de 1 MB incrustado) y se aplica el halo
-   blanco suave para que se lea sobre la pieza.
+   LABORATORIO DIGITAL): sale el PNG circular. Se quitan el perfil ICC y el resto de
+   metadatos de Inkscape que inflaban el fichero a 1 MB, y se ajusta el `viewBox` al
+   contenido real con 8 unidades de margen (la proporción es 1.66:1, no la del
+   lienzo original). Halo blanco suave para que se lea sobre la pieza.
 2. **Acento de interfaz = el del logo**: `--accent: #63bbd4` exacto para iconos,
    bordes, relleno del cubo activo y anillo del loader. Se añaden `--accent-strong`
    (`#1b8aa3`) y `--accent-ink` (`#0f6b80`) para los puntos donde el teal claro no

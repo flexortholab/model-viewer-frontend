@@ -613,14 +613,15 @@ button.obj-cut:hover {
   }
 }
 
-/* Logotipo del laboratorio, esquina inferior derecha (lockup horizontal) */
+/* Logotipo del laboratorio, esquina inferior derecha (lockup horizontal).
+   Proporcion 1098.5 x 659.8 = 1.66:1, la del viewBox ya recortado. */
 #brand-logo {
   position: absolute;
   right: 16px;
   bottom: 12px;
-  width: 148px;
+  width: 176px;
   height: auto;
-  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.9));
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.85));
   pointer-events: none;
   z-index: 5;
 }

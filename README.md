@@ -9,7 +9,16 @@ Pensado para **disyuntores sinterizados con anclaje esquelético** diseñados en
 - **anotaciones** exportables como sidecar JSON
 - embebible en un **webclip / iframe** vía `postMessage`, o por enlace directo
 
-Estado actual: **v0.3.4** funcional (plano de corte unico con gizmo mover+rotar atenuado, capping por pieza con curva de corte exacta por objeto, lista de objetos con iconos propios y corte por pieza, presentacion con marcadores editables, medidas compactas de una en una en mm con 1 decimal, seleccion y nota de medidas, cubo de vistas clicable en la esquina con las caras bien orientadas, giro libre sin topes, paneles separados Vistas (en cruz) y Herramientas, logo oficial del laboratorio con su teal y gris de marca, titulo del caso sin marco, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
+Estado actual: **v0.3.5** funcional (plano de corte unico con gizmo mover+rotar atenuado, capping por pieza con curva de corte exacta por objeto, lista de objetos con iconos propios y corte por pieza, presentacion con marcadores editables, medidas compactas de una en una en mm con 1 decimal, seleccion y nota de medidas, cubo de vistas clicable en la esquina con las caras bien orientadas, **giro libre sin topes** — ArcballControls, se puede pasar de largo por superior e inferior—, paneles separados Vistas (en cruz) y Herramientas, logo oficial del laboratorio con su teal y gris de marca, titulo del caso sin marco, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
+
+### Giro de la escena
+
+Por defecto la escena gira **libre**: la cámara se mueve con un trackball virtual
+(`ArcballControls`), sin topes, así que se puede pasar por encima y por debajo de la
+pieza y seguir dando la vuelta. El modo anterior (`OrbitControls`), que se quedaba
+clavado al llegar a superior/inferior, sigue disponible con **`?giro=orbit`**; el
+libre se puede forzar con **`?giro=libre`**. En `demo-giro.html` hay un interruptor
+en pantalla para comparar ambos modos con la escena real.
 > **Demo desplegada (GitHub Pages, rama gh-pages):** https://rms1982.github.io/dental-viewer/
 > **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/disyuntor-4-pilares.stl&section=y=0
 > La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.

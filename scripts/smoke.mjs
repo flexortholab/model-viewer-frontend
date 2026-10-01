@@ -5,7 +5,7 @@
  * se carga, que la deteccion de unidades da mm, que el capping del corte
  * seccional genera geometria visible y que las mediciones proyectan etiquetas.
  *
- * Uso: node scripts/smoke.mjs [urlBase]
+ * Uso: node scripts/smoke.mjs [urlBase] [extraQuery]
  */
 import { spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
@@ -13,7 +13,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const BASE = process.argv[2] ?? 'http://localhost:4173'
-const URL_TEST = `${BASE}/?model=samples/disyuntor-4-pilares.stl&embed=0`
+const EXTRA_QUERY = process.argv[3] ? `&${process.argv[3]}` : ''
+const URL_TEST = `${BASE}/?model=samples/disyuntor-4-pilares.stl&embed=0${EXTRA_QUERY}`
 
 const profile = mkdtempSync(join(tmpdir(), 'dental-smoke-'))
 const userDataDir = join(profile, 'profile')
@@ -227,6 +228,65 @@ const gizmo = await evaluate(`
   })()
 `)
 check('el gizmo muestra mover y rotar simultaneamente', gizmo.helpers === true && gizmo.modes.join(',') === 'translate,rotate')
+
+// Encuadre al pulsar las tijeras: activa el corte SIN acercarse, la escena
+// entera debe seguir entrando en el encuadre y el angulo actual se conserva.
+const encuadre = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    const V3 = v.camera.position.constructor
+    v.setSection({ enabled: false })
+    v.frameModel()
+    // Girar 90 grados a una vista lateral: el usuario puede estar mirando la
+    // pieza desde cualquier angulo cuando pulsa las tijeras.
+    v.setView('lateral')
+    const anguloAntes = v.camera.position.clone().sub(v.controls.target).normalize()
+    const distanciaAntes = v.camera.position.distanceTo(v.controls.target)
+
+    v.focusObject(0, { withPlane: true })
+    v.camera.updateMatrixWorld(true)
+
+    // Solo X e Y: en perspectiva el Z de NDC tiende a 1 y no dice nada
+    // sobre si la escena cabe en el encuadre.
+    let maxXY = 0
+    for (let sx = -1; sx <= 1; sx += 2) {
+      for (let sy = -1; sy <= 1; sy += 2) {
+        for (let sz = -1; sz <= 1; sz += 2) {
+          const p = new V3(
+            sx > 0 ? v.model.bounds.max.x : v.model.bounds.min.x,
+            sy > 0 ? v.model.bounds.max.y : v.model.bounds.min.y,
+            sz > 0 ? v.model.bounds.max.z : v.model.bounds.min.z,
+          ).project(v.camera)
+          maxXY = Math.max(maxXY, Math.abs(p.x), Math.abs(p.y))
+        }
+      }
+    }
+    const anguloDespues = v.camera.position.clone().sub(v.controls.target).normalize()
+    return {
+      maxXY,
+      corte: v.section.enabled,
+      conservedAngulo: anguloAntes.dot(anguloDespues),
+      distanciaAntes,
+      distanciaDespues: v.camera.position.distanceTo(v.controls.target),
+    }
+  })()
+`)
+check('las tijeras activan el corte', encuadre.corte === true)
+check('las tijeras no hacen zoom a la pieza (se ve la escena entera)',
+  encuadre.maxXY <= 1, `NDC max ${encuadre.maxXY.toFixed(3)}`)
+check('las tijeras reencuadran la escena completa',
+  encuadre.distanciaDespues >= encuadre.distanciaAntes,
+  `${encuadre.distanciaAntes.toFixed(1)} -> ${encuadre.distanciaDespues.toFixed(1)} unidades`)
+check('las tijeras conservan el angulo actual (giro de 90 grados)',
+  encuadre.conservedAngulo > 0.999,
+  `dot ${encuadre.conservedAngulo.toFixed(4)}`)
+await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    v.setSection({ enabled: true, plane: { point: [0, 0, 0], normal: [0, 0, 1] } })
+    v.frameModel()
+  })()
+`)
 
 // Cubo de vistas: 6 caras, clic navega y resalta la vista activa
 const cubeFaces = await evaluate(`
@@ -557,6 +617,7 @@ const limits = await evaluate(`
     // Infinity no viaja en JSON: se normaliza a null para comparar.
     const big = (v) => (v === Infinity || v === -Infinity ? null : v)
     return {
+      modo: window.dentalViewer.navigationMode,
       minPolar: c.minPolarAngle,
       maxPolar: c.maxPolarAngle,
       minAzim: big(c.minAzimuthAngle),
@@ -565,10 +626,14 @@ const limits = await evaluate(`
     }
   })()
 `)
-check('sin limites de giro (polar 0..PI y acimut libre)',
-  limits.minPolar === 0 && limits.maxPolar === Math.PI &&
-  limits.minAzim === null && limits.maxAzim === null && limits.rotate === true,
-  JSON.stringify(limits))
+// En modo 'orbit' se comprueba que no hay limites escritos a mano; en modo
+// 'libre' ArcballControls no usa coordenadas esfericas y por tanto no expone
+// limites polares: lo relevante es que exista giro en cualquier eje.
+const sinLimites = limits.modo === 'libre'
+  ? limits.rotate === true
+  : limits.minPolar === 0 && limits.maxPolar === Math.PI &&
+    limits.minAzim === null && limits.maxAzim === null && limits.rotate === true
+check('sin limites de giro escritos a mano', sinLimites, JSON.stringify(limits))
 
 const orbitBefore = await evaluate(`
   (() => {
@@ -618,14 +683,21 @@ const movido = Math.hypot(
 )
 check('arrastrar en horizontal gira la camara', movido > 5, `${movido.toFixed(1)} unidades`)
 
-await drag(orbitBefore.cx, orbitBefore.cy + orbitBefore.h * 0.35, orbitBefore.cx, orbitBefore.cy - orbitBefore.h * 0.35)
-const debajo = await evaluate(`(() => {
-  const v = window.dentalViewer
-  return { polar: v.controls.getPolarAngle(), y: v.camera.position.y, targetY: v.controls.target.y }
-})()`)
+// Se puede mirar la pieza desde debajo. En modo 'libre' el sentido del arrastre
+// vertical esta invertido respecto a OrbitControls (se comprueba hacia ambos
+// lados), asi que lo que se exige es el resultado: poder ver la cara inferior.
+const verDebajo = async (dy) => {
+  await drag(orbitBefore.cx, orbitBefore.cy, orbitBefore.cx, orbitBefore.cy + dy, 20)
+  return evaluate(`(() => {
+    const v = window.dentalViewer
+    return { polar: v.controls.getPolarAngle(), y: v.camera.position.y, targetY: v.controls.target.y }
+  })()`)
+}
+const debajo = await verDebajo(-orbitBefore.h * 0.35)
+const debajoAlt = debajo.polar > Math.PI / 2 + 0.05 ? debajo : await verDebajo(orbitBefore.h * 0.35)
 check('se puede mirar la pieza desde debajo (polar > 90 grados)',
-  debajo.polar > Math.PI / 2 + 0.05 && debajo.y < debajo.targetY,
-  `polar ${(debajo.polar * 180 / Math.PI).toFixed(0)} grados`)
+  debajoAlt.polar > Math.PI / 2 + 0.05 && debajoAlt.y < debajoAlt.targetY,
+  `polar ${(debajoAlt.polar * 180 / Math.PI).toFixed(0)} grados`)
 
 // Vueltas completas alrededor del modelo: nada debe frenar el giro.
 const vueltas = await evaluate(`
@@ -647,6 +719,66 @@ const vueltas = await evaluate(`
 `)
 check('giro completo alrededor sin topes', vueltas.minPolar <= Math.PI / 2 + 0.05,
   `polar min ${(vueltas.minPolar * 180 / Math.PI).toFixed(1)} grados`)
+
+// El requisito real: poder pasar por superior/inferior y SEGUIR dando la vuelta.
+// Se mide arrastrando en vertical y muestreando el polar en cada paso: con
+// OrbitControls la camara se clava en 180 y los ultimos pasos no se mueven. Si
+// el arrastre sigue vivo, el recorrido tiene que dar la vuelta al palo.
+const polarSerie = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    const c = v.controls
+    v.setView('frontal')
+    c.update()
+    v.requestRender()
+    const r = v.renderer.domElement
+    return { cx: r.clientWidth / 2, cy: r.clientHeight / 2 }
+  })()
+`)
+const STEPS_POLO = 40
+const TOTAL_POLO = 600
+await send('Input.dispatchMouseEvent',
+  { type: 'mousePressed', x: polarSerie.cx, y: polarSerie.cy, button: 'left', buttons: 1, clickCount: 1 }, sessionId)
+const recorrido = []
+for (let i = 1; i <= STEPS_POLO; i++) {
+  await send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved',
+    x: polarSerie.cx,
+    y: Math.round(polarSerie.cy - (TOTAL_POLO * i) / STEPS_POLO),
+    button: 'left',
+    buttons: 1,
+  }, sessionId)
+  recorrido.push(await evaluate(`window.dentalViewer.controls.getPolarAngle()`))
+}
+await send('Input.dispatchMouseEvent',
+  { type: 'mouseReleased', x: polarSerie.cx, y: polarSerie.cy - TOTAL_POLO, button: 'left', buttons: 0, clickCount: 1 }, sessionId)
+
+// Racha maxima de pasos consecutivos sin movimiento: es la firma del tope.
+// Se mide en grados (un paso util ronda los 3 grados) para no confundir un
+// avance lento con un atasco.
+const GRADO = 180 / Math.PI
+const recorridoGrados = recorrido.map((r) => r * GRADO)
+let racha = 0
+let actual = 0
+for (let i = 1; i < recorridoGrados.length; i++) {
+  if (Math.abs(recorridoGrados[i] - recorridoGrados[i - 1]) < 0.5) {
+    actual++
+    racha = Math.max(racha, actual)
+  } else {
+    actual = 0
+  }
+}
+const gradeable = (r) => r.toFixed(0)
+const detalle = `racha maxima sin mover ${racha} pasos; recorrido ${gradeable(Math.min(...recorridoGrados))} -> ${gradeable(Math.max(...recorridoGrados))} -> ${gradeable(recorridoGrados[recorridoGrados.length - 1])} grados`
+// En modo 'libre' el arrastre no puede quedarse atascado en el polo (racha
+// corta: 0-4 pasos, que es inercia al soltar). En el modo antiguo 'orbit' se
+// documenta el atasco de OrbitControls, que es justo lo que ya no se usa por
+// defecto: se comprueba que el behaviour antiguo es el conocido.
+if (limits.modo === 'libre') {
+  check('el arrastre no se queda atascado en el polo (giro libre de verdad)', racha < 8, detalle)
+} else {
+  check('modo antiguo: se reproduce el atasco del polo de OrbitControls', racha >= 8, detalle)
+}
 
 await evaluate(`
   (() => {

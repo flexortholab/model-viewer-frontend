@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Demo giro libre de escena</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #f2f4f7;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #lienzo { position: absolute; inset: 0; }
+
+  #panel { position: absolute; left: 16px; top: 16px; z-index: 10;
+    background: #fff; border: 1px solid #d5dae2; border-radius: 10px;
+    padding: 14px 16px; max-width: 330px;
+    box-shadow: 0 6px 22px rgba(16,24,40,.10); }
+
+  #panel h1 { font-size: 15px; margin: 0 0 10px; color: #16202c; }
+
+  .botones { display: flex; gap: 8px; margin-bottom: 12px; }
+  button { flex: 1; font: inherit; font-size: 13px; padding: 8px 10px; cursor: pointer;
+    border-radius: 7px; border: 1px solid #c3cad6; background: #f7f9fc; color: #16202c; }
+  button.activo { background: #1a7f5a; border-color: #1a7f5a; color: #fff; font-weight: 600; }
+
+  #estado { font-size: 12.5px; color: #46536b; line-height: 1.5; }
+  #estado b { color: #16202c; }
+  .pista { margin-top: 10px; padding-top: 10px; border-top: 1px solid #e6eaf0;
+    font-size: 12px; color: #6b7789; line-height: 1.5; }
+
+  #cargando { position: absolute; inset: 0; display: grid; place-items: center;
+    color: #46536b; font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="lienzo"></div>
+<div id="cargando">Cargando escena real (B1.glb)…</div>
+
+<div id="panel">
+  <h1>Giro de la escena</h1>
+  <div class="botones">
+    <button id="btnLibre" class="activo">Giro libre</button>
+    <button id="btnOrbit">Modo antiguo</button>
+  </div>
+  <div id="estado">Cargando…</div>
+  <div class="pista">
+    <b>Prueba:</b> arrastra hacia arriba más de media pantalla, sin parar.<br>
+    Con <b>giro libre</b> pasa de largo por arriba y sigue bajando.<br>
+    Con el <b>modo antiguo</b> se clava al llegar.
+  </div>
+</div>
+
+<script type="module">
+import { DentalViewer } from './src/viewer.js'
+
+const params = new URLSearchParams(location.search)
+const contenedor = document.getElementById('lienzo')
+const avisarCarga = document.getElementById('cargando')
+
+const viewer = new DentalViewer(contenedor, {})
+window.dentalViewer = viewer
+
+// Aplica el modo pedido y lo refleja en los botones.
+function aplicar(modo) {
+  viewer.setNavigationMode(modo)
+  document.getElementById('btnLibre').classList.toggle('activo', modo === 'libre')
+  document.getElementById('btnOrbit').classList.toggle('activo', modo === 'orbit')
+  pintarEstado(modo)
+}
+
+function pintarEstado(modo) {
+  const c = viewer.controls
+  const p = (c.getPolarAngle() * 180 / Math.PI).toFixed(0)
+  document.getElementById('estado').innerHTML =
+    `Modo <b>${modo === 'libre' ? 'giro libre' : 'modo antiguo'}</b><br>` +
+    `Ángulo actual sobre la pieza: <b>${p}°</b>`
+}
+
+document.getElementById('btnLibre').onclick = () => aplicar('libre')
+document.getElementById('btnOrbit').onclick = () => aplicar('orbit')
+
+// Refresca el angulo mientras se arrastra.
+let ultimo = 0
+setInterval(() => {
+  const modo = viewer.navigationMode
+  const p = Math.round((viewer.controls.getPolarAngle() * 180) / Math.PI)
+  if (p !== ultimo) {
+    ultimo = p
+    pintarEstado(modo)
+  }
+}, 120)
+
+const modelo = params.get('model') || 'samples/B1.glb'
+try {
+  await viewer.load(modelo)
+  avisarCarga.style.display = 'none'
+  aplicar(params.get('giro') === 'orbit' ? 'orbit' : 'libre')
+} catch (err) {
+  avisarCarga.textContent = 'No se pudo cargar la escena: ' + err.message
+}
+</script>
+</body>
+</html>

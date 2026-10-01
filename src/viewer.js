@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
+import { FreeOrbitControls } from './free-controls.js'
 import { loadModel, normalizeModel, applyDentalMaterial, prepareMaterialsForReview, isSupported, extensionOf } from './loaders.js'
 import { SectionPlaneTool } from './section.js'
 import { MeasureTool } from './measure.js'
@@ -33,11 +34,23 @@ export class DentalViewer {
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 2000)
     this.camera.position.set(40, 30, 60)
 
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement)
+    // Navegacion por defecto: giro libre. OrbitControls trabaja en coordenadas
+    // esfericas con el polar limitado a [0, PI], asi que al llegar a superior o
+    // inferior el arrastre se clava y no se puede seguir dando la vuelta.
+    // ArcballControls rota por quaterniones y no tiene esos polos.
+    // El modo antiguo sigue disponible con ?giro=orbit.
+    const giroParam = new URLSearchParams(window.location.search).get('giro')
+    const giro = giroParam || 'libre'
+
+    this.controls = giro === 'libre'
+      ? new FreeOrbitControls(this.camera, this.renderer.domElement)
+      : new OrbitControls(this.camera, this.renderer.domElement)
+
     this.controls.enableDamping = true
-    this.controls.dampingFactor = 0.08
-    this.controls.rotateSpeed = 0.85
+    this.controls.dampingFactor = giro === 'libre' ? 22 : 0.08
+    this.controls.rotateSpeed = giro === 'libre' ? 0.9 : 0.85
     this.controls.screenSpacePanning = true
+    this.navigationMode = giro
 
     this._setupLights()
     this._setupGrid()
@@ -79,6 +92,36 @@ export class DentalViewer {
   /** Marca un frame pendiente (llamar tras cualquier cambio visual). */
   requestRender() {
     this._dirty = true
+  }
+
+  /**
+   * Cambia el tipo de navegacion en caliente, conservando la vista actual.
+   * 'libre' (ArcballControls) no tiene polos; 'orbit' es el modo antiguo.
+   */
+  setNavigationMode(modo = 'libre') {
+    if (modo === this.navigationMode) return
+    const destino = new THREE.Vector3()
+    this.camera.getWorldDirection(destino)
+    this.controls.dispose()
+
+    this.navigationMode = modo
+    this.controls = modo === 'orbit'
+      ? new OrbitControls(this.camera, this.renderer.domElement)
+      : new FreeOrbitControls(this.camera, this.renderer.domElement)
+    this.controls.enableDamping = true
+    this.controls.dampingFactor = modo === 'orbit' ? 0.08 : 22
+    this.controls.rotateSpeed = modo === 'orbit' ? 0.85 : 0.9
+    this.controls.screenSpacePanning = true
+
+    // Reenganchar el listener de 'change' que usa el visor (puede no existir
+    // todavia si se cambia de modo antes del primer load).
+    this._onControlsChange ||= () => this.measure?.rebuild?.(false)
+    this.controls.addEventListener('change', this._onControlsChange)
+    // Mantener la orientacion al cambiar de modo.
+    this.camera.position.copy(this.controls.target).addScaledVector(destino, -1)
+    this.camera.lookAt(this.controls.target)
+    this.controls.update()
+    this.requestRender()
   }
 
   /** Que GPU ejecuta el WebGL (para diagnosticar integrada vs dedicada). */
@@ -245,7 +288,7 @@ export class DentalViewer {
   }
 
   /** Encuadra la camara sobre el modelo con un margen razonable. */
-  frameModel({ distanceFactor = 1.9 } = {}) {
+  frameModel({ margin = 1.16 } = {}) {
     if (!this.model) return
     const radius = Math.max(this.model.size.length() / 2, 5)
     this.camera.near = Math.max(radius / 500, 0.05)
@@ -253,9 +296,8 @@ export class DentalViewer {
     this.camera.updateProjectionMatrix()
 
     const center = this.model.bounds.getCenter(new THREE.Vector3())
-    const distance = radius * distanceFactor
     const dir = new THREE.Vector3(0.42, 0.36, 0.83).normalize()
-    this.camera.position.copy(center).addScaledVector(dir, distance)
+    this.camera.position.copy(center).addScaledVector(dir, this._frameDistance(this.model.bounds, dir, { margin }))
     this.camera.up.set(0, 1, 0)
     this.controls.target.copy(center)
     this.controls.update()
@@ -416,8 +458,47 @@ export class DentalViewer {
   }
 
   /**
-   * Centra la vista en un objeto concreto; con conPlane coloca y activa el
+   * Distancia a la que una caja entra COMPLETA en el encuadre mirando desde
+   * `dir`. Multiplicar el radio por un factor fijo (2.1) recortaba la pieza:
+   * con 38 grados de FOV hacen falta ~3.1x el radio de la esfera envolvente.
+   * Aqui se proyecta la caja al espacio de camara y se resuelve la distancia
+   * minima que mantiene los ochoVertices dentro del frustum, con margen.
+   */
+  _frameDistance(box, dir, { margin = 1.18 } = {}) {
+    const forward = dir.clone().normalize()
+    const worldUp = Math.abs(forward.y) > 0.98
+      ? new THREE.Vector3(0, 0, 1)
+      : new THREE.Vector3(0, 1, 0)
+    const right = new THREE.Vector3().crossVectors(worldUp, forward).normalize()
+    const up = new THREE.Vector3().crossVectors(forward, right).normalize()
+
+    const vTan = Math.tan((this.camera.fov * Math.PI) / 360)
+    const hTan = vTan * Math.max(this.camera.aspect, 1e-6)
+    const half = box.getSize(new THREE.Vector3()).multiplyScalar(0.5)
+
+    let distance = 0
+    for (let sx = -1; sx <= 1; sx += 2) {
+      for (let sy = -1; sy <= 1; sy += 2) {
+        for (let sz = -1; sz <= 1; sz += 2) {
+          const corner = new THREE.Vector3(sx * half.x, sy * half.y, sz * half.z)
+          const depth = corner.dot(forward)
+          distance = Math.max(
+            distance,
+            depth + Math.abs(corner.dot(right)) / hTan,
+            depth + Math.abs(corner.dot(up)) / vTan,
+          )
+        }
+      }
+    }
+    return Math.max(distance * margin, half.length() * 1.05, 1)
+  }
+
+  /**
+   * Centra la vista en un objeto concreto; con withPlane coloca y activa el
    * corte de ese objeto (despues lo ajusta el doctor con el gizmo).
+   *
+   * El boton de tijeras NO hace zoom: reencuadra la escena entera para no
+   * perder el contexto de la pieza y solo coloca el plano de corte sobre ella.
    */
   focusObject(index, { withPlane = false } = {}) {
     const mesh = this.model?.meshes?.[index]
@@ -427,15 +508,19 @@ export class DentalViewer {
     const center = box.getCenter(new THREE.Vector3())
     const radius = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 2)
 
-    this.camera.near = Math.max(radius / 500, 0.05)
-    this.camera.far = radius * 200
-    this.camera.updateProjectionMatrix()
-
     if (withPlane) {
+      // Encuadre de la ESCENA completa sin perder el angulo actual: se
+      // conserva la direccion de la camara y solo se aleja lo necesario para
+      // que quepa todo el modelo. Llamar a frameModel() aqui devolvia la
+      // vista a la isometrica y se perdia el giro que hubiera hecho el
+      // usuario (y con el, la orientacion del corte).
       const viewDir = new THREE.Vector3()
       this.camera.getWorldDirection(viewDir)
-      this.camera.position.copy(center).addScaledVector(viewDir, radius * 2.1)
-      this.controls.target.copy(center)
+      const sceneCenter = this.model.bounds.getCenter(new THREE.Vector3())
+      this.camera.position
+        .copy(sceneCenter)
+        .addScaledVector(viewDir, -this._frameDistance(this.model.bounds, viewDir))
+      this.controls.target.copy(sceneCenter)
       this.controls.update()
       this.section?.setPlane({ point: center.toArray(), normal: viewDir.normalize().toArray() })
       // Igual que al activar el corte global: de perfil por defecto.
@@ -445,7 +530,7 @@ export class DentalViewer {
       this.emit('section', this.section.serialize())
     } else {
       const dir = new THREE.Vector3(0.42, 0.36, 0.83).normalize()
-      this.camera.position.copy(center).addScaledVector(dir, radius * 1.9)
+      this.camera.position.copy(center).addScaledVector(dir, this._frameDistance(box, dir))
       this.controls.target.copy(center)
       this.controls.update()
     }
@@ -741,12 +826,13 @@ export class DentalViewer {
         lateral: [-1, 0.05, 0.02],
         lingual: [1, 0.05, 0.02],
       }
-      const dir = views[view]
-      if (!dir) return
-      const radius = this.model ? this.model.size.length() / 2 : 20
+      const dirName = views[view]
+      if (!dirName) return
       const center = this.model.bounds.getCenter(new THREE.Vector3())
-      const d = new THREE.Vector3(...dir).normalize().multiplyScalar(radius * 1.9)
-      this.camera.position.copy(center).add(d)
+      const dir = new THREE.Vector3(...dirName).normalize()
+      this.camera.position
+        .copy(center)
+        .addScaledVector(dir, this._frameDistance(this.model.bounds, dir, { margin: 1.1 }))
       this.controls.target.copy(center)
       this.controls.update()
       this.requestRender()

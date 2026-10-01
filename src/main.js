@@ -106,7 +106,7 @@ function renderObjects() {
     cut.type = 'button'
     cut.className = 'obj-cut'
     setIcon(cut, ICON_CUT)
-    cut.title = 'Centrar la vista y activar el corte en esta pieza'
+    cut.title = 'Activar el corte en esta pieza (sin cambiar el zoom)'
     cut.addEventListener('click', () => {
       viewer.focusObject(object.index, { withPlane: true })
       syncSectionUI()

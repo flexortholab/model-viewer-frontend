@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Visor de disyuntores sinterizados</title>
-    <script type="module" crossorigin src="./assets/index-BRlKv4u1.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BagQNDRm.css">
+    <script type="module" crossorigin src="./assets/index-C4MoJpv1.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-F6n7fjyE.css">
   </head>
   <body>
     <div id="app">
@@ -14,7 +14,7 @@
         <div id="leftbar" class="col">
         <div id="views-bar" class="toolbar" role="toolbar" aria-label="Vistas">
           <span class="tb-title">Vistas</span>
-          <div class="tb-group">
+          <div class="tb-group views-group">
             <button type="button" data-action="frame" title="Encuadrar (F)">Encuadrar</button>
             <button type="button" data-view="frontal" title="Vista frontal (anterior)">Frontal</button>
             <button type="button" data-view="superior" title="Vista superior (oclusal)">Superior</button>
@@ -22,6 +22,16 @@
             <button type="button" data-view="izquierda" title="Vista lateral izquierda">Izquierda</button>
             <button type="button" data-view="derecha" title="Vista lateral derecha">Derecha</button>
             <button type="button" data-view="isometrica" title="Vista isométrica">Isométrica</button>
+          </div>
+          <div id="viewcube" title="Cubo de vistas: pulsa una cara para ir a esa vista">
+            <div id="viewcube-inner">
+              <button type="button" class="cube-face face-frontal" data-cube="frontal">Frontal</button>
+              <button type="button" class="cube-face face-trasera" data-cube="trasera">Trasera</button>
+              <button type="button" class="cube-face face-izquierda" data-cube="izquierda">Izq.</button>
+              <button type="button" class="cube-face face-derecha" data-cube="derecha">Der.</button>
+              <button type="button" class="cube-face face-superior" data-cube="superior">Sup.</button>
+              <button type="button" class="cube-face face-inferior" data-cube="inferior">Inf.</button>
+            </div>
           </div>
         </div>
         <div id="tools-bar" class="toolbar" role="toolbar" aria-label="Herramientas del visor">
@@ -77,12 +87,12 @@
           </div>
         </div>
 
-        <div id="objects-panel" class="panel objects is-collapsed" hidden>
+        <div id="objects-panel" class="panel objects" hidden>
           <div class="panel-head">
             <strong>Objetos</strong>
             <span id="objects-count" class="count"></span>
             <button type="button" class="panel-toggle" data-action="toggle-objects" aria-label="Plegar">
-              +
+              -
             </button>
           </div>
           <div class="panel-body">

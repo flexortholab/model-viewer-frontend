@@ -42,6 +42,8 @@ export class MeasureTool {
   setEnabled(enabled) {
     this.enabled = !!enabled
     this._pending = null
+    this.clearPreview()
+    this.setHover(null)
     this.labelLayer.classList.toggle('is-measuring', this.enabled)
     return this.enabled
   }
@@ -204,10 +206,10 @@ export class MeasureTool {
     })
   }
 
-  _makePoint(point) {
+  _makePoint(point, color = 0xffd479) {
     const geometry = new THREE.BufferGeometry().setFromPoints([point, point])
     const material = new THREE.PointsMaterial({
-      color: 0xffd479,
+      color,
       size: 4.5,
       sizeAttenuation: false,
       depthTest: false,
@@ -222,34 +224,7 @@ export class MeasureTool {
 
   /** Texto "12.3 mm" horneado en una textura de canvas (sprite siempre visible). */
   _makeValueSprite(text) {
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    const font = '600 20px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
-    ctx.font = font
-    const textWidth = Math.ceil(ctx.measureText(text).width)
-    const padding = 10
-    canvas.width = textWidth + padding * 2
-    canvas.height = 40
-    const ctx2 = canvas.getContext('2d')
-    ctx2.scale(1, 1)
-    // Fondo blanco con borde teal corporativo: maxima legibilidad sobre fondo.
-    ctx2.fillStyle = 'rgba(255,255,255,0.96)'
-    const r = 9
-    ctx2.beginPath()
-    ctx2.roundRect(2, 2, canvas.width - 4, canvas.height - 4, r)
-    ctx2.fill()
-    ctx2.strokeStyle = '#1b8aa3'
-    ctx2.lineWidth = 2
-    ctx2.stroke()
-    ctx2.fillStyle = '#101828'
-    ctx2.font = font
-    ctx2.textAlign = 'center'
-    ctx2.textBaseline = 'middle'
-    ctx2.fillText(text, canvas.width / 2, canvas.height / 2 + 1)
-
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.colorSpace = THREE.SRGBColorSpace
-    texture.anisotropy = 4
+    const { texture, width, height } = this._valueTexture(text)
     const material = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
@@ -258,12 +233,39 @@ export class MeasureTool {
     })
     const sprite = new THREE.Sprite(material)
     const heightFraction = 0.036
-    sprite.scale.set((canvas.width / canvas.height) * heightFraction, heightFraction, 1)
+    sprite.scale.set((width / height) * heightFraction, heightFraction, 1)
     sprite.center.set(0.5, -0.35)
     sprite.renderOrder = 1001
     sprite.raycast = () => {}
     sprite.frustumCulled = false
     return sprite
+  }
+
+  /** Canvas + textura de una cifra con la estetica corporativa. */
+  _valueTexture(text) {
+    const canvas = document.createElement('canvas')
+    const font = '600 20px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+    const ctx = canvas.getContext('2d')
+    ctx.font = font
+    canvas.width = Math.ceil(ctx.measureText(text).width) + 20
+    canvas.height = 40
+    const c = canvas.getContext('2d')
+    c.fillStyle = 'rgba(255,255,255,0.96)'
+    c.beginPath()
+    c.roundRect(2, 2, canvas.width - 4, canvas.height - 4, 9)
+    c.fill()
+    c.strokeStyle = '#1b8aa3'
+    c.lineWidth = 2
+    c.stroke()
+    c.fillStyle = '#101828'
+    c.font = font
+    c.textAlign = 'center'
+    c.textBaseline = 'middle'
+    c.fillText(text, canvas.width / 2, canvas.height / 2 + 1)
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = 4
+    return { texture, width: canvas.width, height: canvas.height }
   }
 
   /** Repinta el sprite de valor tras editar una medida. */
@@ -364,7 +366,148 @@ export class MeasureTool {
   }
 
   setPending(point) {
-    this._pending = point
+    this._pending = point ? point.clone() : null
+    this.clearPreview()
+    if (this._pending) {
+      // Punto de origen: pastilla teal (en curso, no amarilla de medida hecha).
+      const dot = this._makePoint(this._pending, 0x1b8aa3)
+      dot.renderOrder = 1002
+      this.group.add(dot)
+      this._preview = { a: this._pending.clone(), dot, line: null, sprite: null, lastText: '' }
+    }
+  }
+
+  /**
+   * Puntero sobre la pieza mientras se mide: anillo de snap en el cursor y,
+   * si ya hay primer punto, goma elastica con la distancia en vivo.
+   * @param {THREE.Vector3|null} point punto bajo el cursor (ya con snap)
+   * @param {boolean} snapped true si cayo en un vertice (adherencia exacta)
+   */
+  setHover(point, snapped = false) {
+    if (!this.enabled || !point) {
+      if (this._snap) this._snap.visible = false
+      return
+    }
+    if (!this._snap) {
+      this._snap = this._makeSnapRing()
+      this.group.add(this._snap)
+    }
+    this._snap.visible = true
+    this._snap.position.copy(point)
+    this._snap.material.color.setHex(snapped ? 0x1b8aa3 : 0x9aa2b1)
+    if (this._pending) this._updatePreview(point)
+  }
+
+  /** Anillo + punto central para el cursor de medicion (tamano fijo en px). */
+  _makeSnapRing() {
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 64
+    const ctx = canvas.getContext('2d')
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 5
+    ctx.beginPath()
+    ctx.arc(32, 32, 22, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    ctx.arc(32, 32, 5, 0, Math.PI * 2)
+    ctx.fill()
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      sizeAttenuation: false,
+    })
+    const sprite = new THREE.Sprite(material)
+    const heightFraction = 0.03
+    sprite.scale.set(heightFraction, heightFraction, 1)
+    sprite.renderOrder = 1002
+    sprite.raycast = () => {}
+    sprite.frustumCulled = false
+    sprite.visible = false
+    return sprite
+  }
+
+  /** Goma elastica del primer punto al cursor, con cifra en vivo. */
+  _updatePreview(point) {
+    if (!this._preview) return
+    const { a } = this._preview
+    if (!this._preview.line) {
+      this._preview.line = this._makeLine(
+        [a.x, a.y, a.z, point.x, point.y, point.z],
+        { width: 2, color: 0x1b8aa3, dashed: true },
+      )
+      this._preview.line.renderOrder = 1002
+      this.group.add(this._preview.line)
+    } else {
+      this._preview.line.geometry.setPositions([a.x, a.y, a.z, point.x, point.y, point.z])
+    }
+    const text = formatMm(a.distanceTo(point))
+    const mid = new THREE.Vector3().addVectors(a, point).multiplyScalar(0.5)
+    const shown = (!this.section || this.section.isPointVisible(mid)) && this._inFront(mid)
+    if (!this._preview.sprite) {
+      this._preview.sprite = this._makeValueSprite(text)
+      this._preview.sprite.renderOrder = 1002
+      this._preview.lastText = text
+      this.group.add(this._preview.sprite)
+    } else if (text !== this._preview.lastText) {
+      // Solo se repinta el canvas cuando cambia la decima.
+      this._preview.sprite.material.map?.dispose()
+      this._preview.sprite.material.map = this._valueTexture(text).texture
+      this._preview.lastText = text
+    }
+    this._preview.sprite.position.copy(mid)
+    this._preview.sprite.visible = shown
+    this._preview.line.visible = shown
+  }
+
+  /** Canvas + textura de una cifra con la estetica corporativa. */
+  _valueTexture(text) {
+    const canvas = document.createElement('canvas')
+    const font = '600 20px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+    const ctx = canvas.getContext('2d')
+    ctx.font = font
+    canvas.width = Math.ceil(ctx.measureText(text).width) + 20
+    canvas.height = 40
+    const c = canvas.getContext('2d')
+    c.fillStyle = 'rgba(255,255,255,0.96)'
+    c.beginPath()
+    c.roundRect(2, 2, canvas.width - 4, canvas.height - 4, 9)
+    c.fill()
+    c.strokeStyle = '#1b8aa3'
+    c.lineWidth = 2
+    c.stroke()
+    c.fillStyle = '#101828'
+    c.font = font
+    c.textAlign = 'center'
+    c.textBaseline = 'middle'
+    c.fillText(text, canvas.width / 2, canvas.height / 2 + 1)
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = 4
+    return { texture, width: canvas.width, height: canvas.height }
+  }
+
+  _inFront(point) {
+    this._tmp.copy(point).project(this.camera)
+    return this._tmp.z <= 1
+  }
+
+  clearPreview() {
+    if (!this._preview) return
+    for (const node of [this._preview.dot, this._preview.line, this._preview.sprite]) {
+      if (!node) continue
+      this.group.remove(node)
+      node.geometry?.dispose()
+      if (node.material) {
+        node.material.map?.dispose()
+        if (this.lineMaterials.has(node.material)) this.lineMaterials.delete(node.material)
+        node.material.dispose?.()
+      }
+    }
+    this._preview = null
   }
 
   serialize() {

@@ -310,6 +310,7 @@ export class DentalViewer {
   setTool(tool) {
     const enabled = tool === 'measure' ? this.measure.setEnabled(true) : this.measure?.setEnabled(false)
     this.controls.enabled = !enabled
+    this.container.classList.toggle('is-measuring', !!enabled)
     this.requestRender()
     this.emit('tool', { tool: enabled ? 'measure' : 'orbit' })
     return enabled ? 'measure' : 'orbit'
@@ -437,6 +438,8 @@ export class DentalViewer {
       this.controls.target.copy(center)
       this.controls.update()
       this.section?.setPlane({ point: center.toArray(), normal: viewDir.normalize().toArray() })
+      // Igual que al activar el corte global: de perfil por defecto.
+      this.section?.orientToCamera?.(this.camera)
       if (!this.section?.enabled) this.section?.setEnabled(true)
       this._syncDoc()
       this.emit('section', this.section.serialize())
@@ -671,6 +674,7 @@ export class DentalViewer {
     const grab = this.measure.findEndpoint?.(event.clientX, event.clientY)
     if (grab) {
       this._dragMeasure = grab
+      this.measure.setHover(null)
       return null
     }
     const hit = this.pick()
@@ -679,13 +683,15 @@ export class DentalViewer {
     const snapped = this.measure.snapToSurface?.(hit) ?? hit.point
     if (!this._pendingPoint) {
       this._pendingPoint = (snapped ?? hit.point).clone()
-      this.measure.setPending(hit.point)
+      this.measure.setPending(this._pendingPoint)
+      this.requestRender()
       this.emit('measure-pick', { point: (snapped ?? hit.point).clone() })
       return null
     }
     const measurement = this.measure.add(this._pendingPoint, snapped ?? hit.point)
     this._pendingPoint = null
     this.measure.setPending(null)
+    this.measure.setHover(null)
     this.requestRender()
     this.emit('measure-add', measurement)
     return measurement
@@ -704,11 +710,16 @@ export class DentalViewer {
     }
     this.setPointer(event)
     const hit = this.pick()
-    if (!hit || !this.measure?.enabled) return
+    if (!hit || !this.measure?.enabled) {
+      this.measure?.setHover(null)
+      return
+    }
+    // Anillo de snap + goma elastica con cifra en vivo si hay primer punto.
+    const snapped = this.measure.snapToSurface?.(hit) ?? hit.point
+    this.measure.setHover(snapped ?? hit.point, !!snapped && snapped !== hit.point)
+    this.requestRender()
     if (this._pendingPoint) {
-      this.measure.setPending(hit.point)
-      this.requestRender()
-      this.emit('measure-hover', { point: hit.point.clone() })
+      this.emit('measure-hover', { point: (snapped ?? hit.point).clone() })
     }
   }
 

@@ -547,6 +547,10 @@ container.addEventListener('pointermove', (event) => {
   viewer.handleMeasureMove(event)
 })
 
+container.addEventListener('pointerleave', () => {
+  viewer.measure?.setHover(null)
+})
+
 container.addEventListener('pointerup', () => {
   viewer.handleMeasureRelease?.()
 })

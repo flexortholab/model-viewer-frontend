@@ -228,7 +228,15 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 4. GLB/FBX reales de Blender verificados en navegador (B1, Final1, Mario FBX).
 5. Limpieza de carpetas duplicadas accidentales (`src/src`, `scripts/scripts`, …).
 
-**Sesión del 01/10/2026 (mediodía; smoke 46/46, unitarios 24/24):**
+**Sesión del 01/10/2026 (mediodía-3; smoke 53/53, unitarios 24/24):**
+
+1. Medir estilo Autodesk: cursor propio de colocar punto, anillo de snap
+   (teal = vértice exacto, gris = superficie) y goma elástica con la cifra en
+   vivo antes del segundo clic (solo repinta al cambiar la décima).
+2. Corte por pieza (tijeras) también arranca girado 90° por defecto.
+3. `setTool` gestiona la clase del cursor (antes solo la UI).
+
+**Sesión del 01/10/2026 (mediodía-2; smoke 48/48, unitarios 24/24):**
 
 1. Cubo a la esquina inferior izquierda; caras izquierda/derecha anatómicas
    (FDI: derecha −X, izquierda +X) y panel Vistas en cruz con Frontal al centro.

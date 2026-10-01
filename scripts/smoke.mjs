@@ -321,6 +321,47 @@ check('la cifra mm es un sprite visible',
   measure.spriteText === 'ok' && measure.spriteVisible === true,
   `${measure.spriteText}/${measure.spriteVisible}`)
 
+// Flujo interactivo con el raton: cursor, snap, goma con cifra en vivo y
+// salida sola a camara libre (medidas de una en una).
+const flow = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    v.setSection({ enabled: false })
+    v.measure.clear()
+    v.setTool('measure')
+    const canvas = v.renderer.domElement
+    const rect = canvas.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    const fire = (type, x, y) => canvas.dispatchEvent(
+      new PointerEvent(type, { clientX: x, clientY: y, bubbles: true }),
+    )
+    const cursorClass = v.container.classList.contains('is-measuring')
+    fire('pointermove', cx, cy)
+    const snapVisible = v.measure._snap?.visible === true
+    fire('pointerdown', cx, cy)
+    const pending = !!v.measure._preview
+    fire('pointermove', cx + 40, cy)
+    const rubber = !!v.measure._preview?.line
+    const liveText = v.measure._preview?.lastText ?? ''
+    fire('pointerdown', cx + 40, cy)
+    return {
+      cursorClass,
+      snapVisible,
+      pending,
+      rubber,
+      liveText,
+      count: v.measure.measurements.length,
+      exited: v.measure.enabled === false && v.controls.enabled === true,
+    }
+  })()
+`)
+check('modo medir con cursor de colocar punto', flow.cursorClass === true)
+check('anillo de snap visible al pasar sobre la pieza', flow.snapVisible === true)
+check('primer clic deja el origen pendiente', flow.pending === true)
+check('la goma muestra la distancia en vivo', flow.rubber === true && /mm$/.test(flow.liveText), flow.liveText)
+check('al completar sale sola a camara libre (una a una)', flow.count === 1 && flow.exited === true)
+
 // Las etiquetas se ocultan cuando el corte elimina la pieza.
 // La pieza va de y = -3.6 a y = +3.6: un plano en y = 40 no deja nada visible.
 const hidden = await evaluate(`

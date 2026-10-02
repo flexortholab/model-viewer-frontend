@@ -43,7 +43,7 @@ Contexto de partida:
    algún día se quiere que los doctores comenten en línea.
 8. **Sin framework SPA** — una sola vista; Vite + three.js.
 
-Estado del plan: **implementado en su totalidad**. Lo restante está en la hoja de ruta.
+Estado del plan: **implementado en su totalidad**; la interfaz se ha pulido en la sesión del 02/10/2026. Lo restante está en la hoja de ruta.
 
 ## Hoja de ruta
 
@@ -102,6 +102,21 @@ mesh, animaciones FBX (se conservan en estado estático a propósito).
 - **OpenCode Zen plan gratuito** dio abasto para este proyecto (Big Pickle / free tiers);
   la conversación original sugirió OpenCode Go ($10) para modelos top si hiciera falta, y que
   Mistral Vibe Pro no da acceso a GLM-5.3 (se accede vía OpenCode/Zen).
+
+### Pulido UI y demo (02/10/2026)
+
+- [x] Unificar estética de paneles con la barra de Herramientas.
+- [x] Mover Corte seccional a la columna izquierda; Objetos y Presentación a la derecha.
+- [x] Convertir globos de medidas a chips HTML (mismo comportamiento que marcadores).
+- [x] Ajustar tamaño/posición de logo y cubo.
+- [x] Sustituir botón *Encuadrar* por **Isométrica** en Vistas; ensanchar Vistas para los botones.
+- [x] Demo de GitHub Pages con `B1.glb` como caso de ejemplo.
+
+Pendiente de sesiones anteriores (no bloqueante):
+
+- [ ] Limpieza de decodificadores Draco/Basis duplicados en el bundle.
+- [ ] Manifiesto con casos para el enlace directo al doctor.
+- [ ] (Si acaso) i18n — todo el texto sigue en español.
 
 ---
 

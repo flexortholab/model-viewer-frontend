@@ -9,7 +9,7 @@ Pensado para **disyuntores sinterizados con anclaje esquelético** diseñados en
 - **anotaciones** exportables como sidecar JSON
 - embebible en un **webclip / iframe** vía `postMessage`, o por enlace directo
 
-Estado actual: **v0.3.6** funcional (cámara **ortográfica** — sin perspectiva ni "ojo de pez"—, plano de corte unico con gizmo mover+rotar atenuado, capping por pieza con curva de corte exacta por objeto, lista de objetos con iconos propios y corte por pieza, presentacion con marcadores editables, medidas compactas de una en una en mm con 1 decimal, seleccion y nota de medidas, cubo de vistas clicable en la esquina con las caras bien orientadas, **giro libre sin topes** — ArcballControls, se puede pasar de largo por superior e inferior—, paneles separados Vistas (en cruz) y Herramientas, logo oficial del laboratorio con su teal y gris de marca, titulo del caso sin marco, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
+Estado actual: **v0.3.7** funcional (cámara **ortográfica** — sin perspectiva ni "ojo de pez"—, plano de corte único con gizmo mover+rotar atenuado, capping por pieza con curva de corte exacta por objeto, lista de objetos con iconos propios y corte por pieza, presentación con marcadores editables, medidas compactas de una en una en mm con 1 decimal con globos HTML fijos en pantalla, selección y nota de medidas, cubo de vistas clicable en la esquina con las caras bien orientadas, **giro libre sin topes** — ArcballControls, se puede pasar de largo por superior e inferior—, paneles separados Vistas (en cruz), Herramientas, Corte seccional, Objetos y Presentación con estética unificada, logo oficial del laboratorio con su teal y gris de marca, título del caso sin marco, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
 
 ### Cámara y vistas
 
@@ -18,7 +18,7 @@ que se busca al revisar anatomía. Como la escala no depende de la distancia, el
 encuadre se ajusta variando el frustum (`_fitOrtho`) en lugar de alejar la cámara, y
 cada vista recalcula su escala para no recortar la pieza.
 
-El botón **Encuadrar** sustituye al anterior *Isométrica*: hacía casi lo mismo.
+La barra de **Vistas** incluye las seis caras del cubo más **Isométrica**. El atajo `F` sigue reencuadrando el modelo; el botón *Encuadrar* se ha movido al protocolo `postMessage` y al bridge.
 
 ### Mediciones editables
 
@@ -91,7 +91,7 @@ npm run preview    # sirve dist/ en http://localhost:4173
 ## Tests
 
 - **Unitarios** (`test/units.test.js`): detección de unidades, formato `formatMm`, y validación del formato de anotaciones. `npm test`.
-- **Smoke test** (`scripts/smoke.mjs`): prueba end-to-end headless. Requiere `npm run preview` corriendo en el 4173 y Chromium instalado (`CHROME_PATH` para una ruta no estándar). Carga la muestra STL en un Chromium headless (SwiftShader, sin GPU) y valida carga, unidades, corte con stencil, mediciones, round-trip de anotaciones y estabilidad de la escena. En entornos donde el headless no compone pixeles al canvas, los checks visuales del capping se omiten con aviso. Ultimo resultado: **34/34**.
+- **Smoke test** (`scripts/smoke.mjs`): prueba end-to-end headless. Requiere `npm run preview` corriendo en el 4173 y Chromium instalado (`CHROME_PATH` para una ruta no estándar). Carga la muestra STL en un Chromium headless (SwiftShader, sin GPU) y valida carga, unidades, corte con stencil, mediciones, round-trip de anotaciones y estabilidad de la escena. En entornos donde el headless no compone pixeles al canvas, los checks visuales del capping se omiten con aviso. Ultimo resultado: **77/77**.
 
 ---
 
@@ -211,21 +211,28 @@ Seguridad: solo se aceptan mensajes de `window.parent`/`window` y con origen en 
 
 ## Interfaz
 
-**Toolbar** (izquierda):
+**Columna izquierda**:
 
-| Botón | Acción | Atajo |
-|---|---|---|
-| Encuadrar | reencuadra la cámara | `F` |
-| Frontal / Superior / Lateral | vista predefinida | — |
-| Medir | activa modo medición | `M` (sale `Esc`) |
-| Borrar medidas | limpia todas las cotas | — |
-| Exportar | descarga `annotations.json` | `E` |
+- **Vistas** (280 px): rejilla con Superior, Izquierda, Frontal, Derecha, Inferior e **Isométrica**.
+- **Herramientas** (248 px): Medir, Borrar medidas, Marcador, Borrar marcadores, Exportar.
+- **Corte seccional** (248 px, plegable): Activar corte, Alinear con la vista, Girar 90 grados.
 
-**Panel Corte seccional** (derecha, plegable): switch general, botones Alinear con la vista y Girar 90 grados. El plano se mueve/rota con el gizmo sobre la pieza.
+**Columna derecha**:
 
-**Barra de estado** (abajo): unidades detectadas/forzadas con alerta si la confianza es baja, triángulos y dimensiones en mm.
+- **Objetos** (248 px, plegable): lista de piezas con ojo visible/oculto y tijera para centrar el corte.
+- **Presentación** (248 px, plegable): pasos de la presentación con vista libre.
 
-En pantallas ≤ 640px el panel baja a la parte inferior. Todo el texto está en español.
+| Atajo | Acción |
+|---|---|
+| `F` | reencuadra la cámara |
+| `M` | activa/desactiva modo medición (sale con `Esc`) |
+| `K` | activa/desactiva modo marcador |
+| `E` | exporta `annotations.json` |
+| `Supr` | borra la medición seleccionada |
+
+**Cubo de vistas** (abajo-izquierda) y **logo** (abajo-derecha). La barra de estado muestra unidades detectadas/forzadas, triángulos y dimensiones en mm.
+
+En pantallas ≤ 640 px los paneles bajan a la parte inferior. Todo el texto está en español.
 
 ---
 
@@ -366,12 +373,20 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 7. Loader y título: el loader se enciende de forma síncrona al pedir la carga (ya no
    dependía de un `setTimeout` para detectarlo en headless).
 
+**Sesión del 02/10/2026 (smoke 77/77, unitarios 24/24):**
+
+1. **Globos de medidas en HTML**: mismo comportamiento que los marcadores (tamaño fijo en px, no escalan con el zoom), texto centrado verticalmente y ligeramente más grande (15 px) sin crecer el globo.
+2. **Logo y cubo reajustados**: logo a 220 px con márgenes de 36 px; cubo a 36 px de margen.
+3. **Paneles reorganizados**: Corte seccional pasa a la columna izquierda; Objetos y Presentación quedan a la derecha. Todos los paneles comparten estética con Herramientas (fondo, borde, sombra, título en mayúsculas, botones con fondo blanco).
+4. **Barra de Vistas más ancha** (300 px) para no cortar los botones; el botón *Encuadrar* se sustituye por **Isométrica** en la UI (el reencuadre sigue disponible por `F` y bridge).
+5. **Demo de GitHub Pages** apunta a `samples/B1.glb` y se despliega actualizada; `Final1.glb` y `Mario Rodriguez1.fbx` no se publican en Pages.
+
 **Pendiente:**
 
 1. Decodificadores Draco/Basis duplicados entre el bundle de Vite y `public/` — optimizacion, no bloqueante.
 2. Sin backend ni despliegue productivo: la demo es estatica (Pages).
 
-Nota sobre el smoke: en un Chromium headless con SwiftShader los triángulos se emiten (3418, sin errores GL) pero los pixeles no llegan al canvas compuesto; por eso los checks visuales del capping se basan en conteo de pixeles y se omiten si el entorno no rasteriza.
+Nota sobre el smoke: en un Chromium headless con SwiftShader los triángulos se emiten (sin errores GL) pero los pixeles no llegan al canvas compuesto; por eso los checks visuales del capping se basan en conteo de pixeles y se omiten si el entorno no rasteriza.
 
 ## Próximos pasos
 

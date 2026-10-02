@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Visor de disyuntores sinterizados</title>
-    <script type="module" crossorigin src="./assets/index-CKRzFEaP.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BWl4v1sI.css">
+    <script type="module" crossorigin src="./assets/index-DEeTTRNo.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DvVdjzw6.css">
   </head>
   <body>
     <div id="app">
@@ -64,6 +64,10 @@
               <button type="button" data-action="clear-measurements" title="Borrar medidas">
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5 9 6l2.5 2.5L5 15H2.5v-2.5z"/><path d="M11.5 1.5l3 3m0-3-3 3"/></svg>
                 Borrar medidas
+              </button>
+              <button type="button" data-action="remove-last-measurement" title="Borrar última medición (o la seleccionada)">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 2.5h5M6 2.5V1.5h4v1M3 4.5h10l-.8 10H3.8z"/><path d="M6.5 7v5M9.5 7v5"/></svg>
+                Borrar última
               </button>
               <button type="button" data-action="add-marker" aria-pressed="false" title="Añadir marcador (K)">
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.5S3.8 10.2 3.8 6.9A4.2 4.2 0 0 1 8 2.7a4.2 4.2 0 0 1 4.2 4.2c0 3.3-4.2 7.6-4.2 7.6z"/><circle cx="8" cy="6.9" r="1.5"/></svg>
@@ -158,9 +162,9 @@
       <div id="mobile-ui" aria-hidden="true">
         <div id="mobile-title" class="mobile-title"></div>
         <div id="mobile-toolbar" class="mobile-toolbar" role="toolbar" aria-label="Herramientas del visor">
-          <button type="button" data-mobile="measurements" title="Mediciones">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5 12.5 2.5l1.8 1.8-2 2-1.8-1.8-1.2 1.2 1.8 1.8-2 2-1.8-1.8-1.2 1.2 1.8 1.8-2.1 2.1-2.3-2.3z"/></svg>
-            Mediciones
+          <button type="button" data-action="home" title="Inicio">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2 2 7v7h4.5v-4h3v4H14V7z"/></svg>
+            Inicio
           </button>
           <button type="button" data-mobile="objects" title="Objetos">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h4v4h-4zM9.5 2.5h4v4h-4zM2.5 9.5h4v4h-4zM9.5 9.5h4v4h-4z"/></svg>
@@ -170,17 +174,6 @@
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h8M4 6.5h8M4 10.5h8M4 14.5h8"/></svg>
             Presentación
           </button>
-        </div>
-
-        <div id="mobile-measurements" class="mobile-modal" hidden>
-          <div class="mobile-modal-head">
-            <strong>Mediciones</strong>
-            <button type="button" class="mobile-close" data-mobile-close aria-label="Cerrar">×</button>
-          </div>
-          <div class="mobile-modal-body">
-            <button type="button" class="wide" data-action="measure" aria-pressed="false">Medir</button>
-            <button type="button" class="wide" data-action="clear-measurements">Borrar medidas</button>
-          </div>
         </div>
 
         <div id="mobile-objects" class="mobile-modal" hidden>

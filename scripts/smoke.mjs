@@ -229,17 +229,21 @@ check('genera el grupo de stencil (caras traseras y delanteras)', section.stenci
 check('los materiales recortan con el plano', section.planes === 1)
 check('stencil activo en el capping y en los strokes', section.capWrite === true && section.stencilWrite === true)
 
-// Doble gizmo: flechas de mover y anillos de rotar a la vez
+// Gizmo tipo Meshmixer: flechas gruesas y anillos gruesos
 const gizmo = await evaluate(`
   (() => {
     const v = window.dentalViewer
+    const handles = v.section.gizmo3d?._handles
     return {
-      helpers: v.section._helperT.visible && v.section._helperR.visible,
-      modes: [v.section.transformT.getMode?.() ?? 'translate', v.section.transformR.getMode?.() ?? 'rotate'],
+      hasGizmo: !!v.section.gizmo3d,
+      translateHandles: handles ? Array.from(handles.keys()).filter(k => k.startsWith('translate-')).length : 0,
+      rotateHandles: handles ? Array.from(handles.keys()).filter(k => k.startsWith('rotate-')).length : 0,
     }
   })()
 `)
-check('el gizmo muestra mover y rotar simultaneamente', gizmo.helpers === true && gizmo.modes.join(',') === 'translate,rotate')
+check('gizmo meshmixer con flechas y anillos gruesos',
+  gizmo.hasGizmo && gizmo.translateHandles >= 3 && gizmo.rotateHandles >= 3,
+  `${gizmo.translateHandles} flechas, ${gizmo.rotateHandles} anillos`)
 
 // Encuadre al pulsar las tijeras: activa el corte SIN acercarse, la escena
 // entera debe seguir entrando en el encuadre y el angulo actual se conserva.

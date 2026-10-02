@@ -109,6 +109,11 @@ function syncSectionUI() {
   sectionToggle?.setAttribute('aria-pressed', String(state.enabled))
   const fuera = state.enabled && !viewer.section.planeIntersectsBounds()
   panel.classList.toggle('is-outside', fuera)
+  const gizmoBtn = document.getElementById('gizmo-mode')
+  if (gizmoBtn) {
+    const mode = viewer.section.gizmoMode === 'rotate' ? 'Rotar' : 'Mover'
+    gizmoBtn.lastChild.textContent = `Modo gizmo: ${mode}`
+  }
 }
 
 // --- Lista de objetos --------------------------------------------------------
@@ -675,6 +680,19 @@ document.addEventListener('click', (event) => {
       viewer.orientSectionPlane()
       showHint('Plano girado 90 grados en su sitio', 2200)
       break
+    case 'toggle-gizmo-mode': {
+      const nextMode = viewer.section?.gizmoMode === 'translate' ? 'rotate' : 'translate'
+      viewer.section?.setGizmoMode(nextMode)
+      const btn = document.getElementById('gizmo-mode')
+      if (btn) {
+        btn.innerHTML = `
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h3m-3 0 2-2m-2 2 2 2"/><path d="M13.5 8h-3m3 0-2-2m2 2-2 2"/><circle cx="8" cy="8" r="2"/></svg>
+          Modo gizmo: ${nextMode === 'translate' ? 'Mover' : 'Rotar'}
+        `
+      }
+      showHint(nextMode === 'translate' ? 'Gizmo: mover el plano' : 'Gizmo: rotar el plano')
+      break
+    }
     case 'section-toggle': {
       const enabled = !viewer.section?.enabled
       viewer.setSection({ enabled })
@@ -690,7 +708,7 @@ document.addEventListener('click', (event) => {
       viewer.exitMarkerFocus()
       activeMarkerId = null
       renderMarkers()
-      showHint('Vista libre: se vuelven a mostrar todas las mediciones')
+      showHint('Vista libre: se ocultan las mediciones y el marcador del paso')
       break
   }
 })

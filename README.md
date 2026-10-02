@@ -50,7 +50,7 @@ clavado al llegar a superior/inferior, sigue disponible con **`?giro=orbit`**; e
 libre se puede forzar con **`?giro=libre`**. En `demo-giro.html` hay un interruptor
 en pantalla para comparar ambos modos con la escena real.
 > **Demo desplegada (GitHub Pages, rama gh-pages):** https://rms1982.github.io/dental-viewer/
-> **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/disyuntor-4-pilares.stl&section=y=0
+> **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/B1.glb
 > La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.
 
 ---

@@ -213,6 +213,18 @@ const cut = await evaluate(`
 `)
 check('dibuja la curva del corte por pieza (interseccion exacta)', cut.cuts === 1 && cut.segments > 10, `${cut.cuts} curva, ${cut.segments} segmentos`)
 check('la curva vive sobre la pieza (sin lineas fugadas)', cut.maxAbs < 60, `max |xyz| = ${cut.maxAbs.toFixed(1)} mm`)
+const cutColor = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    const mesh = v.model.meshes[0]
+    const base = v.section._pieceColor(mesh) ?? new THREE.Color(0x9a968f)
+    const mat = [...v.section._cutMaterials][0]
+    return { baseR: base.r, cutR: mat?.color.r ?? 0 }
+  })()
+`)
+check('el borde de corte es mas oscuro que la pieza',
+  cutColor.cutR > 0 && cutColor.cutR < cutColor.baseR * 0.45,
+  `base ${cutColor.baseR.toFixed(2)} vs corte ${cutColor.cutR.toFixed(2)}`)
 check('genera el grupo de stencil (caras traseras y delanteras)', section.stencils >= 2, `${section.stencils} mallas`)
 check('los materiales recortan con el plano', section.planes === 1)
 check('stencil activo en el capping y en los strokes', section.capWrite === true && section.stencilWrite === true)

@@ -575,12 +575,19 @@ container.addEventListener('pointerdown', (event) => {
     return
   }
   // Modo libre: clic selecciona una medida (clic en vacio suelta).
-  if (event.button === 0 && event.target === viewer.renderer.domElement) {
+  if (event.button === 0 && !event.target.closest('.panel, .toolbar, #viewcube')) {
     // Editar tiene prioridad: agarrar un extremo para ajustarlo con precision.
     const grab = viewer.grabMeasureEndpoint?.(event)
     if (grab) {
       container.style.cursor = 'grabbing'
       showHint(`${grab.measurement.label} · arrastra el extremo para ajustarlo`, 3200)
+      return
+    }
+    // A continuacion, mover un marcador.
+    const marker = viewer.grabMarker?.(event)
+    if (marker) {
+      container.style.cursor = 'grabbing'
+      showHint('Arrastra el marcador para cambiar su posición', 3200)
       return
     }
     const found = viewer.measure?.findMeasurement(event.clientX, event.clientY)
@@ -608,12 +615,13 @@ container.addEventListener('pointermove', (event) => {
     viewer.handleMeasureMove(event)
     return
   }
-  // Camara libre: si hay arrastre en curso, mueve el extremo. Si no, avisa
-  // con el cursor de que ese punto se puede agarrar.
+  // Camara libre: arrastres de marcador o de extremo de medida.
+  if (viewer.dragMarker?.(event)) return
   if (viewer.dragMeasureEndpoint?.(event)) return
-  if (event.target === viewer.renderer.domElement) {
-    const grab = viewer.measure?.findEndpoint?.(event.clientX, event.clientY)
-    container.style.cursor = grab ? 'grab' : ''
+  if (!event.target.closest('.panel, .toolbar, #viewcube')) {
+    const grabM = viewer.measure?.findEndpoint?.(event.clientX, event.clientY)
+    const grabK = viewer._findMarkerAt?.(event.clientX, event.clientY)
+    container.style.cursor = grabM || grabK ? 'grab' : ''
   }
 })
 
@@ -622,7 +630,20 @@ container.addEventListener('pointerleave', () => {
   container.style.cursor = ''
 })
 
-const releaseDrag = () => {
+const releaseDrag = (event) => {
+  if (viewer._dragMarker) {
+    const start = viewer._dragMarkerStart
+    const moved = start ? Math.hypot((event?.clientX ?? start.x) - start.x, (event?.clientY ?? start.y) - start.y) : 10
+    const marker = viewer.releaseMarker?.()
+    container.style.cursor = ''
+    // Si fue un clic corto sin mover, enfocar el paso (comportamiento de lista).
+    if (marker && moved < 4) {
+      activeMarkerId = marker.id
+      viewer.focusMarker(marker.id)
+      renderMarkers()
+    }
+    return
+  }
   if (!viewer._dragMeasure) return
   container.style.cursor = ''
   viewer.handleMeasureRelease?.()

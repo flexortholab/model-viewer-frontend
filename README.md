@@ -28,6 +28,10 @@ el punto se reajusta la cifra. Al arrastrar se desactiva la cámara, así que la
 pieza no se mueve, y el punto se adhiere a la superficie y a los vértices
 cercanos para clavar la medida. El doble clic sobre la línea edita la nota.
 
+Los marcadores de presentación también se pueden mover: en cámara libre, si
+el cursor pasa por encima del punto aparece la mano y puedes arrastrarlo para
+recolocarlo sobre la pieza. Al soltar se adhiere a la superficie más cercana.
+
 El dibujo es deliberadamente sobrio: línea de cota, dos líneas de arranque,
 los dos puntos y el globo con la cifra. Sin tildes oblicuas en los extremos,
 que solo confundían.
@@ -35,7 +39,7 @@ que solo confundían.
 La cota se calcula en el **plano de la vista**: el larguero y los postes se
 desplazan perpendicularmente al segmento *en pantalla*, no en 3D, así que la
 "portería" no rota con la escena cuando giras la pieza. El larguero se dibuja
-más fino (1,6 px) que los postes (2,6 px).
+más fino (1,6 px) que los postes (3,0 px).
 
 ### Giro de la escena
 
@@ -137,7 +141,9 @@ tironear). La técnica usa:
 - **stencil capping**: caras traseras/frente escriben stencil con operaciones opuestas y un quad coplanar tapa el hueco con `stencilFunc NotEqual 0` — el corte se ve **sólido**, no hueco
 - cada tapa respeta los otros planos activos (un cruce en L queda correcto)
 
-Color de tapa configurable (por defecto `#c0554a`, terracota). Desactivar el corte conserva las posiciones de los planos.
+El borde de corte se pinta un 70% mas oscuro que el color original de cada pieza
+para que resalte sobre el modelo. Color de tapa configurable (por defecto
+`#c0554a`, terracota). Desactivar el corte conserva las posiciones de los planos.
 
 ## Mediciones
 

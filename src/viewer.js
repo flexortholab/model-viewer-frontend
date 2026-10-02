@@ -65,6 +65,7 @@ this.camera.position.set(40, 30, 60)
     this.raycaster = new THREE.Raycaster()
     this.raycaster.firstHitOnly = true
     this.pointer = new THREE.Vector2()
+    this._tmp = new THREE.Vector3()
 
     this.modelRoot = new THREE.Group()
     this.modelRoot.name = 'model'
@@ -840,6 +841,68 @@ this.camera.position.set(40, 30, 60)
       this.measure.moveEndpoint(this._dragMeasure.measurement, this._dragMeasure.key, snapped ?? hit.point)
     }
     return true
+  }
+
+  /**
+   * Intenta agarrar un marcador para moverlo de sitio.
+   * @returns {object|null} el marcador agarrado
+   */
+  grabMarker(event) {
+    const marker = this._findMarkerAt(event.clientX, event.clientY)
+    if (!marker) return null
+    this._dragMarker = marker
+    this._dragMarkerStart = { x: event.clientX, y: event.clientY }
+    this.controls.enabled = false
+    this.measure?.setHover(null)
+    this.requestRender()
+    return marker
+  }
+
+  /** Mueve el marcador agarrado a la superficie bajo el cursor. */
+  dragMarker(event) {
+    if (!this._dragMarker) return false
+    this.setPointer(event)
+    const hit = this.pick()
+    if (hit) {
+      const snapped = this.measure.snapToSurface?.(hit) ?? hit.point
+      this._dragMarker.position = (snapped ?? hit.point).toArray()
+      this._renderMarkers()
+      this._syncDoc()
+    }
+    return true
+  }
+
+  /** Suelta el marcador y, si fue un clic corto, enfoca ese paso. */
+  releaseMarker({ focusIfClick = true } = {}) {
+    if (!this._dragMarker) return null
+    const marker = this._dragMarker
+    this._dragMarker = null
+    this.controls.enabled = !this.measure?.enabled
+    this._syncDoc()
+    this.emit('markers', this.doc.markers)
+    return marker
+  }
+
+  _findMarkerAt(clientX, clientY, tolerance = 14) {
+    const rect = this.container.getBoundingClientRect()
+    const px = clientX - rect.left
+    const py = clientY - rect.top
+    const width = this.container.clientWidth || 1
+    const height = this.container.clientHeight || 1
+    let best = null
+    let bestDist = tolerance
+    for (const marker of this.doc.markers) {
+      this._tmp.fromArray(marker.position).project(this.camera)
+      if (this._tmp.z > 1) continue
+      const x = (this._tmp.x * 0.5 + 0.5) * width
+      const y = (-this._tmp.y * 0.5 + 0.5) * height
+      const dist = Math.hypot(x - px, y - py)
+      if (dist < bestDist) {
+        bestDist = dist
+        best = marker
+      }
+    }
+    return best
   }
 
   handleMeasureClick(event) {

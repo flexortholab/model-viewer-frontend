@@ -146,8 +146,8 @@ export class MeasureTool {
     const { a2, b2 } = this._screenSpaceOffset(a, b, offsetPx)
 
     nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 1.6, color: selected ? 0x1b8aa3 : 0x111111 })
-    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 2.6, color: selected ? 0x1b8aa3 : 0x111111 })
-    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 2.6, color: selected ? 0x1b8aa3 : 0x111111 })
+    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 3.0, color: selected ? 0x1b8aa3 : 0x111111 })
+    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 3.0, color: selected ? 0x1b8aa3 : 0x111111 })
 
     nodes.pointA = this._makePoint(a)
     nodes.pointB = this._makePoint(b)

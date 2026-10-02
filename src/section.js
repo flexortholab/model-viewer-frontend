@@ -432,7 +432,8 @@ export class SectionPlaneTool {
       const geometry = new LineSegmentsGeometry()
       geometry.setPositions(segments)
       const material = new LineMaterial({
-        color: (this._pieceColor(mesh) ?? new THREE.Color(this._seedColor)).multiplyScalar(0.45),
+        // 70% mas oscuro que el color original de la pieza.
+        color: (this._pieceColor(mesh) ?? new THREE.Color(this._seedColor)).multiplyScalar(0.30),
         linewidth: 2.5,
         depthTest: false,
         transparent: true,

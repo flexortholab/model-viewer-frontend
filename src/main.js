@@ -12,6 +12,7 @@ const labelLayer = document.getElementById('labels')
 const hint = document.getElementById('hint')
 const panel = document.getElementById('panel')
 const sectionToggle = document.getElementById('section-toggle')
+const toolsPanel = document.getElementById('tools-bar')
 const objectsPanel = document.getElementById('objects-panel')
 const objectsCount = document.getElementById('objects-count')
 const objectsList = document.getElementById('objects-list')
@@ -68,7 +69,7 @@ function togglePanelContent(panelEl) {
 
 function collapsePanelsOnMobile() {
   if (window.innerWidth > 640) return
-  for (const panelEl of [panel, objectsPanel, markersPanel]) {
+  for (const panelEl of [panel, toolsPanel, objectsPanel, markersPanel]) {
     if (panelEl && !panelEl.classList.contains('is-collapsed')) togglePanelContent(panelEl)
   }
 }
@@ -539,6 +540,9 @@ document.addEventListener('click', (event) => {
       break
     case 'toggle-panel':
       togglePanelContent(panel)
+      break
+    case 'toggle-tools':
+      togglePanelContent(toolsPanel)
       break
     case 'toggle-objects':
       togglePanelContent(objectsPanel)

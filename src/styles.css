@@ -185,26 +185,30 @@ body {
 
 /* Botones de toolbar y de paneles con el mismo lenguaje visual */
 .toolbar button,
-.panel-body button.wide {
+.panel-body button.wide,
+.panel.tools .panel-body button {
   border: 1px solid var(--border);
   background: #fff;
 }
 
 .toolbar button:hover,
-.panel-body button.wide:hover {
+.panel-body button.wide:hover,
+.panel.tools .panel-body button:hover {
   border-color: var(--accent);
 }
 
 /* Iconos minimalistas teal delante del texto */
 .toolbar button,
-.panel-body button.wide {
+.panel-body button.wide,
+.panel.tools .panel-body button {
   display: inline-flex;
   align-items: center;
   gap: 7px;
 }
 
 .toolbar button svg,
-.panel-body button.wide svg {
+.panel-body button.wide svg,
+.panel.tools .panel-body button svg {
   flex: none;
   width: 15px;
   height: 15px;
@@ -684,6 +688,11 @@ button.obj-cut:hover {
 }
 
 /* Herramientas en vertical: una columna de botones a todo ancho */
+#tools-bar .panel-body {
+  max-height: none;
+  overflow: visible;
+}
+
 #tools-bar .tb-group {
   flex-direction: column;
   align-items: stretch;

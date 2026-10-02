@@ -434,7 +434,7 @@ export class SectionPlaneTool {
       const material = new LineMaterial({
         // Gris oscuro uniforme y fino para todos los objetos cortados.
         color: 0x4a4a4a,
-        linewidth: 1.0,
+        linewidth: 1.6,
         depthTest: false,
         transparent: true,
       })

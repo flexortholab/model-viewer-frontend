@@ -5,7 +5,6 @@ import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
 
 import { formatMm } from './units.js'
 
-const TICK = 0.9
 const OFFSET = 2.4
 
 /**
@@ -126,8 +125,6 @@ export class MeasureTool {
         dim: null,
         extA: null,
         extB: null,
-        tickA: null,
-        tickB: null,
         pointA: null,
         pointB: null,
         value: null,
@@ -178,22 +175,11 @@ export class MeasureTool {
     nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 2, color: selected ? 0x1b8aa3 : 0x111111 })
     nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 2, color: selected ? 0x1b8aa3 : 0x111111 })
 
-    // Tildes oblicuas en los extremos, estilo plano de taller.
-    const tickDir = direction.clone().add(best).normalize().multiplyScalar(TICK)
-    nodes.tickA = this._makeLine(
-      [a2.x - tickDir.x, a2.y - tickDir.y, a2.z - tickDir.z,
-       a2.x + tickDir.x, a2.y + tickDir.y, a2.z + tickDir.z],
-      { width: 3.4 },
-    )
-    nodes.tickB = this._makeLine(
-      [b2.x - tickDir.x, b2.y - tickDir.y, b2.z - tickDir.z,
-       b2.x + tickDir.x, b2.y + tickDir.y, b2.z + tickDir.z],
-      { width: 3.4 },
-    )
-
+    // Sin tildes oblicuas: solo la linea de cota y las dos lineas de arranque
+    // hacia el punto medido. Anadir cruces diagonales solo confunia.
     nodes.pointA = this._makePoint(a)
     nodes.pointB = this._makePoint(b)
-    for (const key of ['dim', 'extA', 'extB', 'tickA', 'tickB', 'pointA', 'pointB', 'value']) {
+    for (const key of ['dim', 'extA', 'extB', 'pointA', 'pointB', 'value']) {
       if (nodes[key]) this.group.add(nodes[key])
     }
 
@@ -242,8 +228,7 @@ export class MeasureTool {
       sizeAttenuation: false,
     })
     const sprite = new THREE.Sprite(material)
-    const heightFraction = 0.036
-    sprite.scale.set((width / height) * heightFraction, heightFraction, 1)
+    this._applySpriteSize(sprite, 0.036, width / height)
     sprite.center.set(0.5, -0.35)
     sprite.renderOrder = 1001
     sprite.raycast = () => {}
@@ -251,31 +236,31 @@ export class MeasureTool {
     return sprite
   }
 
-  /** Canvas + textura de una cifra con la estetica corporativa. */
-  _valueTexture(text) {
-    const canvas = document.createElement('canvas')
-    const font = '600 20px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
-    const ctx = canvas.getContext('2d')
-    ctx.font = font
-    canvas.width = Math.ceil(ctx.measureText(text).width) + 20
-    canvas.height = 40
-    const c = canvas.getContext('2d')
-    c.fillStyle = 'rgba(255,255,255,0.96)'
-    c.beginPath()
-    c.roundRect(2, 2, canvas.width - 4, canvas.height - 4, 9)
-    c.fill()
-    c.strokeStyle = '#63bbd4'
-    c.lineWidth = 2
-    c.stroke()
-    c.fillStyle = '#101828'
-    c.font = font
-    c.textAlign = 'center'
-    c.textBaseline = 'middle'
-    c.fillText(text, canvas.width / 2, canvas.height / 2 + 1)
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.colorSpace = THREE.SRGBColorSpace
-    texture.anisotropy = 4
-    return { texture, width: canvas.width, height: canvas.height }
+  /**
+   * Tamano de un sprite NO atenuado, en fraccion de la altura del lienzo.
+   * Con camara ortografica el shader no compensa la distancia, asi que el
+   * scale es en unidades de mundo: hay que escalarlo con el alto del frustum
+   * para que el globo conserve su tamano en pantalla (3.6% del alto).
+   */
+  _applySpriteSize(sprite, heightFraction, aspect = 1) {
+    const frustumHeight = (this.camera.top - this.camera.bottom) || 120
+    sprite.scale.set(heightFraction * frustumHeight * aspect, heightFraction * frustumHeight, 1)
+  }
+
+  /** Reajusta todos los sprites a laResolution actual (zoom, resize, encuadre). */
+  syncSpriteSizes() {
+    for (const measurement of this.measurements) {
+      const sprite = this._entry(measurement).value
+      if (!sprite) continue
+      const image = sprite.material.map?.image
+      const aspect = image ? image.width / image.height : 1
+      this._applySpriteSize(sprite, 0.036, aspect)
+    }
+    if (this._snap) this._applySpriteSize(this._snap, 0.03)
+    if (this._preview?.sprite) {
+      const image = this._preview.sprite.material.map?.image
+      this._applySpriteSize(this._preview.sprite, 0.036, image ? image.width / image.height : 1)
+    }
   }
 
   /** Repinta el sprite de valor tras editar una medida. */
@@ -397,6 +382,9 @@ export class MeasureTool {
 
   /** Oculta lo que el corte o la camara dejan fuera. Sprites + overlays HTML. */
   update() {
+    // Los sprites miden en unidades de mundo: con el frustum ortografico
+    // hay que reajustarlos en cada frame para que no cambien de tamano.
+    this.syncSpriteSizes()
     if (!this.labels.length) return
     for (const entry of this.labels) {
       const mid = entry.position
@@ -505,8 +493,7 @@ export class MeasureTool {
       sizeAttenuation: false,
     })
     const sprite = new THREE.Sprite(material)
-    const heightFraction = 0.03
-    sprite.scale.set(heightFraction, heightFraction, 1)
+    this._applySpriteSize(sprite, 0.03)
     sprite.renderOrder = 1002
     sprite.raycast = () => {}
     sprite.frustumCulled = false
@@ -539,8 +526,10 @@ export class MeasureTool {
     } else if (text !== this._preview.lastText) {
       // Solo se repinta el canvas cuando cambia la decima.
       this._preview.sprite.material.map?.dispose()
-      this._preview.sprite.material.map = this._valueTexture(text).texture
+      const nueva = this._valueTexture(text)
+      this._preview.sprite.material.map = nueva.texture
       this._preview.lastText = text
+      this._applySpriteSize(this._preview.sprite, 0.036, nueva.width / nueva.height)
     }
     this._preview.sprite.position.copy(mid)
     this._preview.sprite.visible = shown

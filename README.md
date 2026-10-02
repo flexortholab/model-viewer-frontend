@@ -20,6 +20,18 @@ cada vista recalcula su escala para no recortar la pieza.
 
 El botón **Encuadrar** sustituye al anterior *Isométrica*: hacía casi lo mismo.
 
+### Mediciones editables
+
+Cualquier medida se puede **retocar en cámara libre**, sin volver al modo
+medir: si el cursor se pone sobre un extremo aparece la mano, y al arrastrar
+el punto se reajusta la cifra. Al arrastrar se desactiva la cámara, así que la
+pieza no se mueve, y el punto se adhiere a la superficie y a los vértices
+cercanos para clavar la medida. El doble clic sobre la línea edita la nota.
+
+El dibujo es deliberadamente sobrio: línea de cota, dos líneas de arranque,
+los dos puntos y el globo con la cifra. Sin tildes oblicuas en los extremos,
+que solo confundían.
+
 ### Giro de la escena
 
 Por defecto la escena gira **libre**: la cámara se mueve con un trackball virtual

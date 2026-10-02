@@ -370,16 +370,45 @@ const measure = await evaluate(`
 `)
 check('crea una medicion', measure.count === 1, measure.id)
 check('la distancia se expresa en mm con 1 decimal', measure.label === '12.3 mm', measure.label)
-// dim, extA, extB, tickA, tickB, pointA, pointB, value (sprite con la cifra)
+// dim, extA, extB, pointA, pointB, value (sprite con la cifra). Sin tildes
+// oblicuas: solo confundian.
 check(
-  'dibuja linea de cota, extensiones, tildes, puntos y cifra en sprite',
-  measure.nodes === 8,
+  'dibuja linea de cota, extensiones, puntos y cifra en sprite',
+  measure.nodes === 6,
   `${measure.nodes} elementos (${measure.nodeKeys.join(', ')})`,
 )
-check('cada nodo tiene su material', measure.lineMaterials >= 7, `${measure.lineMaterials} materiales`)
+check('sin tildes oblicuas en la medicion',
+  !measure.nodeKeys.includes('tickA') && !measure.nodeKeys.includes('tickB'),
+  measure.nodeKeys.join(', '))
+check('cada nodo tiene su material', measure.lineMaterials >= 5, `${measure.lineMaterials} materiales`)
 check('la cifra mm es un sprite visible',
   measure.spriteText === 'ok' && measure.spriteVisible === true,
   `${measure.spriteText}/${measure.spriteVisible}`)
+
+// El globo tiene que conservar su tamano en pantalla con la camara
+// ortografica: el scale es en unidades de mundo, no en fraccion de pantalla.
+const sprite = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    const H = v.renderer.domElement.height
+    const s = v.measure.measurements[0].__nodes.value
+    const altoPx = () => +(s.scale.y / (v.camera.top - v.camera.bottom) * H).toFixed(1)
+    const antes = altoPx()
+    v.camera.zoom = 2.5
+    v.camera.updateProjectionMatrix()
+    v.measure.update()
+    const conZoom = altoPx()
+    v.camera.zoom = 1
+    v.camera.updateProjectionMatrix()
+    v.measure.update()
+    return { antes, conZoom, restituido: altoPx() }
+  })()
+`)
+check('el globo conserva su tamano en pantalla con zoom',
+  Math.abs(sprite.antes - sprite.conZoom) < 0.6 && Math.abs(sprite.antes - sprite.restituido) < 0.6,
+  `${sprite.antes}px / zoom x2.5 ${sprite.conZoom}px / vuelta ${sprite.restituido}px`)
+check('el globo tiene tamano util en pantalla',
+  sprite.antes > 18 && sprite.antes < 60, `${sprite.antes}px`)
 
 // Flujo interactivo con el raton: cursor, snap, goma con cifra en vivo y
 // salida sola a camara libre (medidas de una en una).
@@ -421,6 +450,49 @@ check('anillo de snap visible al pasar sobre la pieza', flow.snapVisible === tru
 check('primer clic deja el origen pendiente', flow.pending === true)
 check('la goma muestra la distancia en vivo', flow.rubber === true && /mm$/.test(flow.liveText), flow.liveText)
 check('al completar sale sola a camara libre (una a una)', flow.count === 1 && flow.exited === true)
+
+// Edicion: en camara libre se puede agarrar un extremo y arrastrarlo para
+// ajustar la cifra con precision, sin volver al modo medir.
+const edicion = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    v.measure.clear()
+    const b = v.model.bounds
+    const V = v.camera.position.constructor
+    const a = b.min.clone()
+    const far = b.max.clone(); far.y = a.y
+    const m = v.measure.add(a, far)
+    const canvas = v.renderer.domElement
+    const p = a.clone().project(v.camera)
+    const cx = canvas.getBoundingClientRect().left + (p.x * 0.5 + 0.5) * canvas.clientWidth
+    const cy = canvas.getBoundingClientRect().top + (-p.y * 0.5 + 0.5) * canvas.clientHeight
+    const camara = v.camera.position.toArray().map((n) => +n.toFixed(3))
+    const fire = (type, x, y) => canvas.dispatchEvent(
+      new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, button: 0 }),
+    )
+    fire('pointerdown', cx, cy)
+    const agarrado = !!v._dragMeasure
+    fire('pointermove', cx + 30, cy - 30)
+    fire('pointerup', cx + 30, cy - 30)
+    const resultado = {
+      agarrado,
+      movido: +a.distanceTo(far).toFixed(2),
+      etiquetaDespues: m.label,
+      camaraIgual: JSON.stringify(camara) === JSON.stringify(v.camera.position.toArray().map((n) => +n.toFixed(3))),
+      soltado: v._dragMeasure === null && v.controls.enabled === true,
+    }
+    // Deja el estado como estaba: una sola medida en el centro de la pieza,
+    // que es lo que espera el bloque siguiente.
+    v.measure.clear()
+    const centro = b.getCenter(new V())
+    v.measure.add(centro, centro.clone().setX(centro.x + 12.3456))
+    return resultado
+  })()
+`)
+check('en camara libre se puede agarrar un extremo', edicion.agarrado === true)
+check('arrastrar el extremo cambia la distancia', edicion.movido > 0.01, edicion.etiquetaDespues)
+check('la camara no se mueve al editar la medida', edicion.camaraIgual === true)
+check('al soltar se reactiva la camara', edicion.soltado === true)
 
 // Las etiquetas se ocultan cuando el corte elimina la pieza.
 // La pieza va de y = -3.6 a y = +3.6: un plano en y = 40 no deja nada visible.

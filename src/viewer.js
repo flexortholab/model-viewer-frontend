@@ -812,16 +812,41 @@ this.camera.position.set(40, 30, 60)
     return null
   }
 
+  /**
+   * Intenta agarrar un extremo de medida. Funciona con la herramienta de
+   * medir activa y tambien en camara libre, para poder retocar cualquier
+   * medida sin volver a entrar en modo medicion.
+   * @returns {{measurement: object, key: string}|null}
+   */
+  grabMeasureEndpoint(event) {
+    const grab = this.measure?.findEndpoint?.(event.clientX, event.clientY)
+    if (!grab) return null
+    this._dragMeasure = grab
+    this.measure.select(grab.measurement.id)
+    this.measure.setHover(null)
+    // Sin camara mientras se arrastra el extremo, o la pieza se moveria con el.
+    this.controls.enabled = false
+    this.requestRender()
+    return grab
+  }
+
+  /** Arrastra el extremo agarrado con adherencia a la superficie. */
+  dragMeasureEndpoint(event) {
+    if (!this._dragMeasure) return false
+    this.setPointer(event)
+    const hit = this.pick()
+    if (hit) {
+      const snapped = this.measure.snapToSurface?.(hit) ?? hit.point
+      this.measure.moveEndpoint(this._dragMeasure.measurement, this._dragMeasure.key, snapped ?? hit.point)
+    }
+    return true
+  }
+
   handleMeasureClick(event) {
     this.setPointer(event)
     // Edicion: si el cursor agarra un extremo de una medida, arrastrarlo
     // manda sobre crear una nueva.
-    const grab = this.measure.findEndpoint?.(event.clientX, event.clientY)
-    if (grab) {
-      this._dragMeasure = grab
-      this.measure.setHover(null)
-      return null
-    }
+    if (this.grabMeasureEndpoint(event)) return null
     const hit = this.pick()
     if (!hit) return null
     // Adherencia a superficie/borde: ajusta al vertice cercano si procede.
@@ -843,16 +868,7 @@ this.camera.position.set(40, 30, 60)
   }
 
   handleMeasureMove(event) {
-    if (this._dragMeasure) {
-      // Arrastre de extremo: ajusta a la superficie y repinta al vuelo.
-      this.setPointer(event)
-      const hit = this.pick()
-      if (hit) {
-        const snapped = this.measure.snapToSurface?.(hit) ?? hit.point
-        this.measure.moveEndpoint(this._dragMeasure.measurement, this._dragMeasure.key, snapped ?? hit.point)
-      }
-      return
-    }
+    if (this.dragMeasureEndpoint(event)) return
     this.setPointer(event)
     const hit = this.pick()
     if (!hit || !this.measure?.enabled) {
@@ -931,7 +947,10 @@ this.camera.position.set(40, 30, 60)
     if (this._dragMeasure) {
       this._dragMeasure = null
       this.measure?.syncDoc?.()
+      this.emit('measure-edit-end')
     }
+    // La camara vuelve a estar disponible salvo que sigamos midiendo.
+    this.controls.enabled = !this.measure?.enabled
   }
 
   _loop() {

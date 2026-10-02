@@ -576,6 +576,13 @@ container.addEventListener('pointerdown', (event) => {
   }
   // Modo libre: clic selecciona una medida (clic en vacio suelta).
   if (event.button === 0 && event.target === viewer.renderer.domElement) {
+    // Editar tiene prioridad: agarrar un extremo para ajustarlo con precision.
+    const grab = viewer.grabMeasureEndpoint?.(event)
+    if (grab) {
+      container.style.cursor = 'grabbing'
+      showHint(`${grab.measurement.label} · arrastra el extremo para ajustarlo`, 3200)
+      return
+    }
     const found = viewer.measure?.findMeasurement(event.clientX, event.clientY)
     const selected = viewer.measure?.select(found?.id ?? null)
     if (selected) {
@@ -597,17 +604,34 @@ container.addEventListener('dblclick', (event) => {
 })
 
 container.addEventListener('pointermove', (event) => {
-  if (!viewer.measure?.enabled) return
-  viewer.handleMeasureMove(event)
+  if (viewer.measure?.enabled) {
+    viewer.handleMeasureMove(event)
+    return
+  }
+  // Camara libre: si hay arrastre en curso, mueve el extremo. Si no, avisa
+  // con el cursor de que ese punto se puede agarrar.
+  if (viewer.dragMeasureEndpoint?.(event)) return
+  if (event.target === viewer.renderer.domElement) {
+    const grab = viewer.measure?.findEndpoint?.(event.clientX, event.clientY)
+    container.style.cursor = grab ? 'grab' : ''
+  }
 })
 
 container.addEventListener('pointerleave', () => {
   viewer.measure?.setHover(null)
+  container.style.cursor = ''
 })
 
-container.addEventListener('pointerup', () => {
+const releaseDrag = () => {
+  if (!viewer._dragMeasure) return
+  container.style.cursor = ''
   viewer.handleMeasureRelease?.()
-})
+}
+container.addEventListener('pointerup', releaseDrag)
+container.addEventListener('pointercancel', releaseDrag)
+// Tambien en window: si el puntero se suelta fuera del lienzo, el arrastre
+// debe terminar igual.
+window.addEventListener('pointerup', releaseDrag)
 
 window.addEventListener('keydown', (event) => {
   if (event.target?.matches?.('input, textarea')) return

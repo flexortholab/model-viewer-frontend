@@ -8,6 +8,7 @@ import { formatMm } from './units.js'
 const OFFSET_PX = 36
 const DARK_GREY = 0x333333
 const MEASURE_BLUE = 0x1b8aa3
+const BALLOON_HEIGHT = 0.027
 
 /**
  * Mediciones sobre la superficie del modelo.
@@ -198,7 +199,7 @@ export class MeasureTool {
       sizeAttenuation: false,
     })
     const sprite = new THREE.Sprite(material)
-    this._applySpriteSize(sprite, 0.030, width / height)
+    this._applySpriteSize(sprite, BALLOON_HEIGHT, width / height)
     sprite.center.set(0.5, -0.35)
     sprite.renderOrder = 1001
     sprite.raycast = () => {}
@@ -278,12 +279,12 @@ export class MeasureTool {
       if (!sprite) continue
       const image = sprite.material.map?.image
       const aspect = image ? image.width / image.height : 1
-      this._applySpriteSize(sprite, 0.030, aspect)
+      this._applySpriteSize(sprite, BALLOON_HEIGHT, aspect)
     }
-    if (this._snap) this._applySpriteSize(this._snap, 0.030)
+    if (this._snap) this._applySpriteSize(this._snap, BALLOON_HEIGHT)
     if (this._preview?.sprite) {
       const image = this._preview.sprite.material.map?.image
-      this._applySpriteSize(this._preview.sprite, 0.030, image ? image.width / image.height : 1)
+      this._applySpriteSize(this._preview.sprite, BALLOON_HEIGHT, image ? image.width / image.height : 1)
     }
   }
 
@@ -528,7 +529,7 @@ export class MeasureTool {
       sizeAttenuation: false,
     })
     const sprite = new THREE.Sprite(material)
-    this._applySpriteSize(sprite, 0.030)
+    this._applySpriteSize(sprite, BALLOON_HEIGHT)
     sprite.renderOrder = 1002
     sprite.raycast = () => {}
     sprite.frustumCulled = false
@@ -564,7 +565,7 @@ export class MeasureTool {
       const nueva = this._valueTexture(text)
       this._preview.sprite.material.map = nueva.texture
       this._preview.lastText = text
-      this._applySpriteSize(this._preview.sprite, 0.030, nueva.width / nueva.height)
+      this._applySpriteSize(this._preview.sprite, BALLOON_HEIGHT, nueva.width / nueva.height)
     }
     this._preview.sprite.position.copy(mid)
     this._preview.sprite.visible = shown
@@ -574,11 +575,11 @@ export class MeasureTool {
   /** Canvas + textura de una cifra con la estetica corporativa. */
   _valueTexture(text) {
     const canvas = document.createElement('canvas')
-    const font = '600 16px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+    const font = '600 15px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
     const ctx = canvas.getContext('2d')
     ctx.font = font
     canvas.width = Math.ceil(ctx.measureText(text).width) + 18
-    canvas.height = 34
+    canvas.height = 32
     const c = canvas.getContext('2d')
     c.fillStyle = 'rgba(255,255,255,0.98)'
     c.beginPath()

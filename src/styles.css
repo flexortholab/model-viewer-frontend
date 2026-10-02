@@ -102,7 +102,8 @@ body {
 }
 
 .marker-label {
-  padding: 5px 10px;
+  padding: 6px 12px;
+  font-size: 14px;
   border: 2px solid #22c55e;
   transform-origin: bottom center;
 }

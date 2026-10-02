@@ -50,7 +50,7 @@ clavado al llegar a superior/inferior, sigue disponible con **`?giro=orbit`**; e
 libre se puede forzar con **`?giro=libre`**. En `demo-giro.html` hay un interruptor
 en pantalla para comparar ambos modos con la escena real.
 > **Demo desplegada (GitHub Pages, rama gh-pages):** https://rms1982.github.io/dental-viewer/
-> **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/B1.glb
+> **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/B1-draco.glb
 > La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.
 
 ---
@@ -379,7 +379,7 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 2. **Logo y cubo reajustados**: logo a 220 px con márgenes de 36 px; cubo a 36 px de margen.
 3. **Paneles reorganizados**: Corte seccional pasa a la columna izquierda; Objetos y Presentación quedan a la derecha. Todos los paneles comparten estética con Herramientas (fondo, borde, sombra, título en mayúsculas, botones con fondo blanco).
 4. **Barra de Vistas más ancha** (300 px) para no cortar los botones; el botón *Encuadrar* se sustituye por **Isométrica** en la UI (el reencuadre sigue disponible por `F` y bridge).
-5. **Demo de GitHub Pages** apunta a `samples/B1.glb` y se despliega actualizada; `Final1.glb` y `Mario Rodriguez1.fbx` no se publican en Pages.
+5. **Demo de GitHub Pages** apunta a `samples/B1-draco.glb` (misma pieza B1 comprimida con Draco, ~4 MB) y se despliega actualizada; `Final1.glb` y `Mario Rodriguez1.fbx` no se publican en Pages.
 
 **Pendiente:**
 

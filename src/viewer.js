@@ -26,13 +26,18 @@ export class DentalViewer {
     // tema oscuro.
     this.scene.background = new THREE.Color(0xffffff)
 
+    // En moviles se reduce la carga de la GPU: sin antialias y pixel ratio 1.
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent,
+    ) || navigator.maxTouchPoints > 2
+
     this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: !isMobile,
       stencil: true,
       preserveDrawingBuffer: true,
-      powerPreference: 'high-performance',
+      powerPreference: isMobile ? 'default' : 'high-performance',
     })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    this.renderer.setPixelRatio(isMobile ? 1 : Math.min(window.devicePixelRatio, 2))
     this.renderer.localClippingEnabled = true
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.05

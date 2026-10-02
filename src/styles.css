@@ -66,20 +66,23 @@ body {
   position: absolute;
   top: 0;
   left: 0;
+  display: inline-flex;
+  align-items: center;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.98);
   color: #1f2937;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   pointer-events: auto;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.12);
   will-change: transform;
+  margin-bottom: 6px;
 }
 
 .measure-label {
-  padding: 5px 10px;
+  padding: 3px 10px;
   border: 2px solid #1b8aa3;
   cursor: pointer;
 }
@@ -102,8 +105,8 @@ body {
 }
 
 .marker-label {
-  padding: 6px 12px;
-  font-size: 14px;
+  padding: 5px 12px;
+  font-size: 15px;
   border: 2px solid #22c55e;
   transform-origin: bottom center;
 }
@@ -173,13 +176,15 @@ body {
   box-shadow: 0 1px 8px rgba(20, 22, 26, 0.08);
 }
 
-/* Botones de toolbar con el mismo lenguaje que los botones de los paneles */
-.toolbar button {
+/* Botones de toolbar y de paneles con el mismo lenguaje visual */
+.toolbar button,
+.panel-body button.wide {
   border: 1px solid var(--border);
   background: #fff;
 }
 
-.toolbar button:hover {
+.toolbar button:hover,
+.panel-body button.wide:hover {
   border-color: var(--accent);
 }
 
@@ -256,14 +261,19 @@ button.wide {
   border: 1px solid var(--border);
 }
 
-/* --- Paneles (corte, objetos, presentacion) en su columna ------------------- */
+/* --- Paneles (corte, objetos, presentacion): mismo lenguaje que Herramientas --- */
 
 .panel {
   position: relative;
   top: auto;
   right: auto;
   bottom: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   width: 248px;
+  padding: 8px;
   border-radius: var(--radius);
   background: var(--panel);
   border: 1px solid var(--border);
@@ -275,8 +285,8 @@ button.wide {
 .panel .panel-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 10px;
+  gap: 6px;
+  padding: 0;
   max-height: min(32vh, 320px);
   overflow-y: auto;
 }
@@ -286,9 +296,18 @@ button.wide {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  padding: 0 2px;
+  border-bottom: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.panel-head strong {
+  font-weight: inherit;
+  color: inherit;
 }
 
 .panel-head .count {
@@ -299,21 +318,25 @@ button.wide {
 }
 
 .panel-toggle {
-  padding: 0 6px;
-  font-size: 16px;
+  padding: 0 4px;
+  font-size: 14px;
   line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+}
+
+.panel-toggle:hover {
+  color: var(--text);
 }
 
 .panel.is-collapsed .panel-body {
   display: none;
 }
 
-.panel.is-collapsed .panel-head {
-  border-bottom: none;
-}
-
 .panel-note {
   margin: 0;
+  padding: 0 2px;
   font-size: 11px;
   color: var(--muted);
 }
@@ -617,9 +640,9 @@ button.obj-cut:hover {
    Proporcion 1098.5 x 659.8 = 1.66:1, la del viewBox ya recortado. */
 #brand-logo {
   position: absolute;
-  right: 16px;
-  bottom: 12px;
-  width: 176px;
+  right: 36px;
+  bottom: 36px;
+  width: 220px;
   height: auto;
   filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.85));
   pointer-events: none;
@@ -674,8 +697,8 @@ button.obj-cut:hover {
 /* Cubo de vistas: orientacion actual + navegacion por caras */
 #viewcube {
   position: absolute;
-  left: 26px;
-  bottom: 26px;
+  left: 36px;
+  bottom: 36px;
   padding: 6px;
   perspective: 420px;
   z-index: 5;

@@ -375,17 +375,17 @@ const measure = await evaluate(`
       nodes: Object.values(m.__nodes).filter(Boolean).length,
       nodeKeys: Object.keys(m.__nodes),
       lineMaterials: v.measure.lineMaterials.size,
-      spriteText: v.measure.measurements[0]?.__nodes?.value?.material?.map?.image ? 'ok' : 'sin sprite',
-      spriteVisible: v.measure.measurements[0]?.__nodes?.value?.visible,
+      labelEl: v.measure.labels.find((l) => l.id === 'measure:' + v.measure.measurements[0]?.id)?.el?.className,
+      labelVisible: v.measure.labels.find((l) => l.id === 'measure:' + v.measure.measurements[0]?.id)?.el?.style.display !== 'none',
     }
   })()
 `)
 check('crea una medicion', measure.count === 1, measure.id)
 check('la distancia se expresa en mm con 1 decimal', measure.label === '12.3 mm', measure.label)
-// dim, extA, extB, pointA, pointB, value (sprite con la cifra). Sin tildes
+// dim, extA, extB, pointA, pointB, value (chip HTML con la cifra). Sin tildes
 // oblicuas: solo confundian.
 check(
-  'dibuja linea de cota, extensiones, puntos y cifra en sprite',
+  'dibuja linea de cota, extensiones, puntos y cifra',
   measure.nodes === 6,
   `${measure.nodes} elementos (${measure.nodeKeys.join(', ')})`,
 )
@@ -393,34 +393,23 @@ check('sin tildes oblicuas en la medicion',
   !measure.nodeKeys.includes('tickA') && !measure.nodeKeys.includes('tickB'),
   measure.nodeKeys.join(', '))
 check('cada nodo tiene su material', measure.lineMaterials >= 5, `${measure.lineMaterials} materiales`)
-check('la cifra mm es un sprite visible',
-  measure.spriteText === 'ok' && measure.spriteVisible === true,
-  `${measure.spriteText}/${measure.spriteVisible}`)
+check('la cifra mm aparece como chip HTML visible',
+  measure.labelEl?.includes('measure-label') && measure.labelVisible === true,
+  `${measure.labelEl}/${measure.labelVisible}`)
 
-// El globo tiene que conservar su tamano en pantalla con la camara
-// ortografica: el scale es en unidades de mundo, no en fraccion de pantalla.
-const sprite = await evaluate(`
+// El globo de las medidas es un chip HTML, no un sprite: tamano fijo en CSS pixels.
+const labelSize = await evaluate(`
   (() => {
     const v = window.dentalViewer
-    const H = v.renderer.domElement.height
     const s = v.measure.measurements[0].__nodes.value
-    const altoPx = () => +(s.scale.y / (v.camera.top - v.camera.bottom) * H).toFixed(1)
-    const antes = altoPx()
-    v.camera.zoom = 2.5
-    v.camera.updateProjectionMatrix()
-    v.measure.update()
-    const conZoom = altoPx()
-    v.camera.zoom = 1
-    v.camera.updateProjectionMatrix()
-    v.measure.update()
-    return { antes, conZoom, restituido: altoPx() }
+    const esHtml = s instanceof HTMLElement
+    return { esHtml, altoPx: s.offsetHeight }
   })()
 `)
-check('el globo conserva su tamano en pantalla con zoom',
-  Math.abs(sprite.antes - sprite.conZoom) < 0.6 && Math.abs(sprite.antes - sprite.restituido) < 0.6,
-  `${sprite.antes}px / zoom x2.5 ${sprite.conZoom}px / vuelta ${sprite.restituido}px`)
+check('el globo de la medida es un chip HTML, no un sprite',
+  labelSize.esHtml === true, `esHtml=${labelSize.esHtml}`)
 check('el globo tiene tamano util en pantalla',
-  sprite.antes > 18 && sprite.antes < 60, `${sprite.antes}px`)
+  labelSize.altoPx > 18 && labelSize.altoPx < 60, `${labelSize.altoPx}px`)
 
 // Flujo interactivo con el raton: cursor, snap, goma con cifra en vivo y
 // salida sola a camara libre (medidas de una en una).

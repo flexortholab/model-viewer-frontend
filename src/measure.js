@@ -161,20 +161,10 @@ export class MeasureTool {
     // Segmento visible (linea de cota) para el hit-test de seleccion.
     measurement._seg = { a: a2.clone(), b: b2.clone() }
 
-    // La cifra en mm es un sprite 3D con el texto horneado en canvas: se ve
-    // SIEMPRE en cualquier navegador (independiente del z-order del DOM).
-    nodes.value = this._makeValueSprite(this.displayLabel(measurement))
-    this.group.add(nodes.value)
-    nodes.value.position.copy(new THREE.Vector3().addVectors(a2, b2).multiplyScalar(0.5))
-
-    // Chip HTML retirado: la cifra via como sprite 3D (nodes.value), que se
-    // dibuja siempre por encima de la escena en cualquier navegador.
-    this.labels.push({
-      el: null,
-      id: measurement.id,
-      spriteKey: 'value',
-      position: new THREE.Vector3().addVectors(a2, b2).multiplyScalar(0.5),
-    })
+    // La cifra en mm es un chip HTML: tamano fijo en pixeles, igual que los
+    // globos de los marcadores, y nunca afectado por el zoom de la camara.
+    const mid = new THREE.Vector3().addVectors(a2, b2).multiplyScalar(0.5)
+    nodes.value = this._makeMeasureChip(this.displayLabel(measurement), measurement.id, mid)
   }
 
   _makePoint(point, color = DARK_GREY) {
@@ -189,29 +179,27 @@ export class MeasureTool {
     return dot
   }
 
-  /** Texto "12.3 mm" horneado en una textura de canvas (sprite siempre visible). */
-  _makeValueSprite(text) {
-    const { texture, width, height } = this._valueTexture(text)
-    const material = new THREE.SpriteMaterial({
-      map: texture,
-      transparent: true,
-      depthTest: false,
-      sizeAttenuation: false,
-    })
-    const sprite = new THREE.Sprite(material)
-    this._applySpriteSize(sprite, BALLOON_HEIGHT, width / height)
-    sprite.center.set(0.5, -0.35)
-    sprite.renderOrder = 1001
-    sprite.raycast = () => {}
-    sprite.frustumCulled = false
-    return sprite
+  /** Chip HTML con la cifra y la nota, estilo coherente con los marcadores. */
+  _makeMeasureChip(text, id, position) {
+    const el = document.createElement('div')
+    el.className = 'measure-label'
+    this._setChipText(el, text)
+    this.addOverlay(`measure:${id}`, el, position)
+    return el
+  }
+
+  _setChipText(el, text) {
+    const i = text.indexOf(' · ')
+    const value = i >= 0 ? text.slice(0, i) : text
+    const note = i >= 0 ? text.slice(i + 3) : ''
+    el.innerHTML = `<span class="measure-value">${value}</span>${note ? `<span class="measure-note">${note}</span>` : ''}`
   }
 
   /**
    * Tamano de un sprite NO atenuado, en fraccion de la altura del lienzo.
    * Con camara ortografica el shader no compensa la distancia, asi que el
    * scale es en unidades de mundo: hay que escalarlo con el alto del frustum
-   * para que el globo conserve su tamano en pantalla (3.6% del alto).
+   * para que el anillo de snap conserve su tamano en pantalla.
    */
   _applySpriteSize(sprite, heightFraction, aspect = 1) {
     const frustumHeight = (this.camera.top - this.camera.bottom) || 120
@@ -272,32 +260,15 @@ export class MeasureTool {
     return { a2: a.clone().add(offset), b2: b.clone().add(offset) }
   }
 
-  /** Reajusta todos los sprites a la resolucion actual (zoom, resize, encuadre). */
+  /** Reajusta el anillo de snap a la resolucion actual (zoom, resize, encuadre). */
   syncSpriteSizes() {
-    for (const measurement of this.measurements) {
-      const sprite = this._entry(measurement).value
-      if (!sprite) continue
-      const image = sprite.material.map?.image
-      const aspect = image ? image.width / image.height : 1
-      this._applySpriteSize(sprite, BALLOON_HEIGHT, aspect)
-    }
     if (this._snap) this._applySpriteSize(this._snap, BALLOON_HEIGHT)
-    if (this._preview?.sprite) {
-      const image = this._preview.sprite.material.map?.image
-      this._applySpriteSize(this._preview.sprite, BALLOON_HEIGHT, image ? image.width / image.height : 1)
-    }
   }
 
-  /** Repinta el sprite de valor tras editar una medida. */
-  _refreshValueSprite(measurement) {
+  /** Actualiza el texto del chip tras editar la nota. */
+  _refreshValueLabel(measurement) {
     const nodes = this._entry(measurement)
-    if (nodes.value) {
-      this.group.remove(nodes.value)
-      nodes.value.material.map?.dispose()
-      nodes.value.material.dispose()
-    }
-    nodes.value = this._makeValueSprite(this.displayLabel(measurement))
-    this.group.add(nodes.value)
+    if (nodes.value) this._setChipText(nodes.value, this.displayLabel(measurement))
   }
 
   /** Texto del sprite: cifra + nota opcional en la misma pastilla. */
@@ -311,7 +282,7 @@ export class MeasureTool {
     const measurement = this.measurements.find((m) => m.id === id)
     if (!measurement) return null
     measurement.note = String(note ?? '')
-    this._refreshValueSprite(measurement)
+    this._refreshValueLabel(measurement)
     this.onChange?.(this.serialize())
     return measurement
   }
@@ -377,6 +348,11 @@ export class MeasureTool {
   _dispose(measurement) {
     const nodes = measurement.__nodes
     if (!nodes) return
+    // El globo es un overlay HTML, no un nodo three.
+    if (nodes.value) {
+      this.removeOverlay(`measure:${measurement.id}`)
+      nodes.value = null
+    }
     for (const key of Object.keys(nodes)) {
       const node = nodes[key]
       if (!node) continue
@@ -391,12 +367,6 @@ export class MeasureTool {
       }
     }
     delete measurement.__nodes
-
-    const index = this.labels.findIndex((l) => l.id === measurement.id)
-    if (index !== -1) {
-      this.labels[index].el?.remove()
-      this.labels.splice(index, 1)
-    }
   }
 
   /** Reconstruye todo (tras cambiar la camara o al restaurar). */
@@ -429,11 +399,7 @@ export class MeasureTool {
       const offscreen = this._tmp.z > 1
       const shown = visible && !offscreen
 
-      if (entry.spriteKey) {
-        // Sprite 3D de valor: controla su visibilidad con flag three.
-        const sprite = this.measurements.find((m) => m.id === entry.id)?.__nodes?.value
-        if (sprite) sprite.visible = shown
-      } else if (entry.el) {
+      if (entry.el) {
         entry.el.style.display = shown ? '' : 'none'
         if (shown) {
           const width = this.container.clientWidth
@@ -481,7 +447,7 @@ export class MeasureTool {
       const dot = this._makePoint(this._pending, 0x1b8aa3)
       dot.renderOrder = 1002
       this.group.add(dot)
-      this._preview = { a: this._pending.clone(), dot, line: null, sprite: null, lastText: '' }
+      this._preview = { a: this._pending.clone(), dot, line: null, chip: null, lastText: '' }
     }
   }
 
@@ -554,50 +520,22 @@ export class MeasureTool {
     const text = formatMm(a.distanceTo(point))
     const mid = new THREE.Vector3().addVectors(a, point).multiplyScalar(0.5)
     const shown = (!this.section || this.section.isPointVisible(mid)) && this._inFront(mid)
-    if (!this._preview.sprite) {
-      this._preview.sprite = this._makeValueSprite(text)
-      this._preview.sprite.renderOrder = 1002
-      this._preview.lastText = text
-      this.group.add(this._preview.sprite)
-    } else if (text !== this._preview.lastText) {
-      // Solo se repinta el canvas cuando cambia la decima.
-      this._preview.sprite.material.map?.dispose()
-      const nueva = this._valueTexture(text)
-      this._preview.sprite.material.map = nueva.texture
-      this._preview.lastText = text
-      this._applySpriteSize(this._preview.sprite, BALLOON_HEIGHT, nueva.width / nueva.height)
+    if (!this._preview.chip) {
+      const el = document.createElement('div')
+      el.className = 'measure-label'
+      this.addOverlay('measure:preview', el, mid.clone())
+      this._preview.chip = el
+      this._preview.lastText = ''
     }
-    this._preview.sprite.position.copy(mid)
-    this._preview.sprite.visible = shown
+    if (text !== this._preview.lastText) {
+      this._setChipText(this._preview.chip, text)
+      this._preview.lastText = text
+    }
+    const entry = this.labels.find((l) => l.id === 'measure:preview')
+    if (entry) entry.position.copy(mid)
     this._preview.line.visible = shown
   }
 
-  /** Canvas + textura de una cifra con la estetica corporativa. */
-  _valueTexture(text) {
-    const canvas = document.createElement('canvas')
-    const font = '600 15px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
-    const ctx = canvas.getContext('2d')
-    ctx.font = font
-    canvas.width = Math.ceil(ctx.measureText(text).width) + 18
-    canvas.height = 32
-    const c = canvas.getContext('2d')
-    c.fillStyle = 'rgba(255,255,255,0.98)'
-    c.beginPath()
-    c.roundRect(2, 2, canvas.width - 4, canvas.height - 4, 8)
-    c.fill()
-    c.strokeStyle = '#1b8aa3'
-    c.lineWidth = 2.2
-    c.stroke()
-    c.fillStyle = '#1f2937'
-    c.font = font
-    c.textAlign = 'center'
-    c.textBaseline = 'middle'
-    c.fillText(text, canvas.width / 2, canvas.height / 2 + 1)
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.colorSpace = THREE.SRGBColorSpace
-    texture.anisotropy = 4
-    return { texture, width: canvas.width, height: canvas.height }
-  }
 
   _inFront(point) {
     this._tmp.copy(point).project(this.camera)
@@ -606,7 +544,7 @@ export class MeasureTool {
 
   clearPreview() {
     if (!this._preview) return
-    for (const node of [this._preview.dot, this._preview.line, this._preview.sprite]) {
+    for (const node of [this._preview.dot, this._preview.line]) {
       if (!node) continue
       this.group.remove(node)
       node.geometry?.dispose()
@@ -616,6 +554,7 @@ export class MeasureTool {
         node.material.dispose?.()
       }
     }
+    if (this._preview.chip) this.removeOverlay('measure:preview')
     this._preview = null
   }
 

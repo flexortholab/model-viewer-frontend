@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Visor de disyuntores sinterizados</title>
-    <script type="module" crossorigin src="./assets/index-DEeTTRNo.js"></script>
+    <script type="module" crossorigin src="./assets/index-C8vp9D4V.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-DvVdjzw6.css">
   </head>
   <body>
@@ -45,6 +45,10 @@
             <button type="button" data-view="isometrica" title="Vista isométrica">
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13.5 5v6L8 14.2 2.5 11V5z"/><path d="M8 1.8V8m0 0 5.5-3M8 8 2.5 5"/></svg>
               <span class="btn-label">Isométrica</span>
+            </button>
+            <button type="button" data-view="trasera" title="Vista trasera (posterior)">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/><circle cx="8" cy="8" r="1.5"/></svg>
+              <span class="btn-label">Trasera</span>
             </button>
           </div>
         </div>
@@ -99,6 +103,10 @@
               <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4" cy="4" r="2.2"/><circle cx="4" cy="12" r="2.2"/><path d="M5.8 5.8 14 14M5.8 10.2 14 2"/></svg>
               Activar corte
             </button>
+            <button type="button" class="wide" id="gizmo-mode" data-action="toggle-gizmo-mode" title="Cambia el gizmo entre mover y rotar">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h3m-3 0 2-2m-2 2 2 2"/><path d="M13.5 8h-3m3 0-2-2m2 2-2 2"/><circle cx="8" cy="8" r="2"/></svg>
+              Modo gizmo: Mover
+            </button>
 
             <button type="button" class="wide" data-action="section-reset" title="Coloca el plano en el centro de la pieza, perpendicular a la vista actual">
               <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/></svg>
@@ -152,7 +160,7 @@
               Vista libre (salir del paso)
             </button>
             <ul id="markers-list" class="marker-list"></ul>
-            <p class="panel-note">Pulsa un paso: restaura vista, corte y medidas guardadas. ✂ en Objetos centra el corte en una pieza.</p>
+            <p class="panel-note">Pulsa un paso: restaura vista, corte, medidas y objetos visibles guardados. ✂ en Objetos centra el corte en una pieza.</p>
           </div>
         </div>
         </div>

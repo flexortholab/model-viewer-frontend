@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Visor de disyuntores sinterizados</title>
-    <script type="module" crossorigin src="./assets/index-CoTe2iPq.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-Bv5GfWNy.css">
+    <script type="module" crossorigin src="./assets/index-CKRzFEaP.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BWl4v1sI.css">
   </head>
   <body>
     <div id="app">
@@ -151,6 +151,56 @@
             <p class="panel-note">Pulsa un paso: restaura vista, corte y medidas guardadas. ✂ en Objetos centra el corte en una pieza.</p>
           </div>
         </div>
+        </div>
+      </div>
+
+      <!-- Interfaz simplificada para movil ---------------------------------- -->
+      <div id="mobile-ui" aria-hidden="true">
+        <div id="mobile-title" class="mobile-title"></div>
+        <div id="mobile-toolbar" class="mobile-toolbar" role="toolbar" aria-label="Herramientas del visor">
+          <button type="button" data-mobile="measurements" title="Mediciones">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5 12.5 2.5l1.8 1.8-2 2-1.8-1.8-1.2 1.2 1.8 1.8-2 2-1.8-1.8-1.2 1.2 1.8 1.8-2.1 2.1-2.3-2.3z"/></svg>
+            Mediciones
+          </button>
+          <button type="button" data-mobile="objects" title="Objetos">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h4v4h-4zM9.5 2.5h4v4h-4zM2.5 9.5h4v4h-4zM9.5 9.5h4v4h-4z"/></svg>
+            Objetos
+          </button>
+          <button type="button" data-mobile="presentation" title="Presentación">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h8M4 6.5h8M4 10.5h8M4 14.5h8"/></svg>
+            Presentación
+          </button>
+        </div>
+
+        <div id="mobile-measurements" class="mobile-modal" hidden>
+          <div class="mobile-modal-head">
+            <strong>Mediciones</strong>
+            <button type="button" class="mobile-close" data-mobile-close aria-label="Cerrar">×</button>
+          </div>
+          <div class="mobile-modal-body">
+            <button type="button" class="wide" data-action="measure" aria-pressed="false">Medir</button>
+            <button type="button" class="wide" data-action="clear-measurements">Borrar medidas</button>
+          </div>
+        </div>
+
+        <div id="mobile-objects" class="mobile-modal" hidden>
+          <div class="mobile-modal-head">
+            <strong>Objetos</strong>
+            <button type="button" class="mobile-close" data-mobile-close aria-label="Cerrar">×</button>
+          </div>
+          <div class="mobile-modal-body">
+            <ul id="mobile-objects-list" class="obj-list"></ul>
+          </div>
+        </div>
+
+        <div id="mobile-presentation" class="mobile-modal" hidden>
+          <div class="mobile-modal-head">
+            <strong>Presentación</strong>
+            <button type="button" class="mobile-close" data-mobile-close aria-label="Cerrar">×</button>
+          </div>
+          <div class="mobile-modal-body">
+            <ul id="mobile-markers-list" class="marker-list"></ul>
+          </div>
         </div>
       </div>
     </div>

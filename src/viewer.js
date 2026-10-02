@@ -8,6 +8,10 @@ import { MeasureTool } from './measure.js'
 import { createDocument, validateDocument } from './annotations.js'
 import { formatMm, round } from './units.js'
 
+// Altura del frustum de la camara ortografica, en unidades de escena. Marca
+// cuanto se ve en vertical; el ancho sale del aspecto del contenedor.
+const ORTHO_VIEW_HEIGHT = 120
+
 export class DentalViewer {
   constructor(container, { labelLayer } = {}) {
     this.container = container
@@ -31,8 +35,11 @@ export class DentalViewer {
     this.renderer.toneMappingExposure = 1.05
     container.appendChild(this.renderer.domElement)
 
-    this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 2000)
-    this.camera.position.set(40, 30, 60)
+// Camara ortografica: la perspectiva plana y sin distorsion de "ojo de pez"
+// que si produce una camara en perspectiva. El frustum se define por altura
+// (VIEW_HEIGHT) y se ajusta al aspecto en resize().
+this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -2000, 6000)
+this.camera.position.set(40, 30, 60)
 
     // Navegacion por defecto: giro libre. OrbitControls trabaja en coordenadas
     // esfericas con el polar limitado a [0, PI], asi que al llegar a superior o
@@ -95,6 +102,23 @@ export class DentalViewer {
   }
 
   /**
+   * Coloca la camara y el objetivo, y resincroniza los controles.
+   *
+   * Todo movimiento de camara hecho desde fuera (setView, cubo, marcadores,
+   * reencuadres) debe pasar por aqui: ArcballControls cachea la pose en
+   * setCamera() y, sin resincronizar, vuelve a imponer la orientacion previa.
+   */
+  _placeCamera(position, target) {
+    if (position) this.camera.position.copy(position)
+    if (target) this.controls.target.copy(target)
+    this.camera.up.set(0, 1, 0)
+    this.camera.lookAt(this.controls.target)
+    this.controls.update()
+    this.controls.sync?.()
+    this.requestRender()
+  }
+
+  /**
    * Cambia el tipo de navegacion en caliente, conservando la vista actual.
    * 'libre' (ArcballControls) no tiene polos; 'orbit' es el modo antiguo.
    */
@@ -102,6 +126,8 @@ export class DentalViewer {
     if (modo === this.navigationMode) return
     const destino = new THREE.Vector3()
     this.camera.getWorldDirection(destino)
+    const distancia = this.camera.position.distanceTo(this.controls.target)
+    const objetivo = this.controls.target.clone()
     this.controls.dispose()
 
     this.navigationMode = modo
@@ -117,11 +143,12 @@ export class DentalViewer {
     // todavia si se cambia de modo antes del primer load).
     this._onControlsChange ||= () => this.measure?.rebuild?.(false)
     this.controls.addEventListener('change', this._onControlsChange)
-    // Mantener la orientacion al cambiar de modo.
-    this.camera.position.copy(this.controls.target).addScaledVector(destino, -1)
-    this.camera.lookAt(this.controls.target)
-    this.controls.update()
-    this.requestRender()
+    this.controls.target.copy(objetivo)
+    // Mantener la orientacion (y la distancia) al cambiar de modo.
+    this._placeCamera(
+      new THREE.Vector3().copy(objetivo).addScaledVector(destino, -distancia),
+      objetivo,
+    )
   }
 
   /** Que GPU ejecuta el WebGL (para diagnosticar integrada vs dedicada). */
@@ -178,8 +205,7 @@ export class DentalViewer {
   resize() {
     const width = this.container.clientWidth || 1
     const height = this.container.clientHeight || 1
-    this.camera.aspect = width / height
-    this.camera.updateProjectionMatrix()
+    this._applyOrthoFrustum()
     this.renderer.setSize(width, height, false)
     this.measure?.setResolution(width, height)
     this.section?.setResolution?.(width, height)
@@ -287,20 +313,30 @@ export class DentalViewer {
     this.controls.addEventListener('change', this._onControlsChange)
   }
 
-  /** Encuadra la camara sobre el modelo con un margen razonable. */
+  /**
+   * Encuadra la camara sobre el modelo con un margen razonable.
+   *
+   * En camara ortografica el tamaño de lo que se ve no depende de la distancia
+   * sino del frustum: por eso se ajusta `_viewHeight` al modelo (con margen) y
+   * se coloca la camara a una distancia fija suficiente para no clipping.
+   */
   frameModel({ margin = 1.16 } = {}) {
     if (!this.model) return
     const radius = Math.max(this.model.size.length() / 2, 5)
-    this.camera.near = Math.max(radius / 500, 0.05)
+    this.camera.near = -radius * 100
     this.camera.far = radius * 200
     this.camera.updateProjectionMatrix()
 
     const center = this.model.bounds.getCenter(new THREE.Vector3())
     const dir = new THREE.Vector3(0.42, 0.36, 0.83).normalize()
-    this.camera.position.copy(center).addScaledVector(dir, this._frameDistance(this.model.bounds, dir, { margin }))
-    this.camera.up.set(0, 1, 0)
-    this.controls.target.copy(center)
-    this.controls.update()
+
+    // Ajustar la escala para que el modelo entre con margen en vertical y
+    // horizontal, segun la direccion desde la que se mira.
+    this._fitOrtho(this.model.bounds, dir, margin)
+    this._placeCamera(
+      new THREE.Vector3().copy(center).addScaledVector(dir, radius * 3),
+      center,
+    )
 
     if (this.shadowCatcher) {
       this.shadowCatcher.position.y = this.model.bounds.min.y - 1
@@ -310,6 +346,52 @@ export class DentalViewer {
     // posicion para no perder el corte que el doctor estaba revisando.
     this.requestRender()
     this.emit('framed', { center, radius })
+  }
+
+  /**
+   * Calcula la altura de frustum necesaria para que una caja quepa con margen
+   * vista desde `dir`, y la aplica. Es el equivalente en ortografico a mover
+   * la camara de lejos: cambia cuanto se ve, no el angulo.
+   */
+  _fitOrtho(box, dir, margin = 1.16) {
+    const forward = dir.clone().normalize()
+    const worldUp = Math.abs(forward.y) > 0.98
+      ? new THREE.Vector3(0, 0, 1)
+      : new THREE.Vector3(0, 1, 0)
+    const right = new THREE.Vector3().crossVectors(worldUp, forward).normalize()
+    const up = new THREE.Vector3().crossVectors(forward, right).normalize()
+
+    const half = box.getSize(new THREE.Vector3()).multiplyScalar(0.5)
+    let extY = 1e-6
+    let extX = 1e-6
+    for (let sx = -1; sx <= 1; sx += 2) {
+      for (let sy = -1; sy <= 1; sy += 2) {
+        for (let sz = -1; sz <= 1; sz += 2) {
+          const corner = new THREE.Vector3(sx * half.x, sy * half.y, sz * half.z)
+          extY = Math.max(extY, Math.abs(corner.dot(up)))
+          extX = Math.max(extX, Math.abs(corner.dot(right)))
+        }
+      }
+    }
+    const aspect = this.container.clientWidth / Math.max(this.container.clientHeight, 1)
+    // Alto necesario, y el ancho equivalente; el mayor manda para no recortar.
+    const neededY = extY * 2 * margin
+    const neededX = (extX * 2 * margin) / Math.max(aspect, 1e-6)
+    this._viewHeight = Math.max(neededY, neededX, 1)
+    this._applyOrthoFrustum()
+  }
+
+  _applyOrthoFrustum() {
+    const width = this.container.clientWidth || 1
+    const height = this.container.clientHeight || 1
+    const aspect = width / height
+    const halfH = (this._viewHeight ?? ORTHO_VIEW_HEIGHT) / 2
+    const halfW = halfH * aspect
+    this.camera.left = -halfW
+    this.camera.right = halfW
+    this.camera.top = halfH
+    this.camera.bottom = -halfH
+    this.camera.updateProjectionMatrix()
   }
 
   setBackground(value) {
@@ -464,33 +546,16 @@ export class DentalViewer {
    * Aqui se proyecta la caja al espacio de camara y se resuelve la distancia
    * minima que mantiene los ochoVertices dentro del frustum, con margen.
    */
+  /**
+   * Distancia a la que colocar la camara ortografica.
+   *
+   * En ortografica la escala no depende de la distancia: lo unico que hace la
+   * distancia es evitar el clipping, asi que basta con alejarse un multiplo
+   * del radio del modelo.
+   */
   _frameDistance(box, dir, { margin = 1.18 } = {}) {
-    const forward = dir.clone().normalize()
-    const worldUp = Math.abs(forward.y) > 0.98
-      ? new THREE.Vector3(0, 0, 1)
-      : new THREE.Vector3(0, 1, 0)
-    const right = new THREE.Vector3().crossVectors(worldUp, forward).normalize()
-    const up = new THREE.Vector3().crossVectors(forward, right).normalize()
-
-    const vTan = Math.tan((this.camera.fov * Math.PI) / 360)
-    const hTan = vTan * Math.max(this.camera.aspect, 1e-6)
     const half = box.getSize(new THREE.Vector3()).multiplyScalar(0.5)
-
-    let distance = 0
-    for (let sx = -1; sx <= 1; sx += 2) {
-      for (let sy = -1; sy <= 1; sy += 2) {
-        for (let sz = -1; sz <= 1; sz += 2) {
-          const corner = new THREE.Vector3(sx * half.x, sy * half.y, sz * half.z)
-          const depth = corner.dot(forward)
-          distance = Math.max(
-            distance,
-            depth + Math.abs(corner.dot(right)) / hTan,
-            depth + Math.abs(corner.dot(up)) / vTan,
-          )
-        }
-      }
-    }
-    return Math.max(distance * margin, half.length() * 1.05, 1)
+    return Math.max(half.length() * 3 * margin, 1)
   }
 
   /**
@@ -517,11 +582,10 @@ export class DentalViewer {
       const viewDir = new THREE.Vector3()
       this.camera.getWorldDirection(viewDir)
       const sceneCenter = this.model.bounds.getCenter(new THREE.Vector3())
-      this.camera.position
-        .copy(sceneCenter)
-        .addScaledVector(viewDir, -this._frameDistance(this.model.bounds, viewDir))
-      this.controls.target.copy(sceneCenter)
-      this.controls.update()
+      this._placeCamera(
+        new THREE.Vector3().copy(sceneCenter).addScaledVector(viewDir, -this._frameDistance(this.model.bounds, viewDir)),
+        sceneCenter,
+      )
       this.section?.setPlane({ point: center.toArray(), normal: viewDir.normalize().toArray() })
       // Igual que al activar el corte global: de perfil por defecto.
       this.section?.orientToCamera?.(this.camera)
@@ -530,9 +594,7 @@ export class DentalViewer {
       this.emit('section', this.section.serialize())
     } else {
       const dir = new THREE.Vector3(0.42, 0.36, 0.83).normalize()
-      this.camera.position.copy(center).addScaledVector(dir, this._frameDistance(box, dir))
-      this.controls.target.copy(center)
-      this.controls.update()
+      this._placeCamera(new THREE.Vector3().copy(center).addScaledVector(dir, this._frameDistance(box, dir)), center)
     }
     this.emit('framed', { center, radius, object: index })
     this.emit('objects', this.listObjects())
@@ -626,9 +688,7 @@ export class DentalViewer {
     const marker = this.doc.markers.find((m) => m.id === id)
     if (!marker) return null
     if (marker.view?.position && marker.view?.target) {
-      this.camera.position.fromArray(marker.view.position)
-      this.controls.target.fromArray(marker.view.target)
-      this.controls.update()
+      this._placeCamera(new THREE.Vector3().fromArray(marker.view.position), new THREE.Vector3().fromArray(marker.view.target))
       this.emit('view', marker.id)
     }
     if (marker.section) {
@@ -830,27 +890,25 @@ export class DentalViewer {
       if (!dirName) return
       const center = this.model.bounds.getCenter(new THREE.Vector3())
       const dir = new THREE.Vector3(...dirName).normalize()
-      this.camera.position
-        .copy(center)
-        .addScaledVector(dir, this._frameDistance(this.model.bounds, dir, { margin: 1.1 }))
-      this.controls.target.copy(center)
-      this.controls.update()
-      this.requestRender()
+      // La escala se recalcula para la nueva direccion: en ortografica cada
+      // vista puede necesitar un frustum distinto para no recortar la pieza.
+      this._fitOrtho(this.model.bounds, dir, 1.1)
+      this._placeCamera(
+        new THREE.Vector3().copy(center).addScaledVector(dir, this._frameDistance(this.model.bounds, dir, { margin: 1.1 })),
+        center,
+      )
       this.emit('view', view)
       return
     }
     if (view?.position && view?.target) {
-      this.camera.position.fromArray(view.position)
-      this.controls.target.fromArray(view.target)
-      this.controls.update()
-      this.requestRender()
+      this._placeCamera(new THREE.Vector3().fromArray(view.position), new THREE.Vector3().fromArray(view.target))
     }
   }
 
-  /** Escala en mm de un punto, usando la distancia a la camara. */
+  /** Escala en mm de un punto, segun el frustum de la camara ortografica. */
   screenToWorldMm(pixel) {
-    const perPixel = (2 * Math.tan((this.camera.fov * Math.PI) / 360) * this.camera.position.distanceTo(this.controls.target)) /
-      (this.container.clientHeight || 1)
+    const alto = this.camera.top - this.camera.bottom
+    const perPixel = alto / (this.container.clientHeight || 1)
     return perPixel * pixel
   }
 

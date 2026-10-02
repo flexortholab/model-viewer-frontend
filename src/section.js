@@ -22,6 +22,11 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
  * su normal/constante y three.js recarga los uniforms en el siguiente render,
  * asi que arrastrar no reconstruye nada.
  */
+
+// Tamano del gizmo de mover/rotar del plano de corte. TransformControls usa
+// 1 por defecto, que resulta enorme sobre la pieza.
+const GIZMO_SIZE = 0.55
+
 export class SectionPlaneTool {
   /**
    * @param {THREE.WebGLRenderer} renderer
@@ -139,6 +144,7 @@ export class SectionPlaneTool {
     this.transformT = new TransformControls(camera, renderer.domElement)
     this.transformT.setMode?.('translate')
     this.transformT.attach(this.gizmo)
+    this.transformT.setSize?.(GIZMO_SIZE)
     this._helperT = this.transformT.getHelper ? this.transformT.getHelper() : this.transformT
     scene.add(this._helperT)
 
@@ -146,6 +152,7 @@ export class SectionPlaneTool {
     this.transformR.setMode?.('rotate')
     this.transformR.setSpace?.('local')
     this.transformR.attach(this.gizmo)
+    this.transformR.setSize?.(GIZMO_SIZE)
     this._helperR = this.transformR.getHelper ? this.transformR.getHelper() : this.transformR
     scene.add(this._helperR)
 

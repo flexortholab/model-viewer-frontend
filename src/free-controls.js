@@ -125,6 +125,21 @@ export class FreeOrbitControls extends THREE.EventDispatcher {
     return true
   }
 
+  /**
+   * Reconstruye el estado interno de ArcballControls tras mover la camara a
+   * mano desde fuera (setView, cubo de vistas, marcadores, reencuadres).
+   *
+   * ArcballControls cachea pose, up, zoom y matriz en setCamera(); si no se
+   * refresca, vuelve a imponer la orientacion anterior y la vista acaba en una
+   * posicion rara. Sin esto, encuadrar dos vistas seguidas desviaba la camara
+   * hasta 141 grados.
+   */
+  sync() {
+    this.camera.updateMatrixWorld()
+    this.arc.target.copy(this.arc.target)
+    this.arc.setCamera(this.camera)
+  }
+
   /** Angulo polar equivalente, derivado de la orientacion real de la camara. */
   getPolarAngle() {
     const offset = this.camera.position.clone().sub(this.arc.target)

@@ -9,7 +9,16 @@ Pensado para **disyuntores sinterizados con anclaje esquelético** diseñados en
 - **anotaciones** exportables como sidecar JSON
 - embebible en un **webclip / iframe** vía `postMessage`, o por enlace directo
 
-Estado actual: **v0.3.5** funcional (plano de corte unico con gizmo mover+rotar atenuado, capping por pieza con curva de corte exacta por objeto, lista de objetos con iconos propios y corte por pieza, presentacion con marcadores editables, medidas compactas de una en una en mm con 1 decimal, seleccion y nota de medidas, cubo de vistas clicable en la esquina con las caras bien orientadas, **giro libre sin topes** — ArcballControls, se puede pasar de largo por superior e inferior—, paneles separados Vistas (en cruz) y Herramientas, logo oficial del laboratorio con su teal y gris de marca, titulo del caso sin marco, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
+Estado actual: **v0.3.6** funcional (cámara **ortográfica** — sin perspectiva ni "ojo de pez"—, plano de corte unico con gizmo mover+rotar atenuado, capping por pieza con curva de corte exacta por objeto, lista de objetos con iconos propios y corte por pieza, presentacion con marcadores editables, medidas compactas de una en una en mm con 1 decimal, seleccion y nota de medidas, cubo de vistas clicable en la esquina con las caras bien orientadas, **giro libre sin topes** — ArcballControls, se puede pasar de largo por superior e inferior—, paneles separados Vistas (en cruz) y Herramientas, logo oficial del laboratorio con su teal y gris de marca, titulo del caso sin marco, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
+
+### Cámara y vistas
+
+La cámara es **ortográfica**: no hay perspectiva ni distorsión de ojo de pez, que es lo
+que se busca al revisar anatomía. Como la escala no depende de la distancia, el
+encuadre se ajusta variando el frustum (`_fitOrtho`) en lugar de alejar la cámara, y
+cada vista recalcula su escala para no recortar la pieza.
+
+El botón **Encuadrar** sustituye al anterior *Isométrica*: hacía casi lo mismo.
 
 ### Giro de la escena
 

@@ -385,10 +385,12 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 **Sesión del 02/10/2026 (tarde; smoke 81/81):**
 
 1. **UI móvil para doctores**: toolbar inferior con **Inicio**, **Objetos** y **Presentación**; `Inicio` limpia la vista (mediciones, marcadores, corte, paso activo) y reencuadra.
-2. **Presentación por pasos**: cada marcador guarda y restaura su vista, corte, mediciones y visibilidad de su propio marcador; al salir del paso se oculta todo.
+2. **Presentación por pasos**: cada marcador guarda y restaura su vista, corte, mediciones, visibilidad de objetos y visibilidad de su propio marcador; al salir del paso se oculta todo.
 3. **Gizmo de corte oculto en móvil**: se fuerza a invisible e inutilizable en pantallas táctiles.
 4. **Modales móviles más legibles**: tipografía, botones y aspa de cierre agrandados.
-5. **Modelo decimado `Test1.glb`**: copiado a `public/samples/Test1.glb` (~5 MB, ~415 k triángulos, menos del 40 % de B1); el smoke lo carga y verifica que no supere 500 k triángulos.
+5. **Modelo decimado `Test1.glb`**: copiado a `public/samples/Test1.glb` (~5 MB, ~415 k triángulos, menos del 40 % de B1); `Iniciar-Visor.bat` ahora abre `Test1.glb`; el smoke lo carga y verifica que no supere 500 k triángulos.
+6. **Herramientas de medida**: nuevo botón **Borrar última** (borra la seleccionada o la última creada).
+7. **Palitos de medidas y marcadores**: anchos de línea duplicados (3,2 px para extensiones y tallos; 2,0 px para el larguero).
 
 **Pendiente:**
 

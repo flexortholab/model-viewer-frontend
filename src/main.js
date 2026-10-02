@@ -66,6 +66,13 @@ function togglePanelContent(panelEl) {
   if (button) button.textContent = panelEl.classList.contains('is-collapsed') ? '+' : '-'
 }
 
+function collapsePanelsOnMobile() {
+  if (window.innerWidth > 640) return
+  for (const panelEl of [panel, objectsPanel, markersPanel]) {
+    if (panelEl && !panelEl.classList.contains('is-collapsed')) togglePanelContent(panelEl)
+  }
+}
+
 // --- Corte seccional --------------------------------------------------------
 
 function syncSectionUI() {
@@ -228,6 +235,7 @@ viewer.on('frame', updateViewCube)
 viewer.on('loaded', (info) => {
   currentModel = info
   panelVisibility(true)
+  collapsePanelsOnMobile()
   // Titulo: nombre del archivo sin extension.
   const base = String(info.name ?? '').split('/').pop().split('?')[0].split('#')[0]
   const title = base.includes('.') ? base.slice(0, base.lastIndexOf('.')) : base

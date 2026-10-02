@@ -807,17 +807,38 @@ button.obj-cut:hover {
     height: 13px;
   }
 
-  .views-cross {
+  .views-cross,
+  .views-extra {
     gap: 3px;
   }
 
-  .views-cross button {
-    padding: 4px 5px;
-    font-size: 11px;
+  .views-cross button,
+  .views-extra button {
+    padding: 6px;
+    gap: 0;
+  }
+
+  .views-cross button .btn-label,
+  .views-extra button .btn-label {
+    display: none;
+  }
+
+  .views-cross button svg,
+  .views-extra button svg {
+    width: 18px;
+    height: 18px;
   }
 
   .panel {
     width: min(190px, calc(100vw - 16px));
+  }
+
+  .panel.is-mobile-collapsed .panel-body {
+    display: none;
+  }
+
+  .panel.is-mobile-collapsed .panel-head {
+    border-bottom: none;
   }
 
   .panel .panel-body {

@@ -1,13 +1,17 @@
 import * as THREE from 'three'
+import { Line2 } from 'three/addons/lines/Line2.js'
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
 
 /**
- * Gizmo tipo Meshmixer para mover/rotar un objeto 3D.
+ * Gizmo plano tipo cinta para mover/rotar un objeto 3D.
  *
- * Crea flechas gruesas para translacion y anillos gruesos para rotacion,
- * mucho mas faciles de agarrar que las lineas finas de TransformControls.
- * Solo se muestra un modo a la vez (mover o rotar) para no saturar la vista.
+ * Lineas gruesas (Line2) + cabezas de flecha para translacion y anillos
+ * gruesos para rotacion. Las mallas de golpe son invisibles pero gruesas,
+ * asi que agarrar el gizmo es comodo aunque la linea visible sea fina.
+ * Solo se muestra un modo a la vez (mover/rotar) para no saturar la vista.
  */
-export class MeshmixerGizmo {
+export class FlatGizmo {
   /**
    * @param {THREE.Camera} camera
    * @param {HTMLElement} domElement
@@ -32,33 +36,36 @@ export class MeshmixerGizmo {
     this.mode = 'translate'
     this.visible = false
     this.raycaster = new THREE.Raycaster()
-    this.raycaster.linePrecision = 0.2
 
     this.group = new THREE.Group()
-    this.group.name = 'meshmixer-gizmo'
+    this.group.name = 'flat-gizmo'
     this.target.add(this.group)
 
     this._handles = new Map()
+    this._lineMaterials = []
     this._createHandles()
 
     this._drag = null
     this._plane = new THREE.Plane()
     this._worldPos = new THREE.Vector3()
     this._startPoint = new THREE.Vector3()
+    this._startPos = new THREE.Vector3()
     this._startQuat = new THREE.Quaternion()
     this._worldAxis = new THREE.Vector3()
     this._startVector = new THREE.Vector3()
     this._tmpQ = new THREE.Quaternion()
+    this._camDir = new THREE.Vector3()
 
     this._onPointerDown = this._onPointerDown.bind(this)
     this._onPointerMove = this._onPointerMove.bind(this)
     this._onPointerUp = this._onPointerUp.bind(this)
 
-    // Fase de captura para interceptar el gesto antes que los controles de
-    // orbita de la camara.
+    // Fase de captura para interceptar el gesto antes que la orbita.
     domElement.addEventListener('pointerdown', this._onPointerDown, true)
     window.addEventListener('pointermove', this._onPointerMove)
     window.addEventListener('pointerup', this._onPointerUp)
+
+    this.setResolution(domElement.clientWidth, domElement.clientHeight)
   }
 
   dispose() {
@@ -72,6 +79,11 @@ export class MeshmixerGizmo {
         node.material?.dispose?.()
       })
     }
+    for (const material of this._lineMaterials) material.dispose()
+  }
+
+  setResolution(width, height) {
+    for (const material of this._lineMaterials) material.resolution.set(width, height)
   }
 
   setMode(mode) {
@@ -91,13 +103,34 @@ export class MeshmixerGizmo {
     }
   }
 
+  _lineMat(color) {
+    const material = new LineMaterial({
+      color,
+      linewidth: 4.0,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+    })
+    this._lineMaterials.push(material)
+    return material
+  }
+
+  _hitMat() {
+    return new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthTest: false,
+      side: THREE.DoubleSide,
+    })
+  }
+
   _createHandles() {
     const r = this.radius
-    const arrowLen = r * 0.55
-    const arrowHead = r * 0.16
-    const shaftR = r * 0.04
-    const torusR = r * 0.45
-    const tubeR = r * 0.045
+    const len = r * 0.55
+    const ringR = r * 0.50
+    const hitRadius = r * 0.07
+    const arrowHeadR = r * 0.07
+    const arrowHeadH = r * 0.12
 
     const axes = [
       { name: 'x', dir: new THREE.Vector3(1, 0, 0), color: 0xef4444 },
@@ -106,62 +139,89 @@ export class MeshmixerGizmo {
     ]
 
     for (const { name, dir, color } of axes) {
-      // --- Flecha de translacion ---
+      // --- Flecha de translacion: linea gruesa + cabeza ---
       const arrow = new THREE.Group()
       arrow.name = `translate-${name}`
       arrow.userData = { mode: 'translate', axis: name }
 
-      const shaftGeo = new THREE.CylinderGeometry(shaftR, shaftR, arrowLen, 16)
-      shaftGeo.translate(0, arrowLen / 2, 0)
-      const shaft = new THREE.Mesh(shaftGeo, this._mat(color))
-      shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
-      arrow.add(shaft)
+      const end = dir.clone().multiplyScalar(len)
+      const lineGeo = new LineGeometry().setPositions([0, 0, 0, end.x, end.y, end.z])
+      const line = new Line2(lineGeo, this._lineMat(color))
+      line.renderOrder = 1001
+      line.raycast = () => {}
+      arrow.add(line)
 
-      const headGeo = new THREE.ConeGeometry(arrowHead, arrowHead * 1.6, 20)
-      headGeo.translate(0, arrowHead * 0.8, 0)
-      const head = new THREE.Mesh(headGeo, this._mat(color))
-      head.position.copy(dir).multiplyScalar(arrowLen)
+      const head = new THREE.Mesh(
+        new THREE.ConeGeometry(arrowHeadR, arrowHeadH, 16),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthTest: false }),
+      )
+      head.position.copy(end)
       head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
+      head.renderOrder = 1002
       arrow.add(head)
+
+      // Cilindro invisible de golpe grueso.
+      const hit = new THREE.Mesh(
+        new THREE.CylinderGeometry(hitRadius, hitRadius, len, 12),
+        this._hitMat(),
+      )
+      hit.position.copy(end).multiplyScalar(0.5)
+      hit.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
+      arrow.add(hit)
 
       this._handles.set(arrow.name, arrow)
       this.group.add(arrow)
 
-      // --- Anillo de rotacion ---
+      // --- Anillo de rotacion: circulo grueso + toro invisible ---
       const ring = new THREE.Group()
       ring.name = `rotate-${name}`
       ring.userData = { mode: 'rotate', axis: name }
 
-      const ringGeo = new THREE.TorusGeometry(torusR, tubeR, 16, 64)
-      const ringMesh = new THREE.Mesh(ringGeo, this._mat(color))
-      if (name === 'x') ringMesh.rotation.y = Math.PI / 2
-      if (name === 'y') ringMesh.rotation.x = Math.PI / 2
-      // z es el plano por defecto
-      ring.add(ringMesh)
+      const circlePoints = []
+      const segments = 64
+      for (let i = 0; i <= segments; i++) {
+        const a = (i / segments) * Math.PI * 2
+        let p
+        if (name === 'x') p = new THREE.Vector3(0, Math.cos(a) * ringR, Math.sin(a) * ringR)
+        else if (name === 'y') p = new THREE.Vector3(Math.cos(a) * ringR, 0, Math.sin(a) * ringR)
+        else p = new THREE.Vector3(Math.cos(a) * ringR, Math.sin(a) * ringR, 0)
+        circlePoints.push(p.x, p.y, p.z)
+      }
+      const ringGeo = new LineGeometry().setPositions(circlePoints)
+      const ringLine = new Line2(ringGeo, this._lineMat(color))
+      ringLine.renderOrder = 1001
+      ringLine.raycast = () => {}
+      ring.add(ringLine)
+
+      const ringHit = new THREE.Mesh(
+        new THREE.TorusGeometry(ringR, hitRadius, 12, 48),
+        this._hitMat(),
+      )
+      if (name === 'x') ringHit.rotation.y = Math.PI / 2
+      if (name === 'y') ringHit.rotation.x = Math.PI / 2
+      ring.add(ringHit)
 
       this._handles.set(ring.name, ring)
       this.group.add(ring)
     }
 
     // Mango central para mover libremente en el plano de la camara.
-    const center = new THREE.Mesh(
-      new THREE.SphereGeometry(r * 0.08, 16, 12),
-      this._mat(0xf59e0b),
-    )
+    const center = new THREE.Group()
     center.name = 'translate-center'
     center.userData = { mode: 'translate', axis: 'center' }
+    const centerVis = new THREE.Mesh(
+      new THREE.SphereGeometry(r * 0.06, 16, 12),
+      new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.95, depthTest: false }),
+    )
+    centerVis.renderOrder = 1002
+    center.add(centerVis)
+    const centerHit = new THREE.Mesh(
+      new THREE.SphereGeometry(r * 0.10, 16, 12),
+      this._hitMat(),
+    )
+    center.add(centerHit)
     this._handles.set(center.name, center)
     this.group.add(center)
-  }
-
-  _mat(color) {
-    return new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: 0.9,
-      depthTest: false,
-      side: THREE.DoubleSide,
-    })
   }
 
   _getPointer(event) {
@@ -195,17 +255,24 @@ export class MeshmixerGizmo {
     const mode = handle.userData.mode
 
     if (mode === 'translate') {
-      this.camera.getWorldDirection(this._worldAxis)
-      this._plane.setFromNormalAndCoplanarPoint(this._worldAxis, this._worldPos)
-      this.raycaster.ray.intersectPlane(this._plane, this._startPoint)
-      this._startPos = this.target.position.clone()
-
-      if (axisName !== 'center') {
+      if (axisName === 'center') {
+        this.camera.getWorldDirection(this._worldAxis)
+      } else {
         this._worldAxis.set(axisName === 'x' ? 1 : 0, axisName === 'y' ? 1 : 0, axisName === 'z' ? 1 : 0)
         this.target.localToWorld(this._worldAxis)
         this._worldAxis.sub(this._worldPos).normalize()
+        this.camera.getWorldDirection(this._camDir)
+        // Plano perpendicular a la camara para arrastrar comodamente.
+        this._plane.setFromNormalAndCoplanarPoint(this._camDir, this._worldPos)
       }
-
+      if (axisName !== 'center') {
+        this.raycaster.ray.intersectPlane(this._plane, this._startPoint)
+      } else {
+        this.camera.getWorldDirection(this._worldAxis)
+        this._plane.setFromNormalAndCoplanarPoint(this._worldAxis, this._worldPos)
+        this.raycaster.ray.intersectPlane(this._plane, this._startPoint)
+      }
+      this._startPos.copy(this.target.position)
       this._drag = { mode: 'translate', axis: axisName }
     } else {
       this._worldAxis.set(axisName === 'x' ? 1 : 0, axisName === 'y' ? 1 : 0, axisName === 'z' ? 1 : 0)
@@ -215,7 +282,6 @@ export class MeshmixerGizmo {
       this.raycaster.ray.intersectPlane(this._plane, this._startPoint)
       this._startVector.subVectors(this._startPoint, this._worldPos).normalize()
       this._startQuat.copy(this.target.quaternion)
-
       this._drag = { mode: 'rotate', axis: axisName }
     }
 
@@ -246,10 +312,8 @@ export class MeshmixerGizmo {
       const dot = this._startVector.dot(vector)
       const cross = new THREE.Vector3().crossVectors(this._startVector, vector)
       let angle = Math.atan2(cross.dot(this._worldAxis), dot)
-      // Invertir angulo segun la orientacion de la camara para que el gesto
-      // siga al cursor de forma natural.
-      this.camera.getWorldDirection(this._tmpQ) // reusar vector
-      if (this._tmpQ.dot(this._worldAxis) < 0) angle = -angle
+      this.camera.getWorldDirection(this._camDir)
+      if (this._camDir.dot(this._worldAxis) < 0) angle = -angle
       this._tmpQ.setFromAxisAngle(this._worldAxis, angle)
       this.target.quaternion.copy(this._tmpQ).multiply(this._startQuat)
     }

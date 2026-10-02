@@ -391,7 +391,7 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 5. **Modelo decimado `Test1.glb`**: copiado a `public/samples/Test1.glb` (~5 MB, ~415 k triángulos, menos del 40 % de B1); `Iniciar-Visor.bat` ahora abre `Test1.glb`; el smoke lo carga y verifica que no supere 500 k triángulos.
 6. **Herramientas de medida**: nuevo botón **Borrar última** (borra la seleccionada o la última creada).
 7. **Palitos de medidas y marcadores**: anchos de línea duplicados (3,2 px para extensiones y tallos; 2,0 px para el larguero).
-8. **Gizmo tipo Meshmixer**: reemplaza las líneas finas de TransformControls por flechas y anillos gruesos; modo mover/rotar alternable desde el panel de corte.
+8. **Gizmo plano tipo cinta**: líneas gruesas (`Line2`) con flechas en +X/+Y/+Z y anillos gruesos para rotar; los botones **Mover** y **Rotar** del panel de corte actúan como interruptores independientes, permitiendo tener el corte activo sin ver el gizmo.
 9. **Botón Vista trasera** en el panel Vistas.
 
 **Pendiente:**

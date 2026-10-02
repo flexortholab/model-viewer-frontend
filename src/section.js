@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { MeshmixerGizmo } from './meshmixer-gizmo.js'
+import { FlatGizmo } from './flat-gizmo.js'
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js'
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
@@ -121,11 +121,12 @@ export class SectionPlaneTool {
     this._linesDirty = false
     this._lastVisible = []
 
-    // Gizmo tipo Meshmixer: flechas y anillos gruesos en lugar de las lineas
-    // finas de TransformControls. Solo un modo a la vez (mover/rotar).
-    this.gizmoMode = 'translate'
+    // Gizmo plano tipo cinta: lineas gruesas + golpes invisibles gruesos.
+    // Modo activo: 'translate', 'rotate' o null (gizmo oculto pero corte
+    // visible). Los botones de la UI actuan como interruptores.
+    this.gizmoMode = null
     this._gizmoVisible = true
-    this.gizmo3d = new MeshmixerGizmo(camera, renderer.domElement, this.gizmo, controls, {
+    this.gizmo3d = new FlatGizmo(camera, renderer.domElement, this.gizmo, controls, {
       radius: this.radius,
       onChange: () => {
         if (this.enabled) this.apply({ lines: false })
@@ -155,18 +156,29 @@ export class SectionPlaneTool {
     return this.mode
   }
 
-  /** Cambia entre modo mover (flechas) y modo rotar (anillos). */
+  /**
+   * Activa/desactiva un modo de gizmo como interruptor.
+   * Si se pide el modo activo, se apaga (modo null).
+   */
   setGizmoMode(mode) {
-    this.gizmoMode = mode === 'rotate' ? 'rotate' : 'translate'
-    this.gizmo3d?.setMode(this.gizmoMode)
+    if (this.gizmoMode === mode) this.gizmoMode = null
+    else this.gizmoMode = mode === 'rotate' ? 'rotate' : 'translate'
+    this._applyGizmoMode()
+  }
+
+  _applyGizmoMode() {
+    const mode = this.gizmoMode ?? 'translate'
+    this.gizmo3d?.setMode(mode)
+    let visible = this.enabled && this._gizmoVisible && this.gizmoMode != null
+    if (this._gizmoForced === false) visible = false
+    else if (this._gizmoForced === true) visible = true
+    this.gizmo3d?.setVisible(visible)
   }
 
   /** Muestra u oculta los gizmos sin perder la posicion del plano. */
   _setGizmoVisible(visible) {
     this._gizmoVisible = !!visible
-    if (this._gizmoForced === false) visible = false
-    else if (this._gizmoForced === true) visible = true
-    this.gizmo3d?.setVisible(visible)
+    this._applyGizmoMode()
   }
 
   /** API publica para forzar la visibilidad de los gizmos (p. ej. en movil). */

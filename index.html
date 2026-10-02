@@ -102,9 +102,13 @@
               <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4" cy="4" r="2.2"/><circle cx="4" cy="12" r="2.2"/><path d="M5.8 5.8 14 14M5.8 10.2 14 2"/></svg>
               Activar corte
             </button>
-            <button type="button" class="wide" id="gizmo-mode" data-action="toggle-gizmo-mode" title="Cambia el gizmo entre mover y rotar">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h3m-3 0 2-2m-2 2 2 2"/><path d="M13.5 8h-3m3 0-2-2m2 2-2 2"/><circle cx="8" cy="8" r="2"/></svg>
-              Modo gizmo: Mover
+            <button type="button" class="wide" id="gizmo-translate" data-action="gizmo-translate" aria-pressed="false" title="Mover el plano de corte">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v11M8 2.5l3 3M8 2.5l-3 3"/><path d="M2.5 8h11M2.5 8 5.5 5M2.5 8l3 3"/></svg>
+              Mover
+            </button>
+            <button type="button" class="wide" id="gizmo-rotate" data-action="gizmo-rotate" aria-pressed="false" title="Rotar el plano de corte">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-2-4.2"/><path d="M13.5 1.5v4h-4"/></svg>
+              Rotar
             </button>
 
             <button type="button" class="wide" data-action="section-reset" title="Coloca el plano en el centro de la pieza, perpendicular a la vista actual">

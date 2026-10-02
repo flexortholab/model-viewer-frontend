@@ -54,13 +54,15 @@ export class MeshmixerGizmo {
     this._onPointerMove = this._onPointerMove.bind(this)
     this._onPointerUp = this._onPointerUp.bind(this)
 
-    domElement.addEventListener('pointerdown', this._onPointerDown)
+    // Fase de captura para interceptar el gesto antes que los controles de
+    // orbita de la camara.
+    domElement.addEventListener('pointerdown', this._onPointerDown, true)
     window.addEventListener('pointermove', this._onPointerMove)
     window.addEventListener('pointerup', this._onPointerUp)
   }
 
   dispose() {
-    this.domElement.removeEventListener('pointerdown', this._onPointerDown)
+    this.domElement.removeEventListener('pointerdown', this._onPointerDown, true)
     window.removeEventListener('pointermove', this._onPointerMove)
     window.removeEventListener('pointerup', this._onPointerUp)
     this.target.remove(this.group)

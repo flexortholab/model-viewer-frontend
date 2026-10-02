@@ -23,6 +23,12 @@ const docTitle = document.getElementById('doc-title')
 const loader = document.getElementById('loader')
 const loaderText = document.getElementById('loader-text')
 
+const mobileUi = document.getElementById('mobile-ui')
+const mobileToolbar = document.getElementById('mobile-toolbar')
+const mobileTitle = document.getElementById('mobile-title')
+const mobileObjectsList = document.getElementById('mobile-objects-list')
+const mobileMarkersList = document.getElementById('mobile-markers-list')
+
 // Iconos de la interfaz: mismo trazo teal que las barras, sin emojis del sistema.
 const ICON_EYE =
   '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.6 8s2.4-4.3 6.4-4.3S14.4 8 14.4 8s-2.4 4.3-6.4 4.3S1.6 8 1.6 8z"/><circle cx="8" cy="8" r="1.9"/></svg>'
@@ -59,6 +65,7 @@ function panelVisibility(visible) {
   panel.hidden = !visible
   objectsPanel.hidden = !visible
   markersPanel.hidden = !visible
+  if (mobileToolbar) mobileToolbar.hidden = !visible
 }
 
 function togglePanelContent(panelEl) {
@@ -72,6 +79,16 @@ function collapsePanelsOnMobile() {
   for (const panelEl of [panel, toolsPanel, objectsPanel, markersPanel]) {
     if (panelEl && !panelEl.classList.contains('is-collapsed')) togglePanelContent(panelEl)
   }
+}
+
+function openMobileModal(id) {
+  for (const modal of document.querySelectorAll('.mobile-modal')) modal.hidden = true
+  const modal = document.getElementById(id)
+  if (modal) modal.hidden = false
+}
+
+function closeMobileModals() {
+  for (const modal of document.querySelectorAll('.mobile-modal')) modal.hidden = true
 }
 
 // --- Corte seccional --------------------------------------------------------
@@ -132,6 +149,35 @@ function renderObjects() {
     })
     li.append(row)
     objectsList.append(li)
+  })
+  renderMobileObjects()
+}
+
+function renderMobileObjects() {
+  if (!mobileObjectsList) return
+  const objects = viewer.listObjects()
+  mobileObjectsList.innerHTML = ''
+  objects.forEach((object) => {
+    const li = document.createElement('li')
+    li.className = 'obj-item' + (object.visible ? '' : ' is-hidden')
+
+    const eye = document.createElement('button')
+    eye.type = 'button'
+    eye.className = 'obj-eye' + (object.visible ? '' : ' is-off')
+    setIcon(eye, object.visible ? ICON_EYE : ICON_EYE_OFF)
+    eye.title = object.visible ? 'Ocultar' : 'Mostrar'
+    eye.setAttribute('aria-pressed', String(object.visible))
+    eye.addEventListener('click', () => {
+      viewer.setMeshVisible(object.index, !object.visible)
+      renderObjects()
+    })
+
+    const name = document.createElement('span')
+    name.className = 'obj-name'
+    name.textContent = object.name
+
+    li.append(eye, name)
+    mobileObjectsList.append(li)
   })
 }
 
@@ -194,6 +240,41 @@ function renderMarkers() {
     })
     markersList.append(li)
   })
+  renderMobileMarkers()
+}
+
+function renderMobileMarkers() {
+  if (!mobileMarkersList) return
+  const markers = viewer.doc.markers ?? []
+  mobileMarkersList.innerHTML = ''
+  markers.forEach((marker, index) => {
+    const li = document.createElement('li')
+    li.className = 'marker-item'
+    li.dataset.kind = marker.kind
+    li.title = 'Pulsa para mostrar el caso en el estado guardado'
+
+    const idx = document.createElement('span')
+    idx.className = 'marker-idx'
+    idx.textContent = String(index + 1)
+
+    const text = document.createElement('span')
+    text.className = 'marker-text' + (marker.text ? '' : ' is-empty')
+    text.textContent = marker.text || `Paso ${index + 1}`
+
+    li.append(idx, text)
+
+    if (marker.id === activeMarkerId) li.classList.add('is-active')
+
+    li.addEventListener('click', () => {
+      const result = viewer.focusMarker(marker.id)
+      if (result) {
+        activeMarkerId = marker.id
+        renderMarkers()
+        showHint(`Paso ${index + 1}${result.text ? `: ${result.text}` : ''}`, 3200)
+      }
+    })
+    mobileMarkersList.append(li)
+  })
 }
 
 // --- Cubo de vistas --------------------------------------------------------
@@ -243,6 +324,9 @@ viewer.on('loaded', (info) => {
   if (docTitle) {
     docTitle.textContent = title || 'Visor dental'
     docTitle.hidden = false
+  }
+  if (mobileTitle) {
+    mobileTitle.textContent = title || 'Visor dental'
   }
   if (loader) loader.hidden = true
   const { x, y, z } = info.sizeMm
@@ -510,6 +594,20 @@ document.addEventListener('click', (event) => {
     viewer.setView(button.dataset.cube)
     return
   }
+  if (button.dataset.mobile) {
+    const modalId = 'mobile-' + button.dataset.mobile
+    const modal = document.getElementById(modalId)
+    if (modal && !modal.hidden) {
+      modal.hidden = true
+    } else {
+      openMobileModal(modalId)
+    }
+    return
+  }
+  if (button.dataset.mobileClose) {
+    closeMobileModals()
+    return
+  }
   switch (button.dataset.action) {
     case 'frame':
       viewer.frameModel()
@@ -579,17 +677,17 @@ document.addEventListener('click', (event) => {
 })
 
 container.addEventListener('pointerdown', (event) => {
-  if (markerMode && !event.target.closest('.panel, .toolbar, #viewcube')) {
+  if (markerMode && !event.target.closest('.panel, .toolbar, #viewcube, #mobile-ui')) {
     addMarkerAt(event)
     return
   }
-  if (event.target.closest('.panel, .toolbar, #viewcube')) return
+  if (event.target.closest('.panel, .toolbar, #viewcube, #mobile-ui')) return
   if (viewer.measure?.enabled) {
     viewer.handleMeasureClick(event)
     return
   }
   // Modo libre: clic selecciona una medida (clic en vacio suelta).
-  if (event.button === 0 && !event.target.closest('.panel, .toolbar, #viewcube')) {
+  if (event.button === 0 && !event.target.closest('.panel, .toolbar, #viewcube, #mobile-ui')) {
     // Editar tiene prioridad: agarrar un extremo para ajustarlo con precision.
     const grab = viewer.grabMeasureEndpoint?.(event)
     if (grab) {
@@ -614,7 +712,7 @@ container.addEventListener('pointerdown', (event) => {
 
 container.addEventListener('dblclick', (event) => {
   if (viewer.measure?.enabled || markerMode) return
-  if (event.target.closest('.panel, .toolbar, #viewcube')) return
+  if (event.target.closest('.panel, .toolbar, #viewcube, #mobile-ui')) return
   const found = viewer.measure?.findMeasurement(event.clientX, event.clientY)
   if (!found) return
   viewer.measure.select(found.id)
@@ -632,7 +730,7 @@ container.addEventListener('pointermove', (event) => {
   // Camara libre: arrastres de marcador o de extremo de medida.
   if (viewer.dragMarker?.(event)) return
   if (viewer.dragMeasureEndpoint?.(event)) return
-  if (!event.target.closest('.panel, .toolbar, #viewcube')) {
+  if (!event.target.closest('.panel, .toolbar, #viewcube, #mobile-ui')) {
     const grabM = viewer.measure?.findEndpoint?.(event.clientX, event.clientY)
     const grabK = viewer._findMarkerAt?.(event.clientX, event.clientY)
     container.style.cursor = grabM || grabK ? 'grab' : ''

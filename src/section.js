@@ -47,6 +47,7 @@ export class SectionPlaneTool {
     this.camera = camera
     this.controls = controls
     this.onChange = onChange
+    this._gizmoForced = null
 
     this.enabled = false
     this.mode = 'translate'
@@ -194,10 +195,18 @@ export class SectionPlaneTool {
 
   /** Muestra u oculta los gizmos sin perder la posicion del plano. */
   _setGizmoVisible(visible) {
+    if (this._gizmoForced === false) visible = false
+    else if (this._gizmoForced === true) visible = true
     this.transformT.enabled = visible
     this.transformR.enabled = visible
     this._helperT.visible = visible
     this._helperR.visible = visible
+  }
+
+  /** API publica para forzar la visibilidad de los gizmos (p. ej. en movil). */
+  setGizmoVisible(visible) {
+    this._gizmoForced = visible === false || visible === true ? visible : null
+    this._setGizmoVisible(visible)
   }
 
   /**

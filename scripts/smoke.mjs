@@ -960,9 +960,40 @@ check('screenshot(scale) exporta a mayor resolucion', shot.s2 > shot.s1,
 check('el canvas vuelve al tamano original tras el shot', Math.abs(shot.back - shot.normal) <= 1,
   `${shot.back} vs ${shot.normal}`)
 
-// Sin errores de consola
-check('sin errores en consola', consoleErrors.length === 0, consoleErrors.join(' | ') || 'ninguno')
-check('sin excepciones sin capturar', pageErrors.length === 0, pageErrors.join(' | ') || 'ninguna')
+// --- Modelo GLB decimado ----------------------------------------------------
+const GLB_URL = `${BASE}/?model=samples/Test1.glb&embed=0${EXTRA_QUERY}`
+console.log(`\nVisor (GLB decimado): ${GLB_URL}\n`)
+const mainConsoleErrors = [...consoleErrors]
+const mainPageErrors = [...pageErrors]
+consoleErrors.length = 0
+pageErrors.length = 0
+await send('Page.navigate', { url: GLB_URL }, sessionId)
+await sleep(1000)
+const glbLoaded = await evaluate(`
+  new Promise((resolve, reject) => {
+    const t0 = Date.now()
+    const tick = () => {
+      if (window.dentalViewer?.model) return resolve(true)
+      if (Date.now() - t0 > 60000) return reject(new Error('timeout cargando Test1.glb'))
+      setTimeout(tick, 200)
+    }
+    tick()
+  })
+`)
+check('Test1.glb carga correctamente', glbLoaded === true)
+const glbInfo = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    return { triangles: v.model.stats.triangles }
+  })()
+`)
+check('Test1.glb tiene menos de 500k triangulos', glbInfo.triangles < 500000, `${glbInfo.triangles} tri`)
+check('Test1.glb sin errores en consola', consoleErrors.length === 0, consoleErrors.join(' | ') || 'ninguno')
+check('Test1.glb sin excepciones sin capturar', pageErrors.length === 0, pageErrors.join(' | ') || 'ninguna')
+
+// Sin errores de consola (pasada principal)
+check('sin errores en consola', mainConsoleErrors.length === 0, mainConsoleErrors.join(' | ') || 'ninguno')
+check('sin excepciones sin capturar', mainPageErrors.length === 0, mainPageErrors.join(' | ') || 'ninguna')
 
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${results.length - failed.length}/${results.length} comprobaciones correctas`)

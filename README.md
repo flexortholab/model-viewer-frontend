@@ -51,6 +51,7 @@ libre se puede forzar con **`?giro=libre`**. En `demo-giro.html` hay un interrup
 en pantalla para comparar ambos modos con la escena real.
 > **Demo desplegada (GitHub Pages, rama gh-pages):** https://rms1982.github.io/dental-viewer/
 > **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/B1-draco.glb
+> **Modelo decimado para pruebas móviles:** https://rms1982.github.io/dental-viewer/?model=samples/Test1.glb (~5 MB, ~415 k triángulos)
 > La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.
 
 ---
@@ -91,7 +92,7 @@ npm run preview    # sirve dist/ en http://localhost:4173
 ## Tests
 
 - **Unitarios** (`test/units.test.js`): detección de unidades, formato `formatMm`, y validación del formato de anotaciones. `npm test`.
-- **Smoke test** (`scripts/smoke.mjs`): prueba end-to-end headless. Requiere `npm run preview` corriendo en el 4173 y Chromium instalado (`CHROME_PATH` para una ruta no estándar). Carga la muestra STL en un Chromium headless (SwiftShader, sin GPU) y valida carga, unidades, corte con stencil, mediciones, round-trip de anotaciones y estabilidad de la escena. En entornos donde el headless no compone pixeles al canvas, los checks visuales del capping se omiten con aviso. Ultimo resultado: **77/77**.
+- **Smoke test** (`scripts/smoke.mjs`): prueba end-to-end headless. Requiere `npm run preview` corriendo en el 4173 y Chromium instalado (`CHROME_PATH` para una ruta no estándar). Carga la muestra STL y el GLB decimado `Test1.glb` en un Chromium headless (SwiftShader, sin GPU) y valida carga, unidades, corte con stencil, mediciones, round-trip de anotaciones, estabilidad de la escena y que el modelo decimado tiene menos de 500 k triángulos. En entornos donde el headless no compone pixeles al canvas, los checks visuales del capping se omiten con aviso. Ultimo resultado: **81/81**.
 
 ---
 
@@ -380,6 +381,14 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 3. **Paneles reorganizados**: Corte seccional pasa a la columna izquierda; Objetos y Presentación quedan a la derecha. Todos los paneles comparten estética con Herramientas (fondo, borde, sombra, título en mayúsculas, botones con fondo blanco).
 4. **Barra de Vistas más ancha** (300 px) para no cortar los botones; el botón *Encuadrar* se sustituye por **Isométrica** en la UI (el reencuadre sigue disponible por `F` y bridge).
 5. **Demo de GitHub Pages** apunta a `samples/B1-draco.glb` (misma pieza B1 comprimida con Draco, ~4 MB) y se despliega actualizada; `Final1.glb` y `Mario Rodriguez1.fbx` no se publican en Pages.
+
+**Sesión del 02/10/2026 (tarde; smoke 81/81):**
+
+1. **UI móvil para doctores**: toolbar inferior con **Inicio**, **Objetos** y **Presentación**; `Inicio` limpia la vista (mediciones, marcadores, corte, paso activo) y reencuadra.
+2. **Presentación por pasos**: cada marcador guarda y restaura su vista, corte, mediciones y visibilidad de su propio marcador; al salir del paso se oculta todo.
+3. **Gizmo de corte oculto en móvil**: se fuerza a invisible e inutilizable en pantallas táctiles.
+4. **Modales móviles más legibles**: tipografía, botones y aspa de cierre agrandados.
+5. **Modelo decimado `Test1.glb`**: copiado a `public/samples/Test1.glb` (~5 MB, ~415 k triángulos, menos del 40 % de B1); el smoke lo carga y verifica que no supere 500 k triángulos.
 
 **Pendiente:**
 

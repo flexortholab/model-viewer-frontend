@@ -816,8 +816,8 @@ button.obj-cut:hover {
   .mobile-toolbar {
     display: flex;
     justify-content: space-between;
-    gap: 6px;
-    padding: 6px;
+    gap: 8px;
+    padding: 8px;
     border-radius: var(--radius);
     background: var(--panel);
     border: 1px solid var(--border);
@@ -830,19 +830,22 @@ button.obj-cut:hover {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    flex-wrap: wrap;
     gap: 6px;
-    padding: 6px 4px;
-    font-size: 11px;
+    padding: 8px 6px;
+    font-size: 14px;
     font-weight: 600;
+    line-height: 1.2;
     border: 1px solid var(--border);
     background: #fff;
-    border-radius: 7px;
+    border-radius: 8px;
+    white-space: normal;
   }
 
   .mobile-toolbar button svg {
     flex: none;
-    width: 14px;
-    height: 14px;
+    width: 18px;
+    height: 18px;
     fill: none;
     stroke: var(--accent);
     stroke-width: 1.5;
@@ -855,15 +858,15 @@ button.obj-cut:hover {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: min(320px, calc(100vw - 32px));
-    max-height: min(70vh, 420px);
+    width: min(340px, calc(100vw - 32px));
+    max-height: min(80vh, 520px);
     display: flex;
     flex-direction: column;
     border-radius: var(--radius);
     background: var(--panel);
     border: 1px solid var(--border);
     backdrop-filter: blur(8px);
-    box-shadow: 0 4px 20px rgba(20, 22, 26, 0.18);
+    box-shadow: 0 4px 24px rgba(20, 22, 26, 0.22);
     z-index: 100;
   }
 
@@ -876,44 +879,62 @@ button.obj-cut:hover {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 8px 10px;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--border);
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
     text-transform: uppercase;
     color: var(--muted);
   }
 
   .mobile-close {
-    padding: 0 6px;
-    font-size: 20px;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0;
+    font-size: 26px;
     line-height: 1;
     color: var(--muted);
     background: transparent;
     border: none;
+    border-radius: 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-close:hover {
+    background: rgba(20, 22, 26, 0.06);
   }
 
   .mobile-modal-body {
-    padding: 10px;
+    padding: 12px;
     overflow-y: auto;
+    font-size: 15px;
   }
 
   .mobile-modal-body .wide {
     width: 100%;
+    padding: 10px 12px;
+    font-size: 15px;
   }
 
   .mobile-modal-body .obj-list,
   .mobile-modal-body .marker-list {
-    gap: 2px;
+    gap: 4px;
   }
 
-  .obj-item,
-  .marker-item {
-    font-size: 12px;
-    padding: 4px 6px;
+  .mobile-modal-body .obj-item,
+  .mobile-modal-body .marker-item {
+    font-size: 15px;
+    padding: 8px 10px;
+  }
+
+  .mobile-modal-body .obj-eye,
+  .mobile-modal-body .obj-name {
+    font-size: 15px;
   }
 
   .panel-note {
-    font-size: 10px;
+    font-size: 12px;
   }
 }

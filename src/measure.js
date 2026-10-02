@@ -122,6 +122,13 @@ export class MeasureTool {
     this.onChange?.(this.serialize())
   }
 
+  removeLast() {
+    const selected = this.selected()
+    if (selected) return this.remove(selected.id)
+    if (this.measurements.length) return this.remove(this.measurements[this.measurements.length - 1].id)
+    return false
+  }
+
   _entry(measurement) {
     if (!measurement.__nodes) {
       measurement.__nodes = {
@@ -148,9 +155,9 @@ export class MeasureTool {
     const offsetPx = Math.min(Math.max(OFFSET_PX, lengthPx * 0.04), 120)
     const { a2, b2 } = this._screenSpaceOffset(a, b, offsetPx)
 
-    nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 1.0, color: selected ? MEASURE_BLUE : DARK_GREY })
-    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 1.6, color: selected ? MEASURE_BLUE : DARK_GREY })
-    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 1.6, color: selected ? MEASURE_BLUE : DARK_GREY })
+    nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 2.0, color: selected ? MEASURE_BLUE : DARK_GREY })
+    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 3.2, color: selected ? MEASURE_BLUE : DARK_GREY })
+    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 3.2, color: selected ? MEASURE_BLUE : DARK_GREY })
 
     nodes.pointA = this._makePoint(a)
     nodes.pointB = this._makePoint(b)

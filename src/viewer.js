@@ -27,17 +27,17 @@ export class DentalViewer {
     this.scene.background = new THREE.Color(0xffffff)
 
     // En moviles se reduce la carga de la GPU: sin antialias y pixel ratio 1.
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    this._isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent,
     ) || navigator.maxTouchPoints > 2
 
     this.renderer = new THREE.WebGLRenderer({
-      antialias: !isMobile,
+      antialias: !this._isMobile,
       stencil: true,
       preserveDrawingBuffer: true,
-      powerPreference: isMobile ? 'default' : 'high-performance',
+      powerPreference: this._isMobile ? 'default' : 'high-performance',
     })
-    this.renderer.setPixelRatio(isMobile ? 1 : Math.min(window.devicePixelRatio, 2))
+    this.renderer.setPixelRatio(this._isMobile ? 1 : Math.min(window.devicePixelRatio, 2))
     this.renderer.localClippingEnabled = true
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.05
@@ -83,6 +83,9 @@ this.camera.position.set(40, 30, 60)
     this.measure = null
     this.markerGroup = new THREE.Group()
     this.modelRoot.add(this.markerGroup)
+
+    this._markersVisible = true
+    this._focusedMarkerId = null
 
     this.doc = createDocument()
     this.model = null
@@ -301,6 +304,7 @@ this.camera.position.set(40, 30, 60)
       onChange: () => this._syncDoc(),
       _frameTick: () => this.requestRender(),
     })
+    if (this._isMobile) this.section.setGizmoVisible(false)
 
     this.measure = new MeasureTool({
       container: this.container,
@@ -464,6 +468,7 @@ this.camera.position.set(40, 30, 60)
           this.section.reset(this.camera)
           this.section.orientToCamera(this.camera)
         }
+        if (this._isMobile) this.section.setGizmoVisible(false)
       }
     } else {
       this.section.apply()
@@ -652,15 +657,16 @@ this.camera.position.set(40, 30, 60)
       kind,
     }
     if (snapshot && serial) {
-      // Snapshot de presentacion: como estaba la vista, el corte y las
-      // mediciones en el momento de crear el marcador. Pulsarlo en la lista
-      // lo restaura todo.
+      // Snapshot de presentacion: como estaba la vista, el corte, las
+      // mediciones y la visibilidad de objetos en el momento de crear el
+      // marcador. Pulsarlo en la lista lo restaura todo.
       marker.view = {
         position: this.camera.position.toArray().map((n) => round(n)),
         target: this.controls.target.toArray().map((n) => round(n)),
       }
       marker.section = serial
       marker.measurements = this.measure?.serialize() ?? []
+      marker.objects = this.listObjects().map(({ index, visible }) => ({ index, visible }))
     }
     this.doc.markers.push(marker)
     this._renderMarkers()
@@ -705,11 +711,25 @@ this.camera.position.set(40, 30, 60)
       // del documento (el conjunto completo vive en doc.measurements).
       this._preservingMeasures = true
       this.section?.restore({ ...marker.section, enabled: !!marker.section.enabled })
+      if (this._isMobile) this.section?.setGizmoVisible(false)
+    } else {
+      this.section?.setEnabled(false)
     }
+    this._preservingMeasures = true
     if (Array.isArray(marker.measurements)) {
       this.measure?.restore(marker.measurements)
       this.measure?.update()
+    } else {
+      this.measure?.clear()
     }
+    if (Array.isArray(marker.objects)) {
+      for (const { index, visible } of marker.objects) {
+        this.setMeshVisible(index, visible)
+      }
+    }
+    this._preservingMeasures = false
+    // Muestra solo el marcador del paso activo.
+    this.setMarkersVisible(true, id)
     // Pulso visual en la etiqueta del marcador.
     this.measure?.pulse?.(`marker:${id}`)
     this.emit('markers', this.doc.markers)
@@ -717,11 +737,14 @@ this.camera.position.set(40, 30, 60)
     return marker
   }
 
-  /** Sale del paso enfocado y recupera todas las mediciones. */
+  /** Sale del paso enfocado y limpia medidas, corte y marcadores. */
   exitMarkerFocus() {
-    this._preservingMeasures = false
-    this.measure?.restore(this.doc.measurements ?? [])
+    this._preservingMeasures = true
+    this.measure?.clear()
     this.measure?.update()
+    this._preservingMeasures = false
+    this.section?.setEnabled(false)
+    this.setMarkersVisible(false)
     this.frameModel()
     this.emit('markers', this.doc.markers)
     return true
@@ -754,6 +777,8 @@ this.camera.position.set(40, 30, 60)
     }
     for (const marker of this.doc.markers) this.measure?.removeOverlay(`marker:${marker.id}`)
 
+    if (!this._markersVisible) return
+
     const anchor = new THREE.Vector3()
     const markerColors = {
       note: 0x22c55e,
@@ -761,6 +786,9 @@ this.camera.position.set(40, 30, 60)
       warning: 0xef4444,
     }
     for (const marker of this.doc.markers) {
+      // En modo paso enfocado solo se dibuja el marcador activo.
+      if (this._focusedMarkerId && marker.id !== this._focusedMarkerId) continue
+
       anchor.fromArray(marker.position)
       const color = markerColors[marker.kind] ?? markerColors.note
 
@@ -777,7 +805,7 @@ this.camera.position.set(40, 30, 60)
 
       const stemMat = new LineMaterial({
         color,
-        linewidth: 1.6,
+        linewidth: 3.2,
         transparent: true,
         opacity: 0.85,
         depthTest: false,
@@ -798,6 +826,12 @@ this.camera.position.set(40, 30, 60)
         this.measure.addOverlay(`marker:${marker.id}`, el, anchor.clone().add(new THREE.Vector3(0, 5.5, 0)))
       }
     }
+  }
+
+  setMarkersVisible(visible, focusedId = null) {
+    this._markersVisible = visible
+    this._focusedMarkerId = focusedId
+    this._renderMarkers()
   }
 
   _syncDoc() {

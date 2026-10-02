@@ -91,6 +91,16 @@ function closeMobileModals() {
   for (const modal of document.querySelectorAll('.mobile-modal')) modal.hidden = true
 }
 
+function goHome() {
+  closeMobileModals()
+  activeMarkerId = null
+  viewer.exitMarkerFocus()
+  viewer.setSection({ enabled: false })
+  viewer.setMarkersVisible(false)
+  for (const obj of viewer.listObjects()) viewer.setMeshVisible(obj.index, true)
+  showHint('Vista inicial')
+}
+
 // --- Corte seccional --------------------------------------------------------
 
 function syncSectionUI() {
@@ -270,6 +280,7 @@ function renderMobileMarkers() {
       if (result) {
         activeMarkerId = marker.id
         renderMarkers()
+        closeMobileModals()
         showHint(`Paso ${index + 1}${result.text ? `: ${result.text}` : ''}`, 3200)
       }
     })
@@ -604,13 +615,16 @@ document.addEventListener('click', (event) => {
     }
     return
   }
-  if (button.dataset.mobileClose) {
+  if ('mobileClose' in button.dataset) {
     closeMobileModals()
     return
   }
   switch (button.dataset.action) {
     case 'frame':
       viewer.frameModel()
+      break
+    case 'home':
+      goHome()
       break
     case 'move':
       // Camara libre: cancela cotas y marcador a la vez.
@@ -633,6 +647,11 @@ document.addEventListener('click', (event) => {
       viewer.measure?.clear()
       showHint('Medidas borradas')
       break
+    case 'remove-last-measurement': {
+      const removed = viewer.measure?.removeLast()
+      showHint(removed ? 'Medición borrada' : 'No hay medición que borrar')
+      break
+    }
     case 'export':
       exportAnnotations()
       break

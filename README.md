@@ -147,10 +147,12 @@ para que resalte sobre el modelo. Color de tapa configurable (por defecto
 
 ## Mediciones
 
-Dos clics sobre la superficie (raycast contra las mallas visibles; los puntos ocultos tras un corte se descartan). Cada cota es geometría 3D en mm con 1 decimal: línea de cota `Line2` (grosor constante en pantalla), líneas de extensión, tildes y puntos, más cifra en sprite 3D (`20.0 mm`).
+Dos clics sobre la superficie (raycast contra las mallas visibles; los puntos ocultos tras un corte se descartan). Cada cota es geometría 3D en mm con 1 decimal: línea de cota `Line2` (grosor constante en pantalla), líneas de extensión, puntos y globo con la cifra (`20.0 mm`).
 
+- Paleta coherente con los marcadores: puntos y trazos en gris muy oscuro, globo con borde azul y fondo blanco.
+- Grosores: larguero 1 px, postes 1,6 px, puntos 0,55 mm de diámetro.
 - La cota se desplaza al lado más legible respecto a la cámara.
-- **Doble clic en la cifra** borra la medición.
+- **Doble clic en la cifra** edita la nota; `Supr` borra la medición seleccionada.
 - Las etiquetas se ocultan si el punto queda tras un corte activo o detrás de la cámara.
 
 ## Anotaciones
@@ -168,6 +170,18 @@ Todas las anotaciones (mediciones, marcadores, corte) se guardan en un **JSON ap
   "markers": [{ "id": "k1", "position": [x,y,z], "text": "...", "kind": "screw|note|warning" }]
 }
 ```
+
+### Marcadores
+
+Un marcador por pulsación del botón **Marcador** (igual que las medidas): tras colocarlo se sale sola del modo marcador. Cada marcador guarda un punto en la pieza, un texto opcional y un tipo (`note`, `screw`, `warning`).
+
+Visualmente comparten escala y estilo con las medidas: punto pequeño, tallo de 1,6 px y globo con fondo blanco. El contorno del globo indica el tipo:
+
+- `note`: verde (`#22c55e`)
+- `screw`: morado (`#a855f7`)
+- `warning`: rojo (`#ef4444`)
+
+En cámara libre se pueden arrastrar para recolocarlos sobre la superficie.
 
 Botón **Exportar** (atajo `E`) descarga `<modelo>.annotations.json`. Los documentos se validan y normalizan al cargar: mediciones sin `a`/`b` válidos se descartan, ids duplicados se renumeran, `kind` desconocido cae a `note`.
 

@@ -5,6 +5,9 @@ import { FreeOrbitControls } from './free-controls.js'
 import { loadModel, normalizeModel, applyDentalMaterial, prepareMaterialsForReview, isSupported, extensionOf } from './loaders.js'
 import { SectionPlaneTool } from './section.js'
 import { MeasureTool } from './measure.js'
+import { Line2 } from 'three/addons/lines/Line2.js'
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
 import { createDocument, validateDocument } from './annotations.js'
 import { formatMm, round } from './units.js'
 
@@ -747,26 +750,36 @@ this.camera.position.set(40, 30, 60)
     for (const marker of this.doc.markers) this.measure?.removeOverlay(`marker:${marker.id}`)
 
     const anchor = new THREE.Vector3()
+    const markerColors = {
+      note: 0x22c55e,
+      screw: 0xa855f7,
+      warning: 0xef4444,
+    }
     for (const marker of this.doc.markers) {
       anchor.fromArray(marker.position)
-      const color =
-        marker.kind === 'warning' ? 0xff6b5a : marker.kind === 'screw' ? 0x5abcd2 : 0xffd479
+      const color = markerColors[marker.kind] ?? markerColors.note
 
       const group = new THREE.Group()
       group.userData.isMarker = true
       group.userData.markerId = marker.id
 
       const dot = new THREE.Mesh(
-        new THREE.SphereGeometry(0.55, 16, 12),
+        new THREE.SphereGeometry(0.275, 16, 12),
         new THREE.MeshBasicMaterial({ color, depthTest: false }),
       )
       dot.renderOrder = 1000
       group.add(dot)
 
-      const stem = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 5, 0)]),
-        new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.55, depthTest: false }),
-      )
+      const stemMat = new LineMaterial({
+        color,
+        linewidth: 1.6,
+        transparent: true,
+        opacity: 0.85,
+        depthTest: false,
+      })
+      stemMat.resolution.set(this.renderer.domElement.clientWidth, this.renderer.domElement.clientHeight)
+      const stemGeo = new LineGeometry().setPositions([0, 0, 0, 0, 5, 0])
+      const stem = new Line2(stemGeo, stemMat)
       stem.renderOrder = 999
       group.add(stem)
 

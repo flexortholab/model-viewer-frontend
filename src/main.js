@@ -380,6 +380,8 @@ function addMarkerAt(event) {
   const kind = ['warning', 'screw'].includes(kindInput) ? kindInput : 'note'
   viewer.addMarker({ position: hit.point.toArray(), text, kind })
   showHint('Paso guardado' + (text ? `: ${text}` : ''))
+  // Un marcador por pulsacion del boton, igual que las medidas.
+  toggleMarkerTool()
 }
 
 // --- Comandos del webclip --------------------------------------------------

@@ -6,6 +6,8 @@ import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
 import { formatMm } from './units.js'
 
 const OFFSET_PX = 36
+const DARK_GREY = 0x333333
+const MEASURE_BLUE = 0x1b8aa3
 
 /**
  * Mediciones sobre la superficie del modelo.
@@ -145,9 +147,9 @@ export class MeasureTool {
     const offsetPx = Math.min(Math.max(OFFSET_PX, lengthPx * 0.04), 120)
     const { a2, b2 } = this._screenSpaceOffset(a, b, offsetPx)
 
-    nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 1.6, color: selected ? 0x1b8aa3 : 0x111111 })
-    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 3.0, color: selected ? 0x1b8aa3 : 0x111111 })
-    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 3.0, color: selected ? 0x1b8aa3 : 0x111111 })
+    nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 1.0, color: selected ? MEASURE_BLUE : DARK_GREY })
+    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 1.6, color: selected ? MEASURE_BLUE : DARK_GREY })
+    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 1.6, color: selected ? MEASURE_BLUE : DARK_GREY })
 
     nodes.pointA = this._makePoint(a)
     nodes.pointB = this._makePoint(b)
@@ -174,20 +176,16 @@ export class MeasureTool {
     })
   }
 
-  _makePoint(point, color = 0x111111) {
-    const geometry = new THREE.BufferGeometry().setFromPoints([point, point])
-    const material = new THREE.PointsMaterial({
-      color,
-      size: 4.5,
-      sizeAttenuation: false,
-      depthTest: false,
-    })
+  _makePoint(point, color = DARK_GREY) {
+    const geometry = new THREE.SphereGeometry(0.275, 12, 8)
+    const material = new THREE.MeshBasicMaterial({ color, depthTest: false })
     this.lineMaterials.add(material)
-    const points = new THREE.Points(geometry, material)
-    points.renderOrder = 1000
-    points.raycast = () => {}
-    points.frustumCulled = false
-    return points
+    const dot = new THREE.Mesh(geometry, material)
+    dot.renderOrder = 1000
+    dot.raycast = () => {}
+    dot.frustumCulled = false
+    dot.position.copy(point)
+    return dot
   }
 
   /** Texto "12.3 mm" horneado en una textura de canvas (sprite siempre visible). */
@@ -200,7 +198,7 @@ export class MeasureTool {
       sizeAttenuation: false,
     })
     const sprite = new THREE.Sprite(material)
-    this._applySpriteSize(sprite, 0.036, width / height)
+    this._applySpriteSize(sprite, 0.030, width / height)
     sprite.center.set(0.5, -0.35)
     sprite.renderOrder = 1001
     sprite.raycast = () => {}
@@ -280,12 +278,12 @@ export class MeasureTool {
       if (!sprite) continue
       const image = sprite.material.map?.image
       const aspect = image ? image.width / image.height : 1
-      this._applySpriteSize(sprite, 0.036, aspect)
+      this._applySpriteSize(sprite, 0.030, aspect)
     }
-    if (this._snap) this._applySpriteSize(this._snap, 0.03)
+    if (this._snap) this._applySpriteSize(this._snap, 0.030)
     if (this._preview?.sprite) {
       const image = this._preview.sprite.material.map?.image
-      this._applySpriteSize(this._preview.sprite, 0.036, image ? image.width / image.height : 1)
+      this._applySpriteSize(this._preview.sprite, 0.030, image ? image.width / image.height : 1)
     }
   }
 
@@ -530,7 +528,7 @@ export class MeasureTool {
       sizeAttenuation: false,
     })
     const sprite = new THREE.Sprite(material)
-    this._applySpriteSize(sprite, 0.03)
+    this._applySpriteSize(sprite, 0.030)
     sprite.renderOrder = 1002
     sprite.raycast = () => {}
     sprite.frustumCulled = false
@@ -566,7 +564,7 @@ export class MeasureTool {
       const nueva = this._valueTexture(text)
       this._preview.sprite.material.map = nueva.texture
       this._preview.lastText = text
-      this._applySpriteSize(this._preview.sprite, 0.036, nueva.width / nueva.height)
+      this._applySpriteSize(this._preview.sprite, 0.030, nueva.width / nueva.height)
     }
     this._preview.sprite.position.copy(mid)
     this._preview.sprite.visible = shown
@@ -576,20 +574,20 @@ export class MeasureTool {
   /** Canvas + textura de una cifra con la estetica corporativa. */
   _valueTexture(text) {
     const canvas = document.createElement('canvas')
-    const font = '600 20px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+    const font = '600 16px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
     const ctx = canvas.getContext('2d')
     ctx.font = font
-    canvas.width = Math.ceil(ctx.measureText(text).width) + 20
-    canvas.height = 40
+    canvas.width = Math.ceil(ctx.measureText(text).width) + 18
+    canvas.height = 34
     const c = canvas.getContext('2d')
-    c.fillStyle = 'rgba(255,255,255,0.96)'
+    c.fillStyle = 'rgba(255,255,255,0.98)'
     c.beginPath()
-    c.roundRect(2, 2, canvas.width - 4, canvas.height - 4, 9)
+    c.roundRect(2, 2, canvas.width - 4, canvas.height - 4, 8)
     c.fill()
-    c.strokeStyle = '#63bbd4'
-    c.lineWidth = 2
+    c.strokeStyle = '#1b8aa3'
+    c.lineWidth = 2.2
     c.stroke()
-    c.fillStyle = '#101828'
+    c.fillStyle = '#1f2937'
     c.font = font
     c.textAlign = 'center'
     c.textBaseline = 'middle'

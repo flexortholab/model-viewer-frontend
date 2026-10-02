@@ -481,11 +481,12 @@ const edicion = await evaluate(`
       camaraIgual: JSON.stringify(camara) === JSON.stringify(v.camera.position.toArray().map((n) => +n.toFixed(3))),
       soltado: v._dragMeasure === null && v.controls.enabled === true,
     }
-    // Deja el estado como estaba: una sola medida en el centro de la pieza,
-    // que es lo que espera el bloque siguiente.
+    // Deja el estado como estaba: una sola medida en la parte superior de la
+    // pieza (y > 0), que es lo que espera el bloque de corte siguiente.
     v.measure.clear()
     const centro = b.getCenter(new V())
-    v.measure.add(centro, centro.clone().setX(centro.x + 12.3456))
+    const a2 = centro.clone().setY(centro.y + 3)
+    v.measure.add(a2, a2.clone().setX(a2.x + 12.3456))
     return resultado
   })()
 `)

@@ -32,6 +32,11 @@ El dibujo es deliberadamente sobrio: línea de cota, dos líneas de arranque,
 los dos puntos y el globo con la cifra. Sin tildes oblicuas en los extremos,
 que solo confundían.
 
+La cota se calcula en el **plano de la vista**: el larguero y los postes se
+desplazan perpendicularmente al segmento *en pantalla*, no en 3D, así que la
+"portería" no rota con la escena cuando giras la pieza. El larguero se dibuja
+más fino (1,6 px) que los postes (2,6 px).
+
 ### Giro de la escena
 
 Por defecto la escena gira **libre**: la cámara se mueve con un trackball virtual

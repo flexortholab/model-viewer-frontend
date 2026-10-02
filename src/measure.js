@@ -5,7 +5,7 @@ import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
 
 import { formatMm } from './units.js'
 
-const OFFSET = 2.4
+const OFFSET_PX = 36
 
 /**
  * Mediciones sobre la superficie del modelo.
@@ -138,45 +138,17 @@ export class MeasureTool {
     const { a, b } = measurement
     const selected = measurement.id === this._selectedId
 
-    // Direccion de la linea de cota: perpendicular al segmento, en el plano
-    // que mas se aleja de la camara para que la cifra quede legible.
-    const direction = new THREE.Vector3().subVectors(b, a)
-    const length = direction.length() || 1
-    direction.divideScalar(length)
+    // El offset se calcula en pixeles de pantalla y luego se convierte a
+    // unidades de mundo, de modo que la cota siempre se dibuja "plana" en el
+    // plano de la vista, como una porteria de futbol pegada a la pantalla.
+    const lengthPx = this._segmentLengthPx(a, b)
+    const offsetPx = Math.min(Math.max(OFFSET_PX, lengthPx * 0.04), 120)
+    const { a2, b2 } = this._screenSpaceOffset(a, b, offsetPx)
 
-    const viewDir = new THREE.Vector3()
-    this.camera.getWorldDirection(viewDir)
+    nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 1.6, color: selected ? 0x1b8aa3 : 0x111111 })
+    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 2.6, color: selected ? 0x1b8aa3 : 0x111111 })
+    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 2.6, color: selected ? 0x1b8aa3 : 0x111111 })
 
-    const candidates = [
-      new THREE.Vector3().crossVectors(direction, viewDir),
-      new THREE.Vector3(0, 1, 0),
-      new THREE.Vector3(1, 0, 0),
-    ]
-    let best = null
-    let bestScore = -Infinity
-    for (const candidate of candidates) {
-      const score = candidate.lengthSq()
-      if (score > 1e-6 && score > bestScore) {
-        bestScore = score
-        best = candidate.clone()
-      }
-    }
-    if (!best) best = new THREE.Vector3(0, 1, 0)
-    best.normalize()
-
-    // Separacion de la linea de cota: escala con la longitud de la medida
-    // (una pieza de 9 m no cabe con un offset fijou de 2.4 mm).
-    const offsetScale = Math.min(Math.max(OFFSET, length * 0.04), 120)
-    const offset = best.clone().multiplyScalar(offsetScale)
-    const a2 = a.clone().add(offset)
-    const b2 = b.clone().add(offset)
-
-    nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 3.4, color: selected ? 0x1b8aa3 : 0x111111 })
-    nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 2, color: selected ? 0x1b8aa3 : 0x111111 })
-    nodes.extB = this._makeLine([b.x, b.y, b.z, b2.x, b2.y, b2.z], { width: 2, color: selected ? 0x1b8aa3 : 0x111111 })
-
-    // Sin tildes oblicuas: solo la linea de cota y las dos lineas de arranque
-    // hacia el punto medido. Anadir cruces diagonales solo confunia.
     nodes.pointA = this._makePoint(a)
     nodes.pointB = this._makePoint(b)
     for (const key of ['dim', 'extA', 'extB', 'pointA', 'pointB', 'value']) {
@@ -247,7 +219,61 @@ export class MeasureTool {
     sprite.scale.set(heightFraction * frustumHeight * aspect, heightFraction * frustumHeight, 1)
   }
 
-  /** Reajusta todos los sprites a laResolution actual (zoom, resize, encuadre). */
+  /**
+   * Devuelve la longitud en pixeles de pantalla del segmento a-b.
+   */
+  _segmentLengthPx(a, b) {
+    const width = this.container.clientWidth || 1
+    const height = this.container.clientHeight || 1
+    this._tmp.copy(a).project(this.camera)
+    const ax = (this._tmp.x * 0.5 + 0.5) * width
+    const ay = (-this._tmp.y * 0.5 + 0.5) * height
+    this._tmp.copy(b).project(this.camera)
+    const bx = (this._tmp.x * 0.5 + 0.5) * width
+    const by = (-this._tmp.y * 0.5 + 0.5) * height
+    return Math.hypot(bx - ax, by - ay)
+  }
+
+  /**
+   * Offset perpendicular al segmento proyectado en pantalla, expresado en
+   * pixeles y convertido a unidades de mundo. Asi la cota siempre se ve
+   * paralela al plano de la vista, sin rotar con la escena.
+   */
+  _screenSpaceOffset(a, b, offsetPx) {
+    const cam = this.camera
+    cam.updateMatrixWorld()
+    const width = this.container.clientWidth || 1
+    const height = this.container.clientHeight || 1
+    const w = cam.right - cam.left
+    const h = cam.top - cam.bottom
+
+    // Ejes de la camara en espacio mundo.
+    const right = new THREE.Vector3(cam.matrixWorld.elements[0], cam.matrixWorld.elements[1], cam.matrixWorld.elements[2])
+    const up = new THREE.Vector3(cam.matrixWorld.elements[4], cam.matrixWorld.elements[5], cam.matrixWorld.elements[6])
+
+    this._tmp.copy(a).project(cam)
+    const ax = (this._tmp.x * 0.5 + 0.5) * width
+    const ay = (-this._tmp.y * 0.5 + 0.5) * height
+    this._tmp.copy(b).project(cam)
+    const bx = (this._tmp.x * 0.5 + 0.5) * width
+    const by = (-this._tmp.y * 0.5 + 0.5) * height
+
+    const sx = bx - ax
+    const sy = by - ay
+    const len = Math.hypot(sx, sy) || 1
+    // Perpendicular en pantalla (sentido arbitrario; da igual).
+    const px = (-sy / len) * offsetPx
+    const py = (sx / len) * offsetPx
+
+    // Para una camara ortografica, pasar de pixeles a unidades de mundo.
+    // El eje Y de la pantalla esta invertido respecto al eje Y de la camara.
+    const ox = px * (w / width)
+    const oy = py * (h / height)
+    const offset = new THREE.Vector3().addScaledVector(right, ox).addScaledVector(up, -oy)
+    return { a2: a.clone().add(offset), b2: b.clone().add(offset) }
+  }
+
+  /** Reajusta todos los sprites a la resolucion actual (zoom, resize, encuadre). */
   syncSpriteSizes() {
     for (const measurement of this.measurements) {
       const sprite = this._entry(measurement).value
@@ -374,14 +400,25 @@ export class MeasureTool {
     }
   }
 
-  /** Reconstruye todo (tras cambiar la camara no hace falta, solo al restaurar). */
+  /** Reconstruye todo (tras cambiar la camara o al restaurar). */
   rebuild() {
     for (const measurement of this.measurements) this._dispose(measurement)
     for (const measurement of this.measurements) this._build(measurement)
   }
 
+  _cameraChanged() {
+    const sig = `${this.camera.matrixWorld.elements.join(',')}|${this.camera.projectionMatrix.elements.join(',')}`
+    if (this._lastCameraSig === sig) return false
+    this._lastCameraSig = sig
+    return true
+  }
+
   /** Oculta lo que el corte o la camara dejan fuera. Sprites + overlays HTML. */
   update() {
+    // Si la camara giro o hizo zoom, la cota hay que reconstruirla porque el
+    // offset se calcula en el plano de la vista.
+    const hasAny = this.measurements.length || this._preview || this._snap
+    if (hasAny && this._cameraChanged()) this.rebuild()
     // Los sprites miden en unidades de mundo: con el frustum ortografico
     // hay que reajustarlos en cada frame para que no cambien de tamano.
     this.syncSpriteSizes()

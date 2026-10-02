@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Visor de disyuntores sinterizados</title>
-    <script type="module" crossorigin src="./assets/index-Cw9F8hlf.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DSOjQCwW.css">
+    <script type="module" crossorigin src="./assets/index-M8LNfx7o.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Bv5GfWNy.css">
   </head>
   <body>
     <div id="app">
@@ -48,31 +48,38 @@
             </button>
           </div>
         </div>
-        <div id="tools-bar" class="toolbar" role="toolbar" aria-label="Herramientas del visor">
-          <span class="tb-title">Herramientas</span>
-          <div class="tb-group">
-            <button type="button" data-action="measure" aria-pressed="false" title="Medir (M)">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5 12.5 2.5l1.8 1.8-2 2-1.8-1.8-1.2 1.2 1.8 1.8-2 2-1.8-1.8-1.2 1.2 1.8 1.8-2.1 2.1-2.3-2.3z"/></svg>
-              Medir
-            </button>
-            <button type="button" data-action="clear-measurements" title="Borrar medidas">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5 9 6l2.5 2.5L5 15H2.5v-2.5z"/><path d="M11.5 1.5l3 3m0-3-3 3"/></svg>
-              Borrar medidas
-            </button>
-            <button type="button" data-action="add-marker" aria-pressed="false" title="Añadir marcador (K)">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.5S3.8 10.2 3.8 6.9A4.2 4.2 0 0 1 8 2.7a4.2 4.2 0 0 1 4.2 4.2c0 3.3-4.2 7.6-4.2 7.6z"/><circle cx="8" cy="6.9" r="1.5"/></svg>
-              Marcador
-            </button>
-            <button type="button" data-action="clear-markers" title="Borrar todos los marcadores">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.5S3.8 10.2 3.8 6.9A4.2 4.2 0 0 1 8 2.7a4.2 4.2 0 0 1 4.2 4.2c0 3.3-4.2 7.6-4.2 7.6z"/><path d="M11.5 1.5l3 3m0-3-3 3"/></svg>
-              Borrar marcadores
+        <div id="tools-bar" class="panel tools" role="toolbar" aria-label="Herramientas del visor">
+          <div class="panel-head">
+            <strong>Herramientas</strong>
+            <button type="button" class="panel-toggle" data-action="toggle-tools" aria-label="Plegar">
+              -
             </button>
           </div>
-          <div class="tb-group">
-            <button type="button" data-action="export" title="Descargar anotaciones (E)">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v8m0 0L5.2 6.7M8 9.5l2.8-2.8"/><path d="M2.5 11.5v3h11v-3"/></svg>
-              Exportar
-            </button>
+          <div class="panel-body">
+            <div class="tb-group">
+              <button type="button" data-action="measure" aria-pressed="false" title="Medir (M)">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5 12.5 2.5l1.8 1.8-2 2-1.8-1.8-1.2 1.2 1.8 1.8-2 2-1.8-1.8-1.2 1.2 1.8 1.8-2.1 2.1-2.3-2.3z"/></svg>
+                Medir
+              </button>
+              <button type="button" data-action="clear-measurements" title="Borrar medidas">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5 9 6l2.5 2.5L5 15H2.5v-2.5z"/><path d="M11.5 1.5l3 3m0-3-3 3"/></svg>
+                Borrar medidas
+              </button>
+              <button type="button" data-action="add-marker" aria-pressed="false" title="Añadir marcador (K)">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.5S3.8 10.2 3.8 6.9A4.2 4.2 0 0 1 8 2.7a4.2 4.2 0 0 1 4.2 4.2c0 3.3-4.2 7.6-4.2 7.6z"/><circle cx="8" cy="6.9" r="1.5"/></svg>
+                Marcador
+              </button>
+              <button type="button" data-action="clear-markers" title="Borrar todos los marcadores">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.5S3.8 10.2 3.8 6.9A4.2 4.2 0 0 1 8 2.7a4.2 4.2 0 0 1 4.2 4.2c0 3.3-4.2 7.6-4.2 7.6z"/><path d="M11.5 1.5l3 3m0-3-3 3"/></svg>
+                Borrar marcadores
+              </button>
+            </div>
+            <div class="tb-group">
+              <button type="button" data-action="export" title="Descargar anotaciones (E)">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v8m0 0L5.2 6.7M8 9.5l2.8-2.8"/><path d="M2.5 11.5v3h11v-3"/></svg>
+                Exportar
+              </button>
+            </div>
           </div>
         </div>
 

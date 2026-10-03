@@ -8,7 +8,7 @@
  * Uso: node scripts/smoke.mjs [urlBase] [extraQuery]
  */
 import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -93,6 +93,8 @@ let messageId = 0
 const pending = new Map()
 const consoleErrors = []
 const pageErrors = []
+// NET=1 registra de qué URL se descarga cada archivo (p. ej. el GLB).
+const requests = []
 
 ws.addEventListener('message', (event) => {
   const data = JSON.parse(event.data)
@@ -102,6 +104,9 @@ ws.addEventListener('message', (event) => {
     if (data.error) reject(new Error(data.error.message))
     else resolve(data.result)
     return
+  }
+  if (data.method === 'Network.requestWillBeSent') {
+    requests.push(data.params.request.url)
   }
   if (data.method === 'Runtime.consoleAPICalled' && data.params.type === 'error') {
     consoleErrors.push(data.params.args.map((a) => a.value ?? a.description ?? '').join(' '))
@@ -129,6 +134,7 @@ const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
 const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
 await send('Runtime.enable', {}, sessionId)
 await send('Page.enable', {}, sessionId)
+if (process.env.NET === '1') await send('Network.enable', {}, sessionId)
 
 async function evaluate(expression) {
   const result = await send(
@@ -232,45 +238,113 @@ const cutColor = await evaluate(`
 check('el borde de corte es mas oscuro que la pieza',
   cutColor.cutR > 0 && cutColor.cutR < cutColor.baseR * 0.45,
   `base ${cutColor.baseR.toFixed(2)} vs corte ${cutColor.cutR.toFixed(2)}`)
+// La curva del corte debe respetar el z-buffer: si no, se dibuja a traves de
+// la pieza y las piezas dejan de leerse solidas.
+const cutDepth = await evaluate(`
+  (() => {
+    const mats = [...window.dentalViewer.section._cutMaterials]
+    return {
+      total: mats.length,
+      conDepth: mats.filter((m) => m.depthTest === true).length,
+    }
+  })()
+`)
+check('la curva del corte respeta la profundidad (la pieza se ve solida)',
+  cutDepth.total > 0 && cutDepth.conDepth === cutDepth.total,
+  `${cutDepth.conDepth}/${cutDepth.total} con depthTest`)
 check('genera el grupo de stencil (caras traseras y delanteras)', section.stencils >= 2, `${section.stencils} mallas`)
 check('los materiales recortan con el plano', section.planes === 1)
 check('stencil activo en el capping y en los strokes', section.capWrite === true && section.stencilWrite === true)
 
-// Gizmo original (TransformControls) + filtro por botones Mover/Rotar.
-// Por defecto gizmoMode = null: corte activo pero gizmo oculto (escena limpia).
+// Gizmo original (TransformControls) UNICO: flechas de los 3 ejes + anillos de
+// rotar a la vez. Por defecto gizmoMode = null: corte activo pero gizmo oculto.
 const gizmo = await evaluate(`
   (() => {
     const v = window.dentalViewer
     const s = v.section
     const snap = () => ({
       mode: s.gizmoMode,
+      on: !!s.gizmoOn,
       translate: s._helperT.visible,
       rotate: s._helperR.visible,
+      enabledT: s.transformT.enabled,
+      enabledR: s.transformR.enabled,
     })
     const initial = snap()
-    // Boton Mover: solo flechas.
-    s.setGizmoMode('translate')
-    const mover = snap()
-    // Boton Rotar: solo anillos.
-    s.setGizmoMode('rotate')
-    const rotar = snap()
-    // Volver a pulsar el mismo lo apaga: escena limpia.
-    s.setGizmoMode('rotate')
+    s.setGizmoMode('combined')
+    const encendido = snap()
+    // Al arrastrar una familia de asas, la otra se aparta (no se solapan).
+    s._dragging = true
+    s._dragOwner = 'translate'
+    s._applyGizmoMode()
+    const arrastrandoFlecha = snap()
+    s._dragging = true
+    s._dragOwner = 'rotate'
+    s._applyGizmoMode()
+    const arrastrandoAnillo = snap()
+    s._dragging = false
+    s._dragOwner = null
+    // Volver a pulsar el mismo boton lo apaga: escena limpia.
+    s.setGizmoMode('combined')
     const apagado = snap()
     s.setGizmoMode(null)
-    return { initial, mover, rotar, apagado, hasT: !!s.transformT, hasR: !!s.transformR }
+    return {
+      initial, encendido, arrastrandoFlecha, arrastrandoAnillo, apagado,
+      hasT: !!s.transformT, hasR: !!s.transformR,
+    }
   })()
 `)
 check('el gizmo arranca oculto con el corte activo (gizmoMode null)',
   gizmo.hasT && gizmo.hasR && gizmo.initial.mode === null &&
   gizmo.initial.translate === false && gizmo.initial.rotate === false,
   `modo=${gizmo.initial.mode}`)
-check('el boton Mover muestra solo las flechas',
-  gizmo.mover.mode === 'translate' && gizmo.mover.translate === true && gizmo.mover.rotate === false)
-check('el boton Rotar muestra solo los anillos',
-  gizmo.rotar.mode === 'rotate' && gizmo.rotar.rotate === true && gizmo.rotar.translate === false)
+check('un solo boton enciende flechas y anillos a la vez',
+  gizmo.encendido.mode === 'combined' && gizmo.encendido.on &&
+  gizmo.encendido.translate === true && gizmo.encendido.rotate === true &&
+  gizmo.encendido.enabledT === true && gizmo.encendido.enabledR === true)
+check('al arrastrar una familia de asas la otra se aparta',
+  gizmo.arrastrandoFlecha.translate === true && gizmo.arrastrandoFlecha.rotate === false &&
+  gizmo.arrastrandoAnillo.rotate === true && gizmo.arrastrandoAnillo.translate === false)
 check('volver a pulsar el mismo boton apaga el gizmo',
   gizmo.apagado.mode === null && gizmo.apagado.translate === false && gizmo.apagado.rotate === false)
+
+// Estetica: las lineas del gizmo (vastagos de flechas y anillos de rotar)
+// van engordadas respecto al radio original de three (0.0075), y los anillos
+// de cada eje son circulos completos (three los deja a medias).
+const gizmoFat = await evaluate(`
+  (() => {
+    const s = window.dentalViewer.section
+    let maxTube = 0
+    let maxShaft = 0
+    const arcs = {}
+    for (const root of [s._helperT, s._helperR]) {
+      root.traverse((n) => {
+        if (!n.isMesh || n.material?.visible === false) return
+        const p = n.geometry?.parameters
+        if (!p) return
+        // Solo los anillos visibles del gizmo (tubo fino ~0.015 tras engordar).
+        // Los pickers de arrastre tienen tubo 0.1 y se excluyen.
+        if (p.tube !== undefined && p.tube < 0.05) {
+          maxTube = Math.max(maxTube, p.tube)
+          const key = n.name
+          arcs[key] = Math.max(arcs[key] ?? 0, p.arc ?? 0)
+        }
+        if (p.radiusTop > 0 && p.radiusTop < 0.1) maxShaft = Math.max(maxShaft, p.radiusTop)
+      })
+    }
+    return { maxTube, maxShaft, arcs }
+  })()
+`)
+check('las lineas del gizmo van engordadas (estetica plana)',
+  gizmoFat.maxTube > 0.0075 && gizmoFat.maxShaft > 0.0075,
+  `anillo ${gizmoFat.maxTube.toFixed(4)}, vastago ${gizmoFat.maxShaft.toFixed(4)}`)
+// Los cuatro anillos (X, Y, Z y E) deben cerrar el circulo.
+const anillosCerrados = ['X', 'Y', 'Z', 'E'].every(
+  (eje) => (gizmoFat.arcs[eje] ?? 0) > Math.PI * 1.9,
+)
+check('los anillos de rotar cierran en circulo completo en los 3 ejes',
+  anillosCerrados,
+  Object.entries(gizmoFat.arcs).map(([k, v]) => `${k}=${v.toFixed(2)}`).join(' '))
 
 // Encuadre al pulsar las tijeras: activa el corte SIN acercarse, la escena
 // entera debe seguir entrando en el encuadre y el angulo actual se conserva.
@@ -349,6 +423,87 @@ const cube = await evaluate(`
 `)
 check('clic en el cubo navega a la vista', cube.above === true)
 check('el cubo resalta la vista activa y rota con la camara', cube.current === true && cube.matrix === true)
+
+// Cotas sobre la cara cortada: esa cara es el capping por stencil, no hay malla
+// que raycastear, asi que pick() cae al plano y acepta el punto solo si esta
+// sobre material. Desde la vista trasera el primer impacto es la cara recortada.
+// Se muestrea la cara porque el centro de la pieza puede ser hueco.
+const capPick = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    // La camara se restaura al final: el centro de esta pieza es hueco y los
+    // checks siguientes hacen clic ahi.
+    const cam = {
+      pos: v.camera.position.clone(),
+      quat: v.camera.quaternion.clone(),
+      zoom: v.camera.zoom,
+      target: v.controls.target.clone(),
+    }
+    v.setSection({ enabled: true, plane: { point: [0, 0, 0], normal: [0, 0, 1] } })
+    v.setView('trasera')
+    v.renderer.render(v.scene, v.camera)
+
+    const bounds = v.model.bounds
+    const tam = bounds.getSize(new (bounds.min.constructor)())
+
+    // Primer punto de la cara cortada que responde a un clic real.
+    let cap = null
+    let ndc = null
+    for (let iy = 0; iy < 9 && !cap; iy++) {
+      for (let ix = 0; ix < 9 && !cap; ix++) {
+        const x = -0.6 + (1.2 * ix) / 8
+        const y = -0.6 + (1.2 * iy) / 8
+        v.pointer.set(x, y)
+        const hit = v.pick()
+        if (hit?.isCap) { cap = hit; ndc = [x, y] }
+      }
+    }
+
+    // El mismo rayo de ese clic, desplazado hasta un punto fuera de la pieza:
+// no hay cara que cortar ahi, asi que se rechaza.
+    let fuera = null
+    if (cap) {
+      const ray = v.raycaster.ray.clone()
+      ray.origin.set(tam.x * 10, tam.y * 10, 100)
+      fuera = v.section.pickCap(ray)
+    }
+
+    const res = {
+      encontrado: !!cap,
+      ndc,
+      enElPlano: cap ? Math.abs(cap.point.z) < 1e-3 : false,
+      dentro: cap
+        ? cap.point.x >= bounds.min.x - 0.05 && cap.point.x <= bounds.max.x + 0.05 &&
+          cap.point.y >= bounds.min.y - 0.05 && cap.point.y <= bounds.max.y + 0.05
+        : false,
+      masCercaQueElFondo: cap
+        ? (() => {
+            // En la cara cortada el cap debe ganar a la pared del fondo.
+            v.pointer.set(ndc[0], ndc[1])
+            const h = v.pick()
+            return h?.isCap === true
+          })()
+        : false,
+      fueraRechazado: fuera === null,
+    }
+
+    // Restaurar camara (el plano se queda en normal +Z: lo espera el bloque
+    // siguiente, que comprueba que se conserva z >= 0).
+    v.camera.position.copy(cam.pos)
+    v.camera.quaternion.copy(cam.quat)
+    v.camera.zoom = cam.zoom
+    v.controls.target.copy(cam.target)
+    v.camera.updateProjectionMatrix()
+    v.renderer.render(v.scene, v.camera)
+    return res
+  })()
+`)
+check('se puede cotar sobre la cara cortada (no hay malla: usa el plano)',
+  capPick.encontrado === true && capPick.enElPlano === true,
+  capPick.encontrado ? `clic en ndc ${capPick.ndc}` : 'ningun punto en la cara')
+check('el punto de la cara cortada cae dentro de la pieza', capPick.dentro === true)
+check('la cara cortada gana a la pared del fondo', capPick.masCercaQueElFondo === true)
+check('un punto del plano fuera de la pieza se rechaza', capPick.fueraRechazado === true)
 
 // Manipulacion del plano: mover y rotar la normal
 const planeManipulation = await evaluate(`
@@ -675,6 +830,9 @@ const markerFlow = await evaluate(`
     v.controls.target.set(1, 2, 0)
     v.controls.update()
     v.setSection({ enabled: true, plane: { point: [0, 2, 0], normal: [0, 1, 0] } })
+    // Zoom del paso: en ortografica es camera.zoom (la distancia no magnifica).
+    v.camera.zoom = 2.5
+    v.camera.updateProjectionMatrix()
     const marker = v.addMarker({ position: [2, 0, 0], text: 'paso test', kind: 'warning' })
     const saved = {
       hasView: !!marker.view,
@@ -684,10 +842,13 @@ const markerFlow = await evaluate(`
         marker.view &&
         Math.abs(marker.view.position[0] - 30) < 1e-2 &&
         Math.abs(marker.view.target[1] - 2) < 1e-2,
+      zoomSaved: Math.abs((marker.view?.zoom ?? 0) - 2.5) < 1e-4,
     }
     // Cambiar el estado y restaurar como haria el doctor al pulsar el paso.
     v.camera.position.set(80, 80, 80)
     v.controls.target.set(0, 0, 0)
+    v.camera.zoom = 0.8
+    v.camera.updateProjectionMatrix()
     v.controls.update()
     v.setSection({ enabled: false })
     const doc = v.applyAnnotations(JSON.parse(JSON.stringify(v.getAnnotations())))
@@ -695,21 +856,35 @@ const markerFlow = await evaluate(`
     const restored = {
       cameraRestored: Math.abs(v.camera.position.x - 30) < 1e-1,
       targetRestored: Math.abs(v.controls.target.y - 2) < 1e-1,
+      zoomRestored: Math.abs(v.camera.zoom - 2.5) < 1e-4,
       sectionRestored: v.section.enabled,
       planoRestoredPosicion: Math.abs(v.section.gizmo.position.y - 2) < 1e-1,
       markerLabels: v.measure.labels.filter((l) => String(l.id).startsWith('marker:')).length,
     }
+    // Sin zoom en el JSON (paso viejo): se conserva el actual, no se rompe.
+    v.camera.zoom = 1.75
+    v.camera.updateProjectionMatrix()
+    const viejo = JSON.parse(JSON.stringify(v.getAnnotations()))
+    for (const m of viejo.markers) delete m.view.zoom
+    v.applyAnnotations(viejo)
+    v.focusMarker(marker.id)
+    const zoomLegacy = Math.abs(v.camera.zoom - 1.75) < 1e-4
     v.removeMarker(marker.id)
+    v.camera.zoom = 1
+    v.camera.updateProjectionMatrix()
     v.setSection({ enabled: false })
     v.exitMarkerFocus()
-    return { saved, restored, markersAfterRemove: v.doc.markers.length }
+    return { saved, restored, zoomLegacy, markersAfterRemove: v.doc.markers.length }
   })()
 `)
-check('el marcador guarda vista y corte del momento',
-  markerFlow.saved.hasView && markerFlow.saved.hasSection && markerFlow.saved.sectionEnabled && markerFlow.saved.viewCaptured)
-check('pulsar el marcador restaura vista, objetivo y corte',
+check('el marcador guarda vista, corte y zoom del momento',
+  markerFlow.saved.hasView && markerFlow.saved.hasSection && markerFlow.saved.sectionEnabled &&
+  markerFlow.saved.viewCaptured && markerFlow.saved.zoomSaved)
+check('pulsar el marcador restaura vista, objetivo, zoom y corte',
   markerFlow.restored.cameraRestored && markerFlow.restored.targetRestored &&
-  markerFlow.restored.sectionRestored && markerFlow.restored.planoRestoredPosicion)
+  markerFlow.restored.zoomRestored && markerFlow.restored.sectionRestored &&
+  markerFlow.restored.planoRestoredPosicion)
+check('un paso sin zoom en el JSON conserva el zoom actual', markerFlow.zoomLegacy === true)
 check('el marcador restaura su etiqueta en la pieza', markerFlow.restored.markerLabels >= 1)
 check('los marcadores se pueden borrar', markerFlow.markersAfterRemove === 0)
 
@@ -1025,6 +1200,43 @@ check('Test1.glb sin excepciones sin capturar', pageErrors.length === 0, pageErr
 // Sin errores de consola (pasada principal)
 check('sin errores en consola', mainConsoleErrors.length === 0, mainConsoleErrors.join(' | ') || 'ninguno')
 check('sin excepciones sin capturar', mainPageErrors.length === 0, mainPageErrors.join(' | ') || 'ninguna')
+
+// --- Capturas del gizmo (SHOTS=1) --------------------------------------------
+// Sirven para revisar la estetica a ojo: el gizmo completo (flechas + anillos)
+// y apagado. Las deja en el directorio temporal del perfil.
+if (process.env.SHOTS === '1') {
+  const { writeFileSync } = await import('node:fs')
+  const outDir = join(tmpdir(), 'dental-gizmo-shots')
+  mkdirSync(outDir, { recursive: true })
+  const shot = async (name, code) => {
+    await evaluate(`
+      (() => {
+        const v = window.dentalViewer
+        v.setSection({ enabled: true })
+        v.section.setGizmoMode(${JSON.stringify(code)})
+        return true
+      })()
+    `)
+    await sleep(900)
+    const { data } = await send('Page.captureScreenshot', { format: 'png' }, sessionId)
+    const file = join(outDir, `${name}.png`)
+    writeFileSync(file, Buffer.from(data, 'base64'))
+    console.log(`  captura ${file}`)
+  }
+  await shot('gizmo-completo', 'combined')
+  await shot('gizmo-apagado', null)
+  await evaluate(`window.dentalViewer.section.setGizmoMode(null)`)
+}
+
+// --- NET=1: de donde se descarga cada archivo -------------------------------
+if (process.env.NET === '1') {
+  const glb = requests.filter((u) => /\.(glb|gltf|stl|fbx|obj|3mf)(\?|$)/i.test(u))
+  const externos = requests.filter((u) => !u.startsWith(BASE) && !u.startsWith('data:') && !u.startsWith('blob:'))
+  console.log('\nNET peticiones de modelo:')
+  for (const u of glb) console.log(`  ${u}`)
+  console.log(`NET peticiones fuera de ${BASE}: ${externos.length}`)
+  for (const u of externos.slice(0, 12)) console.log(`  ${u}`)
+}
 
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${results.length - failed.length}/${results.length} comprobaciones correctas`)

@@ -134,14 +134,35 @@ test('los marcadores conservan el snapshot de presentacion', () => {
       {
         position: [1, 2, 3],
         text: 'paso 1',
-        view: { position: [10, 5, 30], target: [0, 0, 0] },
+        view: { position: [10, 5, 30], target: [0, 0, 0], zoom: 2.5 },
         section: { enabled: true, point: [0, 0, 1], normal: [0, 0, 1] },
       },
     ],
   })
-  assert.deepEqual(doc.markers[0].view, { position: [10, 5, 30], target: [0, 0, 0] })
+  assert.deepEqual(doc.markers[0].view, {
+    position: [10, 5, 30],
+    target: [0, 0, 0],
+    zoom: 2.5,
+  })
   assert.equal(doc.markers[0].section.enabled, true)
   assert.deepEqual(doc.markers[0].section.point, [0, 0, 1])
+})
+
+test('un paso sin zoom sigue siendo valido (JSON anterior)', () => {
+  const doc = validateDocument({
+    markers: [{ position: [0, 0, 0], view: { position: [1, 1, 1], target: [0, 0, 0] } }],
+  })
+  assert.deepEqual(doc.markers[0].view, { position: [1, 1, 1], target: [0, 0, 0] })
+  assert.equal(doc.markers[0].view.zoom, undefined)
+})
+
+test('un zoom invalido se descarta y no rompe el paso', () => {
+  for (const zoom of [0, -3, 'mucho', null]) {
+    const doc = validateDocument({
+      markers: [{ position: [0, 0, 0], view: { position: [1, 1, 1], target: [0, 0, 0], zoom } }],
+    })
+    assert.equal(doc.markers[0].view.zoom, undefined, `zoom=${zoom}`)
+  }
 })
 
 test('un documento sin snapshot de marcador sigue siendo valido', () => {

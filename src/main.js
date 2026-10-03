@@ -109,10 +109,8 @@ function syncSectionUI() {
   sectionToggle?.setAttribute('aria-pressed', String(state.enabled))
   const fuera = state.enabled && !viewer.section.planeIntersectsBounds()
   panel.classList.toggle('is-outside', fuera)
-  const translateBtn = document.getElementById('gizmo-translate')
-  const rotateBtn = document.getElementById('gizmo-rotate')
-  translateBtn?.setAttribute('aria-pressed', String(viewer.section.gizmoMode === 'translate'))
-  rotateBtn?.setAttribute('aria-pressed', String(viewer.section.gizmoMode === 'rotate'))
+  const gizmoBtn = document.getElementById('gizmo-toggle')
+  gizmoBtn?.setAttribute('aria-pressed', String(!!viewer.section.gizmoOn))
 }
 
 // --- Lista de objetos --------------------------------------------------------
@@ -642,11 +640,6 @@ document.addEventListener('click', (event) => {
     case 'add-marker':
       toggleMarkerTool()
       break
-    case 'clear-markers':
-      viewer.clearMarkers()
-      renderMarkers()
-      showHint('Marcadores borrados')
-      break
     case 'clear-measurements':
       viewer.measure?.clear()
       showHint('Medidas borradas')
@@ -679,18 +672,11 @@ document.addEventListener('click', (event) => {
       viewer.orientSectionPlane()
       showHint('Plano girado 90 grados en su sitio', 2200)
       break
-    case 'gizmo-translate': {
-      viewer.section?.setGizmoMode('translate')
+    case 'gizmo-toggle': {
+      viewer.section?.setGizmoMode('combined')
       syncSectionUI()
-      const on = viewer.section?.gizmoMode === 'translate'
-      showHint(on ? 'Gizmo: mover el plano' : 'Gizmo oculto')
-      break
-    }
-    case 'gizmo-rotate': {
-      viewer.section?.setGizmoMode('rotate')
-      syncSectionUI()
-      const on = viewer.section?.gizmoMode === 'rotate'
-      showHint(on ? 'Gizmo: rotar el plano' : 'Gizmo oculto')
+      const on = !!viewer.section?.gizmoOn
+      showHint(on ? 'Gizmo: flechas para mover, anillos para rotar' : 'Gizmo oculto')
       break
     }
     case 'section-toggle': {
@@ -699,7 +685,7 @@ document.addEventListener('click', (event) => {
       syncSectionUI()
       showHint(
         enabled
-          ? 'Corte activo: elige Mover o Rotar para manipular el plano'
+          ? 'Corte activo: enciende el gizmo para ajustar el plano (flechas y anillos)'
           : 'Corte desactivado (se conserva la posicion del plano)',
       )
       break

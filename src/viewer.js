@@ -663,6 +663,10 @@ this.camera.position.set(40, 30, 60)
       marker.view = {
         position: this.camera.position.toArray().map((n) => round(n)),
         target: this.controls.target.toArray().map((n) => round(n)),
+        // Zoom: en ortografica ArcballControls lo guarda en camera.zoom (la
+        // distancia no magnifica nada). Sin esto un paso creado con la pieza
+        // ampliada se restauraba con el zoom que hubiera en ese momento.
+        zoom: round(this.camera.zoom, 6),
       }
       marker.section = serial
       marker.measurements = this.measure?.serialize() ?? []
@@ -703,6 +707,14 @@ this.camera.position.set(40, 30, 60)
     const marker = this.doc.markers.find((m) => m.id === id)
     if (!marker) return null
     if (marker.view?.position && marker.view?.target) {
+      // El zoom va ANTES de colocar la camara: ArcballControls cachea zoom y
+      // matriz en setCamera(), asi que ponerlo despues haria que el siguiente
+      // gesto de rueda partiese de un zoom viejo. Los pasos antiguos sin zoom
+      // en el JSON conservan el que haya ahora.
+      if (Number.isFinite(marker.view.zoom)) {
+        this.camera.zoom = marker.view.zoom
+        this.camera.updateProjectionMatrix()
+      }
       this._placeCamera(new THREE.Vector3().fromArray(marker.view.position), new THREE.Vector3().fromArray(marker.view.target))
       this.emit('view', marker.id)
     }
@@ -858,11 +870,21 @@ this.camera.position.set(40, 30, 60)
     if (!this.model) return null
     this.raycaster.setFromCamera(this.pointer, this.camera)
     const hits = this.raycaster.intersectObjects(this.model.meshes, false)
+    let closer = null
     for (const hit of hits) {
+      // `hits` viene ordenado por distancia: el primero no recortado es el mas
+      // cercano visible, pero puede ser la pared del fondo de la pieza.
       if (this.section && !this.section.isPointVisible(hit.point)) continue
-      return hit
+      closer = hit
+      break
     }
-    return null
+    // Lo que se ve recortado no tiene malla que raycastear: la cara cortada es
+    // el capping por stencil. Con corte activo se prueba el plano y el punto se
+    // acepta solo si cae sobre la seccion solida (cotas sobre el corte). La cara
+    // esta mas cerca que la pared del fondo, asi que gana si la hay.
+    const cap = this.section?.pickCap?.(this.raycaster.ray) ?? null
+    if (cap && (!closer || cap.distance < closer.distance)) return cap
+    return closer
   }
 
   /**

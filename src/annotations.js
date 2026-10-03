@@ -93,6 +93,9 @@ export function validateDocument(raw) {
         }
         if (m.view && isVec3(m.view.position) && isVec3(m.view.target)) {
           marker.view = { position: m.view.position.map(Number), target: m.view.target.map(Number) }
+          // Zoom del paso (opcional: los JSON anteriores no lo traian).
+          const zoom = Number(m.view.zoom)
+          if (Number.isFinite(zoom) && zoom > 0) marker.view.zoom = zoom
         }
         if (m.section && typeof m.section === 'object') {
           const s = m.section

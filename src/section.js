@@ -28,7 +28,18 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
 
 // Tamano del gizmo de mover/rotar del plano de corte. TransformControls usa
 // 1 por defecto, que resulta enorme sobre la pieza.
-const GIZMO_SIZE = 0.55
+const GIZMO_SIZE = 0.8
+
+// Grosor estetico de las lineas del gizmo. Los "trazos" del gizmo de three son
+// tubos 3D muy finos (cilindros y toros de radio 0.0075 en unidades de asa):
+// este factor los engorda recreando solo la geometria, sin tocar materiales,
+// atenuado ni resaltado del eje bajo el cursor.
+const GIZMO_LINE_WIDTH = 2.0
+
+// three dibuja los anillos de rotar por eje como semicirculos (arc 0.5) para
+// distinguir el lado cercano del lejano, pero a medias un eje se queda "sin
+// linea". Los cerramos a circulo completo: los cuatro anillos quedan simetricos.
+const GIZMO_RING_ARC = Math.PI * 2
 
 export class SectionPlaneTool {
   /**
@@ -124,6 +135,8 @@ export class SectionPlaneTool {
     modelRoot.add(this.cutGroup)
     this._cutMaterials = new Set()
     this._dragging = false
+    // Que familia de asas se esta arrastrando ('translate' | 'rotate' | null).
+    this._dragOwner = null
     this._linesDirty = false
     this._lastVisible = []
 
@@ -159,6 +172,10 @@ export class SectionPlaneTool {
     this._helperR = this.transformR.getHelper ? this.transformR.getHelper() : this.transformR
     scene.add(this._helperR)
 
+    // Estetica: lineas planas algo mas anchas (vastagos y anillos engordados).
+    this._thickenGizmo(this._helperT)
+    this._thickenGizmo(this._helperR)
+
     // Modo visible: 'translate', 'rotate' o null (gizmo oculto, corte visible).
     // null = escena limpia sin gizmo ni atenuado.
     this.gizmoMode = null
@@ -172,16 +189,17 @@ export class SectionPlaneTool {
       if (this._dragging) this._linesDirty = true
       this.onChange?.()
     }
-    for (const [own, other] of [[this.transformT, this.transformR], [this.transformR, this.transformT]]) {
+    for (const [own, other, owner] of [
+      [this.transformT, this.transformR, 'translate'],
+      [this.transformR, this.transformT, 'rotate'],
+    ]) {
       own.addEventListener('change', this._onGizmoChange)
       own.addEventListener('dragging-changed', (event) => {
-        // Mientras se arrastra un gizmo: orbita quieta y el otro bloqueado.
-        // Al soltar solo se reactiva el helper del modo activo; el inactivo
-        // se queda oculto para que las asas no se solapen.
+        // Mientras se arrastra el gizmo la orbita se queda quieta.
         if (this.controls) this.controls.enabled = !event.value
-        const activeControl = this.gizmoMode === 'rotate' ? this.transformR : this.transformT
-        other.enabled = !event.value && other === activeControl
         this._dragging = !!event.value
+        this._dragOwner = event.value ? owner : null
+        this._applyGizmoMode()
         if (!event.value && this._linesDirty && this.enabled) {
           this._linesDirty = false
           this._syncPlane()
@@ -204,26 +222,86 @@ export class SectionPlaneTool {
   }
 
   /**
-   * Activa/desactiva un modo de gizmo como interruptor.
-   * Si se pide el modo activo, se apaga (modo null = sin gizmo).
+   * Muestra u oculta el gizmo del plano como interruptor.
+   *
+   * El gizmo es UNO solo: flechas en los 3 ejes para mover y anillos para
+   * rotar, visibles a la vez (doc/plan lo pedia asi). `mode` se conserva por
+   * compatibilidad con el bridge: cualquier valor no nulo enciende el gizmo
+   * entero y volver a llamarlo lo apaga.
    */
   setGizmoMode(mode) {
-    if (this.gizmoMode === mode) this.gizmoMode = null
-    else this.gizmoMode = mode === 'rotate' ? 'rotate' : 'translate'
+    if (mode == null) this.gizmoMode = null
+    else this.gizmoMode = this.gizmoMode == null ? 'combined' : null
     this._applyGizmoMode()
   }
 
-  /** Muestra solo el helper del modo activo. null = gizmo oculto. */
+  /** true si el gizmo esta encendido (ambas familias de asas visibles). */
+  get gizmoOn() {
+    return this.gizmoMode != null
+  }
+
+  /**
+   * Engorda las lineas del gizmo y cierra los anillos de rotar: los vastagos de
+   * las flechas de mover son CylinderGeometry(r 0.0075) y los anillos
+   * TorusGeometry(tubo 0.0075, 3 caras radiales, aspecto de cinta plana) que
+   * three entrega como semicirculos. Se recrea la geometria con el radio
+   * multiplicado por GIZMO_LINE_WIDTH y con el arco completo, conservando la
+   * orientacion y la comparticion; los materiales (atenuado y highlight) no se
+   * tocan. Se descartan los pickers invisibles (tubo 0.1, radio 0.2) y los
+   * crosshair de arrastre (Line de 1 px, solo visibles al arrastrar).
+   */
+  _thickenGizmo(root) {
+    const cache = new Map()
+    root.traverse((node) => {
+      if (!node.isMesh) return
+      if (node.material?.visible === false) return
+      const geo = node.geometry
+      const p = geo?.parameters
+      if (!p) return
+      if (cache.has(geo)) {
+        node.geometry = cache.get(geo)
+        return
+      }
+      let next = null
+      if (geo.type === 'TorusGeometry' && p.tube <= 0.01) {
+        // Anillos de rotar: mismo radio, tubo mas grueso y arco completo; se
+        // rehacen las rotaciones que CircleGeometry hornea en la geometria.
+        next = new THREE.TorusGeometry(
+          p.radius, p.tube * GIZMO_LINE_WIDTH, p.radialSegments, p.tubularSegments, GIZMO_RING_ARC,
+        )
+        next.rotateY(Math.PI / 2)
+        next.rotateX(Math.PI / 2)
+      } else if (geo.type === 'CylinderGeometry' && p.radiusTop > 0 && p.radiusTop <= 0.01) {
+        // Vastagos de las flechas de mover: mismo largo, radio mas grueso.
+        next = new THREE.CylinderGeometry(
+          p.radiusTop * GIZMO_LINE_WIDTH, p.radiusBottom * GIZMO_LINE_WIDTH,
+          p.height, p.radialSegments, p.heightSegments,
+        )
+        next.translate(0, p.height / 2, 0)
+      }
+      if (next) {
+        cache.set(geo, next)
+        node.geometry = next
+      }
+    })
+  }
+
+  /** Flechas y anillos a la vez. null = gizmo oculto. */
   _applyGizmoMode() {
-    const activeT = this.gizmoMode === 'translate'
     let visible = this.enabled && this._gizmoVisible && this.gizmoMode != null
     if (this._gizmoForced === false) visible = false
     else if (this._gizmoForced === true) visible = true
 
-    this.transformT.enabled = visible && activeT
-    this.transformR.enabled = visible && !activeT
-    this._helperT.visible = visible && activeT
-    this._helperR.visible = visible && !activeT
+    // Al arrastrar una familia de asas se aparta la otra: las dos estan
+    // visibles y se solapan en el centro, asi que sin esto el raton queda
+    // encima de la asa que se esta moviendo y el arrastre da saltos. El orden
+    // de registro (translate primero) resuelve el solape en el centro.
+    const busyT = this._dragging && this._dragOwner === 'translate'
+    const busyR = this._dragging && this._dragOwner === 'rotate'
+    this.transformT.enabled = visible && !busyR
+    this.transformR.enabled = visible && !busyT
+    this._helperT.visible = visible && !busyR
+    this._helperR.visible = visible && !busyT
   }
 
   /** Muestra u oculta los gizmos sin perder la posicion del plano. */
@@ -264,8 +342,10 @@ export class SectionPlaneTool {
     const hovering = this._pointerInside &&
       (this.transformT.axis != null || this.transformR.axis != null)
     const dragging = this.transformT.dragging || this.transformR.dragging
-    // Con el gizmo apagado no hay nada que atenuar.
-    const target = !this.enabled || this.gizmoMode == null ? 1 : (hovering || dragging ? 1 : 0.15)
+    // Con el gizmo apagado no hay nada que atenuar. El reposo ya no es casi
+    // invisible (0.15): como se puede ocultar del todo con los botones, el
+    // atenuado sirve para que no tape la pieza, no para esconderlo.
+    const target = !this.enabled || this.gizmoMode == null ? 1 : (hovering || dragging ? 1 : 0.45)
     const next = this._fadeLevel + (target - this._fadeLevel) * 0.25
     const settled = Math.abs(next - target) < 0.01
     this._fadeLevel = settled ? target : next
@@ -474,7 +554,12 @@ export class SectionPlaneTool {
         // Gris oscuro uniforme y fino para todos los objetos cortados.
         color: 0x4a4a4a,
         linewidth: 1.6,
-        depthTest: false,
+        // Con depth test la curva se ve SOLO donde el corte esta a la vista:
+        // cualquier geometria solida por delante la tapa y la pieza se lee
+        // maciza, en vez de transparentarse las lineas del corte. La tapa
+        // (cap) esta 0.015 por detras del plano, asi que el contorno no
+        // desaparece nunca contra su propia cara de corte.
+        depthTest: true,
         transparent: true,
       })
       material.resolution.set(width, height)
@@ -575,11 +660,56 @@ export class SectionPlaneTool {
     }
   }
 
+  /**
+   * Punto de medicion sobre la CARA YA CORTADA.
+   *
+   * Esa cara no es geometria: es el capping por stencil, un quad pintado donde
+   * el contador no es 0. El rayo la atraviesa sin llegar a ninguna malla, asi
+   * que no hay nada que raycastear: se resuelve el plano y se decide si el punto
+   * cae sobre material.
+   *
+   * El criterio es el mismo que usa el capping en GPU: desde un pelin por
+   * delante del plano (ya en el lado conservado) se lanza el rayo de vista en
+   * direccion aleatoria; si su PRIMERA cara es trasera, el rayo salia de dentro
+   * del solido, luego el punto esta dentro de la seccion y la cara se ve
+   * pintada ahi. Si la primera cara es delantera, el rayo venia del vacio: hay
+   * punto, pero no cara, y se descarta.
+   *
+   * @param {THREE.Ray} ray rayo de la camara (ya construido)
+   * @returns {{point: THREE.Vector3, object: null, face: null, isCap: true}|null}
+   */
+  pickCap(ray) {
+    if (!this.enabled) return null
+    this._syncPlane()
+    const point = ray.intersectPlane(this.plane, new THREE.Vector3())
+    if (!point) return null
+
+    const solids = this.meshes.filter(
+      (m) => m.visible && !(Array.isArray(m.material) && m.material.some((mat) => mat.visible === false)),
+    )
+    if (!solids.length) return null
+
+    const delta = Math.max(this.radius * 1e-4, 1e-4)
+    const probe = this._capProbe ??= new THREE.Raycaster()
+    probe.set(point.clone().addScaledVector(this.plane.normal, delta), ray.direction.clone())
+    const hits = probe.intersectObjects(solids, false)
+    const face = hits[0]?.face
+    if (!face) return null
+    // Cara trasera vista desde el rayo = el rayo venia de dentro del solido.
+    const world = face.normal.clone().transformDirection(hits[0].object.matrixWorld)
+    if (world.dot(ray.direction) <= 0) return null
+
+    return { point, object: null, face: null, isCap: true, distance: ray.origin.distanceTo(point) }
+  }
+
   /** Un punto queda "dentro" si esta del lado positivo de la normal. */
   isPointVisible(point) {
     if (!this.enabled) return true
     this._syncPlane()
-    return this.plane.distanceToPoint(point) >= 0
+    // Tolerancia: los puntos de la cara cortada caen EN el plano (distancia
+    // ~0 por error de coma flotante) y son validos; sin ella su etiqueta se
+    // esconderia y no se podria cotar sobre el corte.
+    return this.plane.distanceToPoint(point) >= -Math.max(this.radius * 1e-5, 1e-6)
   }
 
   /** ¿El plano en su posicion actual roza la caja de la pieza? */

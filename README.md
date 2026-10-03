@@ -143,12 +143,16 @@ tironear). La técnica usa:
 - cada tapa respeta los otros planos activos (un cruce en L queda correcto)
 
 El borde de corte se pinta un 70% mas oscuro que el color original de cada pieza
-para que resalte sobre el modelo. Color de tapa configurable (por defecto
+para que resalte sobre el modelo. La curva se dibuja **con test de profundidad**
+(`depthTest`), asi que cualquier geometria solida por delante la tapa: las piezas
+se leen macizas y el contorno solo aparece donde el corte esta a la vista. La tapa
+va 0.015 mm por detras del plano, de modo que el contorno nunca desaparece contra
+su propia cara de corte. Color de tapa configurable (por defecto
 `#c0554a`, terracota). Desactivar el corte conserva las posiciones de los planos.
 
 ## Mediciones
 
-Dos clics sobre la superficie (raycast contra las mallas visibles; los puntos ocultos tras un corte se descartan). Cada cota es geometría 3D en mm con 1 decimal: línea de cota `Line2` (grosor constante en pantalla), líneas de extensión, puntos y globo con la cifra (`20.0 mm`).
+Dos clics sobre la superficie (raycast contra las mallas visibles; los puntos ocultos tras un corte se descartan). Con el **corte seccional activo se puede cotar también sobre la cara cortada**: esa cara es el capping por stencil y no tiene malla, así que `SectionPlaneTool.pickCap()` resuelve el rayo contra el plano y acepta el punto solo si cae sobre la sección sólida. El criterio es el mismo que usa el capping en GPU (la primera cara que ve el rayo en el lado conservado debe ser trasera), y como la cara está más cerca que la pared del fondo, el punto del corte gana. Cada cota es geometría 3D en mm con 1 decimal: línea de cota `Line2` (grosor constante en pantalla), líneas de extensión, puntos y globo con la cifra (`20.0 mm`).
 
 - Paleta coherente con los marcadores: puntos y trazos en gris muy oscuro, globo con borde azul y fondo blanco.
 - Grosores: larguero 1 px, postes 1,6 px, puntos 0,55 mm de diámetro.
@@ -184,6 +188,8 @@ Visualmente comparten escala y estilo con las medidas: punto pequeño, tallo de 
 
 En cámara libre se pueden arrastrar para recolocarlos sobre la superficie.
 
+Cada marcador hace de **paso de presentación**: guarda el snapshot del momento (posición y objetivo de cámara, **zoom**, plano de corte, mediciones y visibilidad de objetos) y lo restaura al pulsarlo. El zoom se guarda como `camera.zoom`, que es donde lo deja `ArcballControls` en cámara ortográfica (allá la distancia no magnifica nada), y se restaura *antes* de colocar la cámara para que el control no imponga su valor cacheado. En el JSON es opcional: los pasos guardados antes de este cambio se siguen restaurando, conservando el zoom que haya en ese momento.
+
 Botón **Exportar** (atajo `E`) descarga `<modelo>.annotations.json`. Los documentos se validan y normalizan al cargar: mediciones sin `a`/`b` válidos se descartan, ids duplicados se renumeran, `kind` desconocido cae a `note`.
 
 ## Embebido en webclip (postMessage)
@@ -215,8 +221,8 @@ Seguridad: solo se aceptan mensajes de `window.parent`/`window` y con origen en 
 **Columna izquierda**:
 
 - **Vistas** (280 px): rejilla con Superior, Izquierda, Frontal, Derecha, Inferior e **Isométrica**.
-- **Herramientas** (248 px): Medir, Borrar medidas, Marcador, Borrar marcadores, Exportar.
-- **Corte seccional** (248 px, plegable): Activar corte, Alinear con la vista, Girar 90 grados.
+- **Herramientas** (248 px): Medir, Borrar última, Marcador, Exportar.
+- **Corte seccional** (248 px, plegable): Activar corte, Alinear con la vista, Girar 90 grados, y el interruptor **Gizmo** (flechas + anillos a la vez; apagado = gizmo oculto).
 
 **Columna derecha**:
 
@@ -304,8 +310,9 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 1. Cubo a la esquina inferior izquierda; caras izquierda/derecha anatómicas
    (FDI: derecha −X, izquierda +X) y panel Vistas en cruz con Frontal al centro.
 2. Materiales mate y sólidos (metalness 0, rugosidad ≥0.8, mismos colores).
-3. Gizmo atenuado al 15% sin el ratón encima (vuelve solo al pasar o arrastrar;
-   respeta el `_opacity` interno de TransformControls).
+3. Gizmo atenuado sin el ratón encima (45 %; vuelve solo al pasar o arrastrar;
+   respeta el `_opacity` interno de TransformControls). Antes era 15 %, casi
+   invisible, porque no había forma de apagarlo del todo del gizmo.
 4. Medidas de una en una: al completar vuelve a cámara libre (hay que pulsar
    Medir para la siguiente).
 5. Smoke robusto al readback congelado de SwiftShader (salta, no falla).
@@ -391,8 +398,13 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 5. **Modelo decimado `Test1.glb`**: copiado a `public/samples/Test1.glb` (~5 MB, ~415 k triángulos, menos del 40 % de B1); `Iniciar-Visor.bat` ahora abre `Test1.glb`; el smoke lo carga y verifica que no supere 500 k triángulos.
 6. **Herramientas de medida**: nuevo botón **Borrar última** (borra la seleccionada o la última creada).
 7. **Palitos de medidas y marcadores**: anchos de línea duplicados (3,2 px para extensiones y tallos; 2,0 px para el larguero).
-8. **Gizmo**: se mantiene el gizmo original de three (`TransformControls`, tamaño 0.55, atenuado al 15 % en reposo). Los botones **Mover** y **Rotar** del panel de corte filtran cuál se ve: pulsar uno muestra solo sus flechas o solo sus anillos, y volver a pulsarlo lo apaga. Con ambos apagados el corte sigue visible pero el gizmo no se dibuja (escena limpia).
+8. **Gizmo**: se mantiene el gizmo original de three (`TransformControls`, tamaño 0.8, atenuado al 45 % en reposo). Es **uno solo** con las dos familias de asas visibles a la vez: flechas en los 3 ejes (más los 3 tiradores de plano XY/YZ/XZ) para mover, y los 4 anillos para rotar. El botón **Gizmo** del panel de corte lo enciende y lo apaga; apagado, el corte sigue visible pero el gizmo no se dibuja (escena limpia). Como se puede ocultar del todo, el atenuado ya no necesita ser casi invisible: sirve para que no tape la pieza. Al arrastrar una familia de asas la otra se aparta (`_dragOwner`), porque en el centro ambas se solapan y el gesto daría saltos; el orden de registro (translate primero) resuelve el solape del centro.
 9. **Botón Vista trasera** en el panel Vistas.
+10. **Estética del gizmo**: los "trazos" del gizmo de three son tubos de 3 caras radiales de radio 0.0075 (aspecto de cinta plana); `_thickenGizmo` los recrea al doble de grosor (`GIZMO_LINE_WIDTH = 2.0`) sin tocar materiales, de modo que el atenuado y el resaltado del eje siguen igual. Los anillos de rotar se cierran a círculo completo (`GIZMO_RING_ARC`): three los entrega como semicírculos y un eje se quedaba a medias.
+11. **Curva de corte con profundidad**: el perímetro del corte pasa a `depthTest: true`, así que la geometría sólida por delante lo tapa y las piezas se leen macizas en vez de transparentar las líneas del corte.
+12. **Cotas sobre la cara cortada**: `pickCap()` permite medir directamente en la superficie del corte (el capping por stencil no es malla, así que el rayo se resuelve contra el plano y se valida el punto). `pick()` elige el punto más cercano, de modo que la cara cortada prevalece sobre la pared del fondo. `isPointVisible()` admite una tolerancia mínima para que las etiquetas de esas cotas no se oculten por estar en el plano.
+13. **Fuera el botón "Borrar marcadores"** del panel Herramientas (redundante: se borran con `Supr` sobre el marcador).
+14. **Los pasos de presentación guardan el zoom**: `marker.view.zoom` (`camera.zoom`) se guarda al crear el marcador y se restaura al pulsarlo, antes de colocar la cámara. Opcional en el JSON, compatible con los pasos ya guardados.
 
 **Pendiente:**
 

@@ -241,7 +241,7 @@ const gizmo = await evaluate(`
     }
   })()
 `)
-check('gizmo meshmixer con flechas y anillos gruesos',
+check('gizmo plano: 3 flechas de mover y 3 anillos de rotar',
   gizmo.hasGizmo && gizmo.translateHandles >= 3 && gizmo.rotateHandles >= 3,
   `${gizmo.translateHandles} flechas, ${gizmo.rotateHandles} anillos`)
 

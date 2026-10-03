@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
 
-import { cutPlaneSegments } from '../src/section.js'
+import { cutPlaneSegments, PIVOT_GIZMO_OPTIONS } from '../src/section.js'
 
 const box = () => new THREE.BoxGeometry(2, 2, 2)
 const planeZ = (constant) => new THREE.Plane(new THREE.Vector3(0, 0, 1), constant)
@@ -43,4 +43,20 @@ test('un plano tangente a un vertice no deja segmentos degenerados', () => {
     const dz = segments[s + 5] - segments[s + 2]
     assert.ok(dx * dx + dy * dy + dz * dz > 1e-12)
   }
+})
+
+test('el gizmo usa la configuracion PivotControls elegida', () => {
+  assert.deepEqual(PIVOT_GIZMO_OPTIONS, {
+    translate: true,
+    rotate: true,
+    scale: false,
+    space: 'local',
+    size: 1.3,
+    fixed: false,
+    activeAxes: [true, true, true],
+    axisColors: { x: 0xff8093, y: 0x80ff80, z: 0x2ecffe },
+    thickness: 1.2,
+    length: 1,
+    rotateArc: 1 / 4,
+  })
 })

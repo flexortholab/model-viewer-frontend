@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { TransformControls } from 'three/addons/controls/TransformControls.js'
+import { PivotControls } from 'three-pivot-controls'
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js'
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
@@ -9,13 +9,14 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
  *
  * El plano esta anclado al MODELO (es hijo de modelRoot), no a la escena ni a
  * la camara: girar el foco no desplaza el corte; el corte es propiedad de la
- * pieza y gira con ella. Se coloca con un gizmo (TransformControls):
+ * pieza y gira con ella. Se coloca con un gizmo PivotControls:
  *
- *   - Modo MOVER: arrastra el plano por el espacio.
- *   - Modo ROTAR: gira el plano sobre si mismo (espacio local).
+ *   - Flechas y tiradores de plano: mueven el plano en espacio local.
+ *   - Tres arcos de eje (X, Y y Z, cada uno de un cuarto de circulo): lo giran
+ *     en espacio local. No hay familia de escala.
  *
- * Los botones Mover/Rotar del panel de corte filtran cual de los dos se ve;
- * con los dos apagados el gizmo no se dibuja (escena limpia).
+ * El unico boton "Gizmo" del panel de corte enciende y apaga el gizmo; apagado,
+ * el gizmo no se dibuja (escena limpia) pero el corte sigue visible.
  *
  * La superficie de corte se tapa con capping por stencil (caras traseras
  * incrementan el contador, delanteras lo decrementan y un quad coplanar pinta
@@ -26,20 +27,31 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
  * asi que arrastrar no reconstruye nada.
  */
 
-// Tamano del gizmo de mover/rotar del plano de corte. TransformControls usa
-// 1 por defecto, que resulta enorme sobre la pieza.
-const GIZMO_SIZE = 0.8
+// Ajustes exactos del gizmo PivotControls elegido en la demo. Se conservan como
+// contrato visible y comprobable: mover y rotar a la vez, sin escala, ejes
+// X/Y/Z activos, espacio local y los colores pedidos.
+export const PIVOT_GIZMO_OPTIONS = Object.freeze({
+  translate: true,
+  rotate: true,
+  scale: false,
+  space: 'local',
+  size: 1.3,
+  fixed: false,
+  activeAxes: Object.freeze([true, true, true]),
+  axisColors: Object.freeze({ x: 0xff8093, y: 0x80ff80, z: 0x2ecffe }),
+  thickness: 1.2,
+  length: 1,
+  rotateArc: 1 / 4,
+})
 
-// Grosor estetico de las lineas del gizmo. Los "trazos" del gizmo de three son
-// tubos 3D muy finos (cilindros y toros de radio 0.0075 en unidades de asa):
-// este factor los engorda recreando solo la geometria, sin tocar materiales,
-// atenuado ni resaltado del eje bajo el cursor.
-const GIZMO_LINE_WIDTH = 2.0
-
-// three dibuja los anillos de rotar por eje como semicirculos (arc 0.5) para
-// distinguir el lado cercano del lejano, pero a medias un eje se queda "sin
-// linea". Los cerramos a circulo completo: los cuatro anillos quedan simetricos.
-const GIZMO_RING_ARC = Math.PI * 2
+// three-pivot-controls trabaja en unidades de mundo cuando `fixed` es false.
+// En este visor ortografico en milimetros, el valor 1.3 de la demo quedaria
+// diminuto: la calibracion multiplica ese tamano para que la punta de la
+// flecha quede al 16.5% del alto visible (33% de diametro), sin cambiar el
+// resto de la configuracion. Con `fixed: false`, el zoom posterior sigue
+// cambiando el tamano aparente, como en la demo.
+const PIVOT_ARROW_TIP_LOCAL = 0.62
+const PIVOT_ARROW_TIP_SCREEN_RADIUS = 0.165
 
 export class SectionPlaneTool {
   /**
@@ -64,7 +76,7 @@ export class SectionPlaneTool {
     this._gizmoForced = null
 
     this.enabled = false
-    this.mode = 'translate'
+    this.mode = 'pivot'
     this.capColor = 'auto'
     this._seedColor = 0x8a7f72
 
@@ -81,7 +93,8 @@ export class SectionPlaneTool {
     this.gizmo.name = 'section-plane'
     modelRoot.add(this.gizmo)
 
-    // Visual del plano: disco translucido + anillo de borde.
+    // Visual del plano: solo anillo de borde. El disco queda oculto por
+    // peticion: al activar el corte no debe aparecer la superficie gris.
     this.planeMesh = new THREE.Mesh(
       new THREE.CircleGeometry(this.radius, 64),
       new THREE.MeshBasicMaterial({
@@ -94,6 +107,7 @@ export class SectionPlaneTool {
     )
     this.planeMesh.renderOrder = 4
     this.planeMesh.raycast = () => {}
+    this.planeMesh.visible = false
     this.gizmo.add(this.planeMesh)
 
     this.ringMesh = new THREE.Mesh(
@@ -155,66 +169,66 @@ export class SectionPlaneTool {
       this._frameTick?.()
     })
 
-    // Dos gizmos de three sobre el mismo plano: flechas (mover) y anillos
-    // (rotar). Los botones Mover/Rotar de la UI filtran cual se ve.
-    this.transformT = new TransformControls(camera, renderer.domElement)
-    this.transformT.setMode?.('translate')
-    this.transformT.attach(this.gizmo)
-    this.transformT.setSize?.(GIZMO_SIZE)
-    this._helperT = this.transformT.getHelper ? this.transformT.getHelper() : this.transformT
-    scene.add(this._helperT)
+    // Un solo gizmo PivotControls sobre el plano: flechas y arcos a la vez, sin
+    // familia de escala. PivotControls ya reparte el raton entre sus asas y no
+    // necesita dos controles ni zonas de preferencia manuales.
+    this.pivotOptions = PIVOT_GIZMO_OPTIONS
+    this.pivot = new PivotControls(camera, renderer.domElement, {
+      ...PIVOT_GIZMO_OPTIONS,
+      activeAxes: [...PIVOT_GIZMO_OPTIONS.activeAxes],
+      axisColors: { ...PIVOT_GIZMO_OPTIONS.axisColors },
+    })
+    this.pivot.attach(this.gizmo)
+    this._pivotHelper = this.pivot.getHelper()
+    scene.add(this._pivotHelper)
+    this._pivotViewportScale = 1
+    this._fitPivotGizmoToView()
 
-    this.transformR = new TransformControls(camera, renderer.domElement)
-    this.transformR.setMode?.('rotate')
-    this.transformR.setSpace?.('local')
-    this.transformR.attach(this.gizmo)
-    this.transformR.setSize?.(GIZMO_SIZE)
-    this._helperR = this.transformR.getHelper ? this.transformR.getHelper() : this.transformR
-    scene.add(this._helperR)
-
-    // Estetica: lineas planas algo mas anchas (vastagos y anillos engordados).
-    this._thickenGizmo(this._helperT)
-    this._thickenGizmo(this._helperR)
-
-    // Modo visible: 'translate', 'rotate' o null (gizmo oculto, corte visible).
-    // null = escena limpia sin gizmo ni atenuado.
+    // null = gizmo oculto con el corte visible (escena limpia).
     this.gizmoMode = null
     this._gizmoVisible = true
 
-    this._onGizmoChange = () => {
-      // Arrastrar recalcula el capping cada frame (barato en GPU) pero las
-      // curvas de corte se reconstruyen al SOLTAR (recorrer 1M triangulos en
-      // cada frame bloquearia el arrastre).
-      if (this.enabled) this.apply({ lines: !this._dragging })
-      if (this._dragging) this._linesDirty = true
+    this._onPivotDragStart = (event) => {
+      // Mientras se arrastra el gizmo la orbita se queda quieta.
+      if (this.controls) this.controls.enabled = false
+      this._dragging = true
+      this._dragOwner = event?.handle?.mode ?? null
       this.onChange?.()
     }
-    for (const [own, other, owner] of [
-      [this.transformT, this.transformR, 'translate'],
-      [this.transformR, this.transformT, 'rotate'],
-    ]) {
-      own.addEventListener('change', this._onGizmoChange)
-      own.addEventListener('dragging-changed', (event) => {
-        // Mientras se arrastra el gizmo la orbita se queda quieta.
-        if (this.controls) this.controls.enabled = !event.value
-        this._dragging = !!event.value
-        this._dragOwner = event.value ? owner : null
-        this._applyGizmoMode()
-        if (!event.value && this._linesDirty && this.enabled) {
-          this._linesDirty = false
-          this._syncPlane()
-          this._buildCutLines(this._lastVisible.length ? this._lastVisible : this.meshes)
-        }
-      })
+    this._onPivotDrag = () => {
+      // Arrastrar recalcula el capping cada frame (barato en GPU) pero las
+      // curvas de corte se reconstruyen al SOLTAR (recorrer 1M triangulos en
+      // cada frame bloquearia el arrastre). PivotControls ya ha movido el
+      // objeto del plano antes de emitir el evento.
+      this._dragging = true
+      if (this.enabled) this.apply({ lines: false })
+      this._linesDirty = true
+      this.onChange?.()
     }
+    this._onPivotDragEnd = () => {
+      if (this.controls) this.controls.enabled = true
+      this._dragging = false
+      this._dragOwner = null
+      if (this._linesDirty && this.enabled) {
+        this._linesDirty = false
+        this._syncPlane()
+        this._buildCutLines(this._lastVisible.length ? this._lastVisible : this.meshes)
+      }
+      this.onChange?.()
+    }
+    this.pivot.addEventListener('dragstart', this._onPivotDragStart)
+    this.pivot.addEventListener('drag', this._onPivotDrag)
+    this.pivot.addEventListener('dragend', this._onPivotDragEnd)
     this.setEnabled(false)
   }
 
-  /** Espacio del gizmo: trasladar en mundo, rotar local al plano. */
+  /** Espacio del gizmo: PivotControls incluye mover y rotar a la vez. */
   setMode(mode) {
-    // Con ambos gizmos activos a la vez, "mode" solo cambia el enfasis en la
-    // UI; se mantiene la API por compatibilidad con el bridge.
-    this.mode = mode === 'rotate' ? 'rotate' : 'translate'
+    // Se mantiene la API por compatibilidad con documentos y con el bridge: el
+    // gizmo siempre ofrece ambas familias, asi que cualquier modo heredado
+    // equivale al modo unico 'pivot'.
+    if (mode == null) return
+    this.mode = 'pivot'
   }
 
   getMode() {
@@ -222,12 +236,9 @@ export class SectionPlaneTool {
   }
 
   /**
-   * Muestra u oculta el gizmo del plano como interruptor.
-   *
-   * El gizmo es UNO solo: flechas en los 3 ejes para mover y anillos para
-   * rotar, visibles a la vez (doc/plan lo pedia asi). `mode` se conserva por
-   * compatibilidad con el bridge: cualquier valor no nulo enciende el gizmo
-   * entero y volver a llamarlo lo apaga.
+   * Enciende o apaga el gizmo completo como interruptor (flechas y anillos a la
+   * vez). `mode` se conserva por compatibilidad con el bridge: cualquier valor
+   * no nulo lo enciende y volver a llamarlo lo apaga.
    */
   setGizmoMode(mode) {
     if (mode == null) this.gizmoMode = null
@@ -235,73 +246,51 @@ export class SectionPlaneTool {
     this._applyGizmoMode()
   }
 
-  /** true si el gizmo esta encendido (ambas familias de asas visibles). */
+  /** true si el gizmo esta encendido. */
   get gizmoOn() {
     return this.gizmoMode != null
   }
 
   /**
-   * Engorda las lineas del gizmo y cierra los anillos de rotar: los vastagos de
-   * las flechas de mover son CylinderGeometry(r 0.0075) y los anillos
-   * TorusGeometry(tubo 0.0075, 3 caras radiales, aspecto de cinta plana) que
-   * three entrega como semicirculos. Se recrea la geometria con el radio
-   * multiplicado por GIZMO_LINE_WIDTH y con el arco completo, conservando la
-   * orientacion y la comparticion; los materiales (atenuado y highlight) no se
-   * tocan. Se descartan los pickers invisibles (tubo 0.1, radio 0.2) y los
-   * crosshair de arrastre (Line de 1 px, solo visibles al arrastrar).
+   * Calcula la calibracion de viewport para PivotControls. La libreria deja el
+   * tamano 1.3 en unidades de mundo porque `fixed` es false; en este visor
+   * ortografico en milimetros eso solo sirve como tamano base. El factor lleva
+   * la punta de la flecha al 16.5% del alto visible actual, es decir, un
+   * diametro aproximado del 33%, sin tocar la configuracion pedida.
    */
-  _thickenGizmo(root) {
-    const cache = new Map()
-    root.traverse((node) => {
-      if (!node.isMesh) return
-      if (node.material?.visible === false) return
-      const geo = node.geometry
-      const p = geo?.parameters
-      if (!p) return
-      if (cache.has(geo)) {
-        node.geometry = cache.get(geo)
-        return
-      }
-      let next = null
-      if (geo.type === 'TorusGeometry' && p.tube <= 0.01) {
-        // Anillos de rotar: mismo radio, tubo mas grueso y arco completo; se
-        // rehacen las rotaciones que CircleGeometry hornea en la geometria.
-        next = new THREE.TorusGeometry(
-          p.radius, p.tube * GIZMO_LINE_WIDTH, p.radialSegments, p.tubularSegments, GIZMO_RING_ARC,
-        )
-        next.rotateY(Math.PI / 2)
-        next.rotateX(Math.PI / 2)
-      } else if (geo.type === 'CylinderGeometry' && p.radiusTop > 0 && p.radiusTop <= 0.01) {
-        // Vastagos de las flechas de mover: mismo largo, radio mas grueso.
-        next = new THREE.CylinderGeometry(
-          p.radiusTop * GIZMO_LINE_WIDTH, p.radiusBottom * GIZMO_LINE_WIDTH,
-          p.height, p.radialSegments, p.heightSegments,
-        )
-        next.translate(0, p.height / 2, 0)
-      }
-      if (next) {
-        cache.set(geo, next)
-        node.geometry = next
-      }
-    })
+  _fitPivotGizmoToView() {
+    const height = (this.camera.top - this.camera.bottom) / this.camera.zoom
+    if (!Number.isFinite(height) || height <= 0) return
+    this._pivotViewportScale =
+      (height * PIVOT_ARROW_TIP_SCREEN_RADIUS) /
+      (PIVOT_GIZMO_OPTIONS.size * PIVOT_ARROW_TIP_LOCAL)
   }
 
-  /** Flechas y anillos a la vez. null = gizmo oculto. */
+  /**
+   * Sincroniza el helper PivotControls con el plano antes de pintar. Hay que
+   * llamarlo en cada frame: la libreria pide `update()` antes del render y,
+   * justo despues, se reaplica la calibracion de viewport que `update()`
+   * reescribe.
+   */
+  updatePivotGizmo() {
+    if (!this.pivot) return
+    this.pivot.update()
+    this.pivot.getHelper().scale.multiplyScalar(this._pivotViewportScale ?? 1)
+  }
+
+  /**
+   * Flechas y arcos a la vez. null = gizmo oculto.
+   */
   _applyGizmoMode() {
     let visible = this.enabled && this._gizmoVisible && this.gizmoMode != null
     if (this._gizmoForced === false) visible = false
     else if (this._gizmoForced === true) visible = true
 
-    // Al arrastrar una familia de asas se aparta la otra: las dos estan
-    // visibles y se solapan en el centro, asi que sin esto el raton queda
-    // encima de la asa que se esta moviendo y el arrastre da saltos. El orden
-    // de registro (translate primero) resuelve el solape en el centro.
-    const busyT = this._dragging && this._dragOwner === 'translate'
-    const busyR = this._dragging && this._dragOwner === 'rotate'
-    this.transformT.enabled = visible && !busyR
-    this.transformR.enabled = visible && !busyT
-    this._helperT.visible = visible && !busyR
-    this._helperR.visible = visible && !busyT
+    // PivotControls controla el objeto directamente: basta con adjuntarlo o
+    // soltarlo. No hay que ocultar una familia durante el arrastre porque sus
+    // asas conviven por construccion.
+    if (visible) this.pivot.attach(this.gizmo)
+    else this.pivot.detach()
   }
 
   /** Muestra u oculta los gizmos sin perder la posicion del plano. */
@@ -317,45 +306,32 @@ export class SectionPlaneTool {
   }
 
   /**
-   * Atenua el gizmo y el visual del plano cuando el raton no esta encima.
-   * Devuelve true mientras la transicion sigue en curso (el visor le da
-   * frames hasta que se asienta). Solo opacidades: nada del pipeline cambia.
+   * Atenua el visual del plano cuando el raton no esta encima. PivotControls
+   * gestiona el resaltado de sus propias asas, asi que aqui solo se tocan los
+   * materiales del visual del plano. Devuelve true mientras la transicion sigue en
+   * curso (el visor le da frames hasta que se asienta). Solo opacidades: nada
+   * del pipeline cambia.
    */
   updateGizmoFade() {
     if (!this._fadeMats) {
       this._fadeMats = []
-      const collect = (root) => {
-        root.traverse((node) => {
-          const list = Array.isArray(node.material) ? node.material : [node.material]
-          for (const material of list) {
-            if (!material || this._fadeMats.some((e) => e.material === material)) continue
-            material.transparent = true
-            this._fadeMats.push({ material, base: material.opacity })
-          }
-        })
+      for (const mesh of [this.planeMesh, this.ringMesh]) {
+        const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+        for (const material of list) {
+          if (!material || this._fadeMats.some((e) => e.material === material)) continue
+          material.transparent = true
+          this._fadeMats.push({ material, base: material.opacity })
+        }
       }
-      collect(this._helperT)
-      collect(this._helperR)
-      collect(this.planeMesh)
-      collect(this.ringMesh)
     }
-    const hovering = this._pointerInside &&
-      (this.transformT.axis != null || this.transformR.axis != null)
-    const dragging = this.transformT.dragging || this.transformR.dragging
-    // Con el gizmo apagado no hay nada que atenuar. El reposo ya no es casi
-    // invisible (0.15): como se puede ocultar del todo con los botones, el
-    // atenuado sirve para que no tape la pieza, no para esconderlo.
-    const target = !this.enabled || this.gizmoMode == null ? 1 : (hovering || dragging ? 1 : 0.45)
+    const target = !this.enabled || this.gizmoMode == null
+      ? 1
+      : (this._pointerInside || this._dragging ? 1 : 0.45)
     const next = this._fadeLevel + (target - this._fadeLevel) * 0.25
     const settled = Math.abs(next - target) < 0.01
     this._fadeLevel = settled ? target : next
     for (const { material, base } of this._fadeMats) {
-      // _opacity: el propio TransformControls restaura la opacidad de sus
-      // asas en cada updateMatrixWorld; hay que escribir ahi tambien o el
-      // atenuado no se ve. El resaltado del eje bajo el cursor (opacity 1)
-      // sigue funcionando porque al pasar el raton el objetivo es 1.
       material.opacity = base * this._fadeLevel
-      if ('_opacity' in material) material._opacity = base * this._fadeLevel
     }
     return !settled
   }
@@ -378,6 +354,7 @@ export class SectionPlaneTool {
     // Sin corte: ni visual del plano ni gizmo en pantalla.
     this.gizmo.visible = this.enabled
     this._setGizmoVisible(this.enabled)
+    if (this.enabled) this._fitPivotGizmoToView()
     this.apply()
   }
 
@@ -754,14 +731,13 @@ export class SectionPlaneTool {
   }
 
   dispose() {
-    for (const transform of [this.transformT, this.transformR]) {
-      transform.removeEventListener('change', this._onGizmoChange)
-      transform.detach()
-      transform.dispose?.()
-    }
-    for (const helper of [this._helperT, this._helperR]) {
-      if (helper.parent) helper.parent.remove(helper)
-    }
+    this.pivot.removeEventListener('dragstart', this._onPivotDragStart)
+    this.pivot.removeEventListener('drag', this._onPivotDrag)
+    this.pivot.removeEventListener('dragend', this._onPivotDragEnd)
+    this.pivot.detach()
+    this.pivot.dispose?.()
+    if (this._pivotHelper.parent) this._pivotHelper.parent.remove(this._pivotHelper)
+    this.pivot = null
     this._teardownStencil()
     this._capGeometry.dispose()
     this.planeMesh.geometry.dispose()

@@ -4,12 +4,12 @@ Visor web 3D tipo Autodesk Viewer para compartir diseños dentales con clientes 
 Pensado para **disyuntores sinterizados con anclaje esquelético** diseñados en Blender, pero acepta cualquier modelo 3D estático.
 
 - unidades en **milímetros** con detección automática
-- **corte seccional** con plano único y gizmo (mover+rotar), capping sólido por pieza (stencil buffer) con anillo de contorno
+- **corte seccional** con plano único y gizmo PivotControls (mover+rotar, sin escala), capping sólido por pieza (stencil buffer) con anillo de contorno
 -  estilo plano de taller con etiquetas proyectadas
 - **anotaciones** exportables como sidecar JSON
 - embebible en un **webclip / iframe** vía `postMessage`, o por enlace directo
 
-Estado actual: **v0.3.7** funcional (cámara **ortográfica** — sin perspectiva ni "ojo de pez"—, plano de corte único con gizmo mover+rotar atenuado, capping por pieza con curva de corte exacta por objeto, lista de objetos con iconos propios y corte por pieza, presentación con marcadores editables, medidas compactas de una en una en mm con 1 decimal con globos HTML fijos en pantalla, selección y nota de medidas, cubo de vistas clicable en la esquina con las caras bien orientadas, **giro libre sin topes** — ArcballControls, se puede pasar de largo por superior e inferior—, paneles separados Vistas (en cruz), Herramientas, Corte seccional, Objetos y Presentación con estética unificada, logo oficial del laboratorio con su teal y gris de marca, título del caso sin marco, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
+Estado actual: **v0.3.7** funcional (cámara **ortográfica** — sin perspectiva ni "ojo de pez"—, plano de corte único con gizmo PivotControls de flechas, planos y arcos de rotación a la vez, con un solo botón, capping por pieza con curva de corte exacta por objeto, lista de objetos con iconos propios y corte por pieza, presentación con marcadores editables, medidas compactas de una en una en mm con 1 decimal con globos HTML fijos en pantalla, selección y nota de medidas, cubo de vistas clicable en la esquina con las caras bien orientadas, **giro libre sin topes** — ArcballControls, se puede pasar de largo por superior e inferior—, paneles separados Vistas (en cruz), Herramientas, Corte seccional, Objetos y Presentación con estética unificada, logo oficial del laboratorio con su teal y gris de marca, título del caso sin marco, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
 
 ### Cámara y vistas
 
@@ -131,8 +131,12 @@ Sin `?model=`, el visor queda a la espera de un comando `load` por `postMessage`
 
 ## Corte seccional
 
-Un plano único anclado al modelo, colocado con gizmo (flechas para mover, anillos para
-rotar, ambos visibles a la vez). Botones **Alinear con la vista** y **Girar 90 grados**.
+Un plano único anclado al modelo, colocado con un gizmo PivotControls que trae a
+la vez las flechas y los planos para mover, y los arcos de un cuarto de círculo
+de X, Y y Z para rotar. No incluye escala. Un solo botón **Gizmo** lo enciende y
+apaga; no hay botones Mover/Rotar separados. El disco del plano queda oculto y
+solo se conserva su anillo de borde. Botones **Alinear con la vista** y
+**Girar 90 grados**.
 La superficie del corte se tapa en solido (stencil) y su perimetro se dibuja con la
 curva exacta de interseccion plano↔malla por pieza (calculada en CPU al activar el
 corte y al soltar el gizmo; durante el arrastre solo se mueve el capping para no
@@ -178,7 +182,7 @@ Todas las anotaciones (mediciones, marcadores, corte) se guardan en un **JSON ap
 
 ### Marcadores
 
-Un marcador por pulsación del botón **Marcador** (igual que las medidas): tras colocarlo se sale sola del modo marcador. Cada marcador guarda un punto en la pieza, un texto opcional y un tipo (`note`, `screw`, `warning`).
+Un marcador por pulsación del botón **Marcador** (igual que las medidas): tras colocarlo se sale sola del modo marcador. El diálogo pide un texto opcional y la clase con tres botones seleccionables: **Nota**, **Aviso** y **Tornillo** (`note`, `warning`, `screw`). Cada marcador guarda un punto en la pieza, el texto y el tipo elegido.
 
 Visualmente comparten escala y estilo con las medidas: punto pequeño, tallo de 1,6 px y globo con fondo blanco. El contorno del globo indica el tipo:
 
@@ -222,7 +226,7 @@ Seguridad: solo se aceptan mensajes de `window.parent`/`window` y con origen en 
 
 - **Vistas** (280 px): rejilla con Superior, Izquierda, Frontal, Derecha, Inferior e **Isométrica**.
 - **Herramientas** (248 px): Medir, Borrar última, Marcador, Exportar.
-- **Corte seccional** (248 px, plegable): Activar corte, Alinear con la vista, Girar 90 grados, y el interruptor **Gizmo** (flechas + anillos a la vez; apagado = gizmo oculto).
+- **Corte seccional** (248 px, plegable): Activar corte, Alinear con la vista, Girar 90 grados, y el interruptor **Gizmo** (flechas, planos y arcos a la vez, sin escala; apagado = gizmo oculto, el corte sigue visible).
 
 **Columna derecha**:
 
@@ -398,13 +402,16 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 5. **Modelo decimado `Test1.glb`**: copiado a `public/samples/Test1.glb` (~5 MB, ~415 k triángulos, menos del 40 % de B1); `Iniciar-Visor.bat` ahora abre `Test1.glb`; el smoke lo carga y verifica que no supere 500 k triángulos.
 6. **Herramientas de medida**: nuevo botón **Borrar última** (borra la seleccionada o la última creada).
 7. **Palitos de medidas y marcadores**: anchos de línea duplicados (3,2 px para extensiones y tallos; 2,0 px para el larguero).
-8. **Gizmo**: se mantiene el gizmo original de three (`TransformControls`, tamaño 0.8, atenuado al 45 % en reposo). Es **uno solo** con las dos familias de asas visibles a la vez: flechas en los 3 ejes (más los 3 tiradores de plano XY/YZ/XZ) para mover, y los 4 anillos para rotar. El botón **Gizmo** del panel de corte lo enciende y lo apaga; apagado, el corte sigue visible pero el gizmo no se dibuja (escena limpia). Como se puede ocultar del todo, el atenuado ya no necesita ser casi invisible: sirve para que no tape la pieza. Al arrastrar una familia de asas la otra se aparta (`_dragOwner`), porque en el centro ambas se solapan y el gesto daría saltos; el orden de registro (translate primero) resuelve el solape del centro.
+8. **Gizmo**: `three-pivot-controls` con mover y rotar a la vez, sin escala. Incluye las tres flechas, los tres tiradores de plano y los tres arcos de un cuarto de círculo de X, Y y Z en espacio local. Un **único** botón **Gizmo** lo enciende y apaga; apagado, el corte sigue visible pero el gizmo no se dibuja (escena limpia). La librería ya reparte el ratón entre sus asas, así que no hacen falta dos controles ni zonas manuales de preferencia.
 9. **Botón Vista trasera** en el panel Vistas.
-10. **Estética del gizmo**: los "trazos" del gizmo de three son tubos de 3 caras radiales de radio 0.0075 (aspecto de cinta plana); `_thickenGizmo` los recrea al doble de grosor (`GIZMO_LINE_WIDTH = 2.0`) sin tocar materiales, de modo que el atenuado y el resaltado del eje siguen igual. Los anillos de rotar se cierran a círculo completo (`GIZMO_RING_ARC`): three los entrega como semicírculos y un eje se quedaba a medias.
-11. **Curva de corte con profundidad**: el perímetro del corte pasa a `depthTest: true`, así que la geometría sólida por delante lo tapa y las piezas se leen macizas en vez de transparentar las líneas del corte.
-12. **Cotas sobre la cara cortada**: `pickCap()` permite medir directamente en la superficie del corte (el capping por stencil no es malla, así que el rayo se resuelve contra el plano y se valida el punto). `pick()` elige el punto más cercano, de modo que la cara cortada prevalece sobre la pared del fondo. `isPointVisible()` admite una tolerancia mínima para que las etiquetas de esas cotas no se oculten por estar en el plano.
-13. **Fuera el botón "Borrar marcadores"** del panel Herramientas (redundante: se borran con `Supr` sobre el marcador).
-14. **Los pasos de presentación guardan el zoom**: `marker.view.zoom` (`camera.zoom`) se guarda al crear el marcador y se restaura al pulsarlo, antes de colocar la cámara. Opcional en el JSON, compatible con los pasos ya guardados.
+10. **Ajustes exactos del gizmo**: tamaño 1.3, `fixed: false`, grosor 1.2, alcance 1, arcos de 1/4 y colores `ff8093`, `80ff80` y `2ecffe`. Como el visor es ortográfico y trabaja en milímetros, se conserva `fixed: false` y se aplica una calibración de viewport para que el tamaño 1.3 se lea como en la demo; el zoom posterior sigue cambiando el tamaño aparente.
+11. **Pruebas del gizmo**: el smoke comprueba el inventario real de asas (`translate` + `rotate`, ningún modo `scale`), los ejes activos, los arcos de un cuarto, los colores, el grosor/alcance pedidos y el tamaño calibrado en pantalla.
+12. **Curva de corte con profundidad**: el perímetro del corte pasa a `depthTest: true`, así que la geometría sólida por delante lo tapa y las piezas se leen macizas en vez de transparentar las líneas del corte.
+13. **Cotas sobre la cara cortada**: `pickCap()` permite medir directamente en la superficie del corte (el capping por stencil no es malla, así que el rayo se resuelve contra el plano y se valida el punto). `pick()` elige el punto más cercano, de modo que la cara cortada prevalece sobre la pared del fondo. `isPointVisible()` admite una tolerancia mínima para que las etiquetas de esas cotas no se oculten por estar en el plano.
+14. **Fuera el botón "Borrar marcadores"** del panel Herramientas (redundante: se borran con `Supr` sobre el marcador).
+15. **Los pasos de presentación guardan el zoom**: `marker.view.zoom` (`camera.zoom`) se guarda al crear el marcador y se restaura al pulsarlo, antes de colocar la cámara. Opcional en el JSON, compatible con los pasos ya guardados.
+16. **Disco del plano oculto**: al activar el corte no aparece la superficie gris del plano; solo se conserva su anillo de borde junto con el capping, las curvas y el gizmo.
+17. **Clase de marcador con botones**: el diálogo de nuevo marcador sustituye el prompt de texto por tres botones seleccionables (**Nota**, **Aviso** y **Tornillo**), con **Nota** por defecto y confirmación/cancelación explícitas.
 
 **Pendiente:**
 

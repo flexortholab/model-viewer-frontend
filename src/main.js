@@ -22,6 +22,9 @@ const markersList = document.getElementById('markers-list')
 const docTitle = document.getElementById('doc-title')
 const loader = document.getElementById('loader')
 const loaderText = document.getElementById('loader-text')
+const markerDialog = document.getElementById('marker-dialog')
+const markerDialogText = document.getElementById('marker-dialog-text')
+const markerKindButtons = [...document.querySelectorAll('[data-marker-kind]')]
 
 const mobileUi = document.getElementById('mobile-ui')
 const mobileToolbar = document.getElementById('mobile-toolbar')
@@ -456,14 +459,75 @@ function toggleMeasure() {
   return active
 }
 
+const MARKER_KINDS = ['note', 'warning', 'screw']
+let pendingMarkerPoint = null
+let selectedMarkerKind = 'note'
+
+function setSelectedMarkerKind(kind) {
+  selectedMarkerKind = MARKER_KINDS.includes(kind) ? kind : 'note'
+  for (const button of markerKindButtons) {
+    button.setAttribute('aria-pressed', String(button.dataset.markerKind === selectedMarkerKind))
+  }
+}
+
+function openMarkerDialog(point) {
+  pendingMarkerPoint = point
+  if (markerDialogText) markerDialogText.value = ''
+  setSelectedMarkerKind('note')
+  markerDialog.hidden = false
+  markerDialogText?.focus()
+}
+
+function closeMarkerDialog() {
+  markerDialog.hidden = true
+  pendingMarkerPoint = null
+}
+
+function confirmMarkerDialog() {
+  if (!pendingMarkerPoint) {
+    closeMarkerDialog()
+    return
+  }
+  const text = (markerDialogText?.value ?? '').trim()
+  viewer.addMarker({ position: pendingMarkerPoint, text, kind: selectedMarkerKind })
+  showHint('Paso guardado' + (text ? `: ${text}` : ''))
+  closeMarkerDialog()
+  // Un marcador por pulsacion del boton, igual que las medidas.
+  if (markerMode) toggleMarkerTool()
+}
+
+for (const button of markerKindButtons) {
+  button.addEventListener('click', () => setSelectedMarkerKind(button.dataset.markerKind))
+}
+markerDialog?.querySelector('[data-marker-dialog="confirm"]')?.addEventListener('click', confirmMarkerDialog)
+for (const button of markerDialog?.querySelectorAll('[data-marker-dialog="cancel"]') ?? []) {
+  button.addEventListener('click', closeMarkerDialog)
+}
+markerDialog?.addEventListener('click', (event) => {
+  if (event.target === markerDialog) closeMarkerDialog()
+})
+markerDialog?.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    event.stopPropagation()
+    closeMarkerDialog()
+  }
+})
+markerDialogText?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    confirmMarkerDialog()
+  }
+})
+
 /**
- * Modo marcador: pulsar sobre la pieza anade un marcador (texto via prompt).
+ * Modo marcador: pulsar sobre la pieza abre el dialogo del marcador.
  * Convive con la medicion: se activa uno desactiva el otro.
  */
 let markerMode = false
 
 function toggleMarkerTool() {
   markerMode = !markerMode
+  if (!markerMode) closeMarkerDialog()
   if (markerMode && viewer.measure?.enabled) {
     viewer.setTool('orbit')
     container.classList.remove('is-measuring')
@@ -475,19 +539,14 @@ function toggleMarkerTool() {
 }
 
 function addMarkerAt(event) {
+  if (!markerDialog?.hidden) return
   viewer.setPointer(event)
   const hit = viewer.pick()
   if (!hit) {
     showHint('No hay pieza bajo el cursor', 1500)
     return
   }
-  const text = (window.prompt('Texto del marcador (opcional):', '') ?? '').trim()
-  const kindInput = (window.prompt("Clase del marcador: 'note', 'warning' o 'screw':", 'note') ?? '').trim()
-  const kind = ['warning', 'screw'].includes(kindInput) ? kindInput : 'note'
-  viewer.addMarker({ position: hit.point.toArray(), text, kind })
-  showHint('Paso guardado' + (text ? `: ${text}` : ''))
-  // Un marcador por pulsacion del boton, igual que las medidas.
-  toggleMarkerTool()
+  openMarkerDialog(hit.point.toArray())
 }
 
 // --- Comandos del webclip --------------------------------------------------
@@ -676,7 +735,7 @@ document.addEventListener('click', (event) => {
       viewer.section?.setGizmoMode('combined')
       syncSectionUI()
       const on = !!viewer.section?.gizmoOn
-      showHint(on ? 'Gizmo: flechas para mover, anillos para rotar' : 'Gizmo oculto')
+      showHint(on ? 'Gizmo: flechas y planos para mover, arcos de X, Y y Z para rotar' : 'Gizmo oculto')
       break
     }
     case 'section-toggle': {

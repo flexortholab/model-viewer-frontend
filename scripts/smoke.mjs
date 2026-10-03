@@ -255,25 +255,33 @@ check('la curva del corte respeta la profundidad (la pieza se ve solida)',
 check('genera el grupo de stencil (caras traseras y delanteras)', section.stencils >= 2, `${section.stencils} mallas`)
 check('los materiales recortan con el plano', section.planes === 1)
 check('stencil activo en el capping y en los strokes', section.capWrite === true && section.stencilWrite === true)
+const visualPlano = await evaluate(`
+  (() => {
+    const s = window.dentalViewer.section
+    return { disco: s.planeMesh.visible, anillo: s.ringMesh.visible }
+  })()
+`)
+check('el disco del plano queda oculto y conserva el anillo de borde',
+  visualPlano.disco === false && visualPlano.anillo === true,
+  `disco=${visualPlano.disco} anillo=${visualPlano.anillo}`)
 
-// Gizmo original (TransformControls) UNICO: flechas de los 3 ejes + anillos de
-// rotar a la vez. Por defecto gizmoMode = null: corte activo pero gizmo oculto.
+// Gizmo PivotControls UNICO en la UI: flechas, planos y arcos de un cuarto a
+// la vez, sin escala. Por defecto gizmoMode = null: corte activo pero gizmo
+// oculto y desadjuntado.
 const gizmo = await evaluate(`
   (() => {
     const v = window.dentalViewer
     const s = v.section
     const snap = () => ({
       mode: s.gizmoMode,
-      on: !!s.gizmoOn,
-      translate: s._helperT.visible,
-      rotate: s._helperR.visible,
-      enabledT: s.transformT.enabled,
-      enabledR: s.transformR.enabled,
+      helper: s._pivotHelper.visible,
+      attached: s.pivot.getObject() === s.gizmo,
     })
     const initial = snap()
     s.setGizmoMode('combined')
     const encendido = snap()
-    // Al arrastrar una familia de asas, la otra se aparta (no se solapan).
+    // PivotControls convive con ambas familias: durante un arrastre no se
+    // oculta ninguna asa. Basta con comprobar que sigue adjuntado.
     s._dragging = true
     s._dragOwner = 'translate'
     s._applyGizmoMode()
@@ -281,70 +289,286 @@ const gizmo = await evaluate(`
     s._dragging = true
     s._dragOwner = 'rotate'
     s._applyGizmoMode()
-    const arrastrandoAnillo = snap()
+    const arrastrandoArco = snap()
     s._dragging = false
     s._dragOwner = null
-    // Volver a pulsar el mismo boton lo apaga: escena limpia.
+    // Volver a pulsar el mismo lo apaga: escena limpia.
     s.setGizmoMode('combined')
     const apagado = snap()
     s.setGizmoMode(null)
-    return {
-      initial, encendido, arrastrandoFlecha, arrastrandoAnillo, apagado,
-      hasT: !!s.transformT, hasR: !!s.transformR,
-    }
+    return { initial, encendido, arrastrandoFlecha, arrastrandoArco, apagado }
   })()
 `)
 check('el gizmo arranca oculto con el corte activo (gizmoMode null)',
-  gizmo.hasT && gizmo.hasR && gizmo.initial.mode === null &&
-  gizmo.initial.translate === false && gizmo.initial.rotate === false,
+  gizmo.initial.mode === null &&
+  gizmo.initial.helper === false && gizmo.initial.attached === false,
   `modo=${gizmo.initial.mode}`)
-check('un solo boton enciende flechas y anillos a la vez',
-  gizmo.encendido.mode === 'combined' && gizmo.encendido.on &&
-  gizmo.encendido.translate === true && gizmo.encendido.rotate === true &&
-  gizmo.encendido.enabledT === true && gizmo.encendido.enabledR === true)
-check('al arrastrar una familia de asas la otra se aparta',
-  gizmo.arrastrandoFlecha.translate === true && gizmo.arrastrandoFlecha.rotate === false &&
-  gizmo.arrastrandoAnillo.rotate === true && gizmo.arrastrandoAnillo.translate === false)
+check('un solo boton enciende flechas, planos y arcos a la vez',
+  gizmo.encendido.mode === 'combined' &&
+  gizmo.encendido.helper === true && gizmo.encendido.attached === true)
+check('al arrastrar no se desadjunta ni se oculta ninguna familia',
+  gizmo.arrastrandoFlecha.helper === true && gizmo.arrastrandoFlecha.attached === true &&
+  gizmo.arrastrandoArco.helper === true && gizmo.arrastrandoArco.attached === true)
 check('volver a pulsar el mismo boton apaga el gizmo',
-  gizmo.apagado.mode === null && gizmo.apagado.translate === false && gizmo.apagado.rotate === false)
+  gizmo.apagado.mode === null &&
+  gizmo.apagado.helper === false && gizmo.apagado.attached === false)
 
-// Estetica: las lineas del gizmo (vastagos de flechas y anillos de rotar)
-// van engordadas respecto al radio original de three (0.0075), y los anillos
-// de cada eje son circulos completos (three los deja a medias).
-const gizmoFat = await evaluate(`
+// Configuracion PivotControls y geometria real de sus asas: cada asa
+// interactiva lleva `userData.tpc`, asi que se lee el inventario sin depender
+// de rutas internas del paquete.
+const pivot = await evaluate(`
   (() => {
     const s = window.dentalViewer.section
-    let maxTube = 0
-    let maxShaft = 0
-    const arcs = {}
-    for (const root of [s._helperT, s._helperR]) {
-      root.traverse((n) => {
-        if (!n.isMesh || n.material?.visible === false) return
-        const p = n.geometry?.parameters
-        if (!p) return
-        // Solo los anillos visibles del gizmo (tubo fino ~0.015 tras engordar).
-        // Los pickers de arrastre tienen tubo 0.1 y se excluyen.
-        if (p.tube !== undefined && p.tube < 0.05) {
-          maxTube = Math.max(maxTube, p.tube)
-          const key = n.name
-          arcs[key] = Math.max(arcs[key] ?? 0, p.arc ?? 0)
-        }
-        if (p.radiusTop > 0 && p.radiusTop < 0.1) maxShaft = Math.max(maxShaft, p.radiusTop)
-      })
+    const helper = s._pivotHelper
+    const handles = []
+    helper.traverse((n) => {
+      const info = n.userData?.tpc
+      if (!info) return
+      const materials = Array.isArray(n.material) ? n.material : [n.material]
+      for (const material of materials) {
+        if (!material?.color) continue
+        handles.push({
+          mode: info.mode,
+          axis: info.axis,
+          color: material.color.getHex(),
+          geometry: n.geometry?.type,
+          params: n.geometry?.parameters,
+        })
+      }
+    })
+    const modes = [...new Set(handles.map((h) => h.mode))].sort()
+    const axes = (mode, length) => [...new Set(
+      handles.filter((h) => h.mode === mode && h.axis.length === length).map((h) => h.axis),
+    )].sort()
+    const arcValues = [...new Set(
+      handles
+        .filter((h) => h.mode === 'rotate' && h.geometry === 'TorusGeometry')
+        .map((h) => h.params?.arc),
+    )]
+    const arrowThickness = [...new Set(
+      handles
+        .filter((h) => h.mode === 'translate' && h.axis.length === 1 && h.geometry === 'CylinderGeometry')
+        .map((h) => h.params?.radiusTop),
+    )]
+    const ringThickness = [...new Set(
+      handles
+        .filter((h) => h.mode === 'rotate' && h.geometry === 'TorusGeometry')
+        .map((h) => h.params?.tube),
+    )]
+    const arrowLength = [...new Set(
+      handles
+        .filter((h) => h.mode === 'translate' && h.axis.length === 1 && h.geometry === 'CylinderGeometry')
+        .map((h) => h.params?.height),
+    )]
+    const ringRadius = [...new Set(
+      handles
+        .filter((h) => h.mode === 'rotate' && h.geometry === 'TorusGeometry')
+        .map((h) => h.params?.radius),
+    )]
+    const colors = [...new Set(handles.map((h) => h.color))].sort((a, b) => a - b)
+    const groups = {
+      translate: helper.getObjectByName('translate')?.children.length ?? -1,
+      rotate: helper.getObjectByName('rotate')?.children.length ?? -1,
+      scale: helper.getObjectByName('scale')?.children.length ?? -1,
     }
-    return { maxTube, maxShaft, arcs }
+    return {
+      options: {
+        translate: s.pivotOptions.translate,
+        rotate: s.pivotOptions.rotate,
+        scale: s.pivotOptions.scale,
+        space: s.pivotOptions.space,
+        size: s.pivotOptions.size,
+        fixed: s.pivotOptions.fixed,
+        activeAxes: [...s.pivotOptions.activeAxes],
+        axisColors: { ...s.pivotOptions.axisColors },
+        thickness: s.pivotOptions.thickness,
+        length: s.pivotOptions.length,
+        rotateArc: s.pivotOptions.rotateArc,
+      },
+      modes,
+      translateAxes: axes('translate', 1),
+      planes: axes('translate', 2),
+      rotateAxes: axes('rotate', 1),
+      scaleHandles: handles.filter((h) => h.mode === 'scale').length,
+      groups,
+      arcs: arcValues,
+      colors,
+      arrowThickness,
+      ringThickness,
+      arrowLength,
+      ringRadius,
+    }
   })()
 `)
-check('las lineas del gizmo van engordadas (estetica plana)',
-  gizmoFat.maxTube > 0.0075 && gizmoFat.maxShaft > 0.0075,
-  `anillo ${gizmoFat.maxTube.toFixed(4)}, vastago ${gizmoFat.maxShaft.toFixed(4)}`)
-// Los cuatro anillos (X, Y, Z y E) deben cerrar el circulo.
-const anillosCerrados = ['X', 'Y', 'Z', 'E'].every(
-  (eje) => (gizmoFat.arcs[eje] ?? 0) > Math.PI * 1.9,
+const pivotEsperado = {
+  translate: true,
+  rotate: true,
+  scale: false,
+  space: 'local',
+  size: 1.3,
+  fixed: false,
+  activeAxes: [true, true, true],
+  axisColors: { x: 0xff8093, y: 0x80ff80, z: 0x2ecffe },
+  thickness: 1.2,
+  length: 1,
+  rotateArc: 0.25,
+}
+check('el gizmo usa la configuracion PivotControls pedida',
+  JSON.stringify(pivot.options) === JSON.stringify(pivotEsperado),
+  JSON.stringify(pivot.options))
+check('mover y rotar estan presentes a la vez, sin escala',
+  pivot.modes.join(',') === 'rotate,translate' && pivot.scaleHandles === 0 &&
+  pivot.groups.translate === 6 && pivot.groups.rotate === 3 && pivot.groups.scale === 0,
+  `modos=${pivot.modes.join('+')} grupos=${pivot.groups.translate}/${pivot.groups.rotate}/${pivot.groups.scale}`)
+check('los tres ejes estan activos en flechas, planos y arcos',
+  pivot.translateAxes.join(',') === 'x,y,z' &&
+  pivot.planes.join(',') === 'xy,yz,zx' &&
+  pivot.rotateAxes.join(',') === 'x,y,z',
+  `flechas=${pivot.translateAxes.join(',')} planos=${pivot.planes.join(',')} arcos=${pivot.rotateAxes.join(',')}`)
+check('los arcos son de un cuarto de circulo',
+  pivot.arcs.length === 1 && Math.abs(pivot.arcs[0] - Math.PI / 2) < 1e-6,
+  `arcos=${pivot.arcs.map((a) => a.toFixed(4)).join(',')}`)
+check('los colores de eje son los pedidos',
+  pivot.colors.join(',') === [0xff8093, 0x80ff80, 0x2ecffe].sort((a, b) => a - b).join(','),
+  `colores=${pivot.colors.map((c) => c.toString(16)).join(',')}`)
+check('el grosor pedido se refleja en la geometria (thickness 1.2)',
+  pivot.arrowThickness.length === 1 && Math.abs(pivot.arrowThickness[0] - 0.09) < 1e-6 &&
+  pivot.ringThickness.length === 1 && Math.abs(pivot.ringThickness[0] - 0.048) < 1e-6,
+  `flecha=${pivot.arrowThickness.join(',')} arco=${pivot.ringThickness.join(',')}`)
+check('el alcance pedido se refleja en la geometria (length 1)',
+  pivot.arrowLength.length === 1 && Math.abs(pivot.arrowLength[0] - 0.62) < 1e-6 &&
+  pivot.ringRadius.length === 1 && Math.abs(pivot.ringRadius[0] - 0.45) < 1e-6,
+  `flecha=${pivot.arrowLength.join(',')} arco=${pivot.ringRadius.join(',')}`)
+
+// Arrastre real de un tirador de plano con el raton: el plano se mueve, la
+// orbita se desactiva durante el gesto y se reactiva al soltar.
+const arrastre = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    const s = v.section
+    const el = v.renderer.domElement
+    const V3 = v.camera.position.constructor
+    if (!s.gizmoOn) s.setGizmoMode('combined')
+    s.updatePivotGizmo()
+    v.scene.updateMatrixWorld(true)
+    const helper = s._pivotHelper
+    const slider = helper.localToWorld(new V3(0.2, 0.2, 0)).project(v.camera)
+    const center = helper.getWorldPosition(new V3()).project(v.camera)
+    const rect = el.getBoundingClientRect()
+    const toClient = (p) => ({
+      x: rect.left + (p.x * 0.5 + 0.5) * rect.width,
+      y: rect.top + (-p.y * 0.5 + 0.5) * rect.height,
+    })
+    const start = toClient(slider)
+    const middle = toClient(center)
+    const dx = start.x - middle.x
+    const dy = start.y - middle.y
+    const length = Math.hypot(dx, dy) || 1
+    return {
+      start,
+      end: { x: start.x + (dx / length) * 60, y: start.y + (dy / length) * 60 },
+      before: s.gizmo.position.toArray(),
+    }
+  })()
+`)
+await send('Input.dispatchMouseEvent', {
+  type: 'mousePressed',
+  x: arrastre.start.x,
+  y: arrastre.start.y,
+  button: 'left',
+  clickCount: 1,
+}, sessionId)
+await send('Input.dispatchMouseEvent', {
+  type: 'mouseMoved',
+  x: arrastre.end.x,
+  y: arrastre.end.y,
+  button: 'left',
+  buttons: 1,
+}, sessionId)
+await sleep(200)
+const duranteArrastre = await evaluate(`
+  (() => {
+    const s = window.dentalViewer.section
+    return {
+      dragging: s._dragging,
+      owner: s._dragOwner,
+      controls: s.controls.enabled,
+      point: s.gizmo.position.toArray(),
+    }
+  })()
+`)
+await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: arrastre.end.x, y: arrastre.end.y, button: 'left' }, sessionId)
+await sleep(200)
+const trasArrastre = await evaluate(`
+  (() => {
+    const s = window.dentalViewer.section
+    return { dragging: s._dragging, controls: s.controls.enabled }
+  })()
+`)
+const distanciaArrastre = Math.hypot(
+  duranteArrastre.point[0] - arrastre.before[0],
+  duranteArrastre.point[1] - arrastre.before[1],
+  duranteArrastre.point[2] - arrastre.before[2],
 )
-check('los anillos de rotar cierran en circulo completo en los 3 ejes',
-  anillosCerrados,
-  Object.entries(gizmoFat.arcs).map(([k, v]) => `${k}=${v.toFixed(2)}`).join(' '))
+await evaluate(`
+  window.dentalViewer.section.setPlane({ point: ${JSON.stringify(arrastre.before)} })
+`)
+check('arrastrar un asa de mover desplaza el plano y bloquea la orbita',
+  duranteArrastre.dragging === true && duranteArrastre.owner === 'translate' &&
+  duranteArrastre.controls === false && distanciaArrastre > 0.05,
+  `arrastrando=${duranteArrastre.dragging} dueno=${duranteArrastre.owner} ` +
+  `orbita=${duranteArrastre.controls} desplazamiento=${distanciaArrastre.toFixed(2)} mm ` +
+  `inicio=${arrastre.start.x.toFixed(0)},${arrastre.start.y.toFixed(0)} ` +
+  `fin=${arrastre.end.x.toFixed(0)},${arrastre.end.y.toFixed(0)}`)
+check('al soltar el asa se reactiva la orbita',
+  trasArrastre.dragging === false && trasArrastre.controls === true)
+
+// Tamano real en pantalla. PivotControls con `fixed: false` deja el tamano
+// 1.3 en unidades de mundo; la calibracion del visor lo lleva a la fraccion
+// pedida del alto visible (punta de flecha al 16.5%, diametro del 33%).
+const gizmoTamano = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    const s = v.section
+    const V3 = v.camera.position.constructor
+    const alto = v.renderer.domElement.clientHeight
+    const altoMundo = (v.camera.top - v.camera.bottom) / v.camera.zoom
+
+    if (!s.gizmoOn) s.setGizmoMode('combined')
+    s.updatePivotGizmo()
+    v.scene.updateMatrixWorld(true)
+
+    const escala = new V3()
+    let radio = 0
+    s._pivotHelper.traverse((n) => {
+      const info = n.userData?.tpc
+      if (!info || info.mode !== 'translate' || info.axis.length !== 1) return
+      if (n.geometry?.type !== 'CylinderGeometry') return
+      const pos = n.geometry.getAttribute('position')
+      if (!pos) return
+      n.updateWorldMatrix(true, false)
+      n.getWorldScale(escala)
+      const k = Math.max(escala.x, escala.y, escala.z)
+      for (let i = 0; i < pos.count; i++) {
+        const d = k * Math.hypot(pos.getX(i), pos.getY(i), pos.getZ(i))
+        if (d > radio) radio = d
+      }
+    })
+    const helperScale = s._pivotHelper.scale.x
+    const viewportScale = s._pivotViewportScale
+    s.setGizmoMode(null)
+    return { radio, helperScale, viewportScale, alto, altoMundo }
+  })()
+`)
+const fraccion = gizmoTamano.radio / gizmoTamano.altoMundo
+check('el gizmo se ve grande en pantalla sin salirse',
+  Math.abs(fraccion - 0.165) < 0.005,
+  `punta al ${(fraccion * 100).toFixed(1)}% del alto ` +
+  `(diametro al ${(fraccion * 200).toFixed(1)}%, alto=${gizmoTamano.alto}px)`)
+check('la calibracion conserva el tamano 1.3 con fixed false',
+  Math.abs(gizmoTamano.helperScale - gizmoTamano.viewportScale * 1.3) < 1e-6,
+  `helper=${gizmoTamano.helperScale.toFixed(4)} ` +
+  `calibracion=${gizmoTamano.viewportScale.toFixed(4)}`)
 
 // Encuadre al pulsar las tijeras: activa el corte SIN acercarse, la escena
 // entera debe seguir entrando en el encuadre y el angulo actual se conserva.
@@ -819,6 +1043,85 @@ const objectsListTest = await evaluate(`
 check('la lista de objetos lista la pieza', objectsListTest.before.name.length > 0, objectsListTest.before.name)
 check('el ojo oculta y muestra la pieza', objectsListTest.hidden.visible === false && objectsListTest.restored.visible === true)
 
+// --- Presentacion: dialogo de clase con botones -----------------------------
+const markerDialogFlow = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    const toolButton = document.querySelector('[data-action="add-marker"]')
+    if (toolButton.getAttribute('aria-pressed') !== 'true') toolButton.click()
+    const canvas = v.renderer.domElement
+    const rect = canvas.getBoundingClientRect()
+    let picked = null
+    // El centro de la caja puede caer en un hueco de la pieza: se busca el
+    // primer pixel de una rejilla central que realmente toque modelo.
+    for (const nx of [-0.4, -0.2, 0, 0.2, 0.4]) {
+      for (const ny of [-0.3, -0.15, 0, 0.15, 0.3]) {
+        const x = rect.left + (nx * 0.5 + 0.5) * rect.width
+        const y = rect.top + (-ny * 0.5 + 0.5) * rect.height
+        v.setPointer({ clientX: x, clientY: y })
+        if (v.pick()) {
+          picked = { x, y }
+          break
+        }
+      }
+      if (picked) break
+    }
+    const x = picked?.x ?? rect.left + rect.width / 2
+    const y = picked?.y ?? rect.top + rect.height / 2
+    const pickedModel = picked !== null
+    const fire = (type) => canvas.dispatchEvent(
+      new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, button: 0 }),
+    )
+    fire('pointerdown')
+    const dialog = document.getElementById('marker-dialog')
+    const buttons = [...dialog.querySelectorAll('[data-marker-kind]')]
+    const opened = {
+      visible: dialog.hidden === false,
+      picked: pickedModel,
+      kinds: buttons.map((button) => button.dataset.markerKind),
+      labels: buttons.map((button) => button.textContent.trim()),
+      defaultNote: dialog.querySelector('[data-marker-kind="note"]').getAttribute('aria-pressed'),
+    }
+    let selected = null
+    let hidden = dialog.hidden === true
+    let created = null
+    if (opened.visible) {
+      const input = document.getElementById('marker-dialog-text')
+      input.value = 'paso dialogo'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      dialog.querySelector('[data-marker-kind="screw"]').click()
+      selected = dialog.querySelector('[data-marker-kind="screw"]').getAttribute('aria-pressed')
+      dialog.querySelector('[data-marker-dialog="confirm"]').click()
+      created = v.doc.markers[v.doc.markers.length - 1]
+      hidden = dialog.hidden === true
+    }
+    fire('pointerup')
+    if (toolButton.getAttribute('aria-pressed') === 'true') toolButton.click()
+    const result = {
+      opened,
+      selected,
+      hidden,
+      toolOff: toolButton.getAttribute('aria-pressed') === 'false',
+      text: created?.text,
+      kind: created?.kind,
+    }
+    if (created) v.removeMarker(created.id)
+    return result
+  })()
+`)
+check('el dialogo de marcador ofrece las 3 clases como botones',
+  markerDialogFlow.opened.visible === true &&
+  markerDialogFlow.opened.kinds.join(',') === 'note,warning,screw' &&
+  markerDialogFlow.opened.labels.join('/') === 'Nota/Aviso/Tornillo' &&
+  markerDialogFlow.opened.defaultNote === 'true',
+  `${markerDialogFlow.opened.labels.join('/')} ` +
+  `visible=${markerDialogFlow.opened.visible} pieza=${markerDialogFlow.opened.picked}`)
+check('la clase elegida con boton se guarda en el marcador',
+  markerDialogFlow.selected === 'true' &&
+  markerDialogFlow.hidden === true && markerDialogFlow.toolOff === true &&
+  markerDialogFlow.text === 'paso dialogo' && markerDialogFlow.kind === 'screw',
+  `clase=${markerDialogFlow.kind}`)
+
 // --- Presentacion: marcadores con snapshot de vista+corte ------------------
 const markerFlow = await evaluate(`
   (() => {
@@ -1202,8 +1505,8 @@ check('sin errores en consola', mainConsoleErrors.length === 0, mainConsoleError
 check('sin excepciones sin capturar', mainPageErrors.length === 0, mainPageErrors.join(' | ') || 'ninguna')
 
 // --- Capturas del gizmo (SHOTS=1) --------------------------------------------
-// Sirven para revisar la estetica a ojo: el gizmo completo (flechas + anillos)
-// y apagado. Las deja en el directorio temporal del perfil.
+// Sirven para revisar la estetica a ojo: flechas, planos, arcos y apagado.
+// Las deja en el directorio temporal del perfil.
 if (process.env.SHOTS === '1') {
   const { writeFileSync } = await import('node:fs')
   const outDir = join(tmpdir(), 'dental-gizmo-shots')

@@ -1091,6 +1091,8 @@ this.camera.position.set(40, 30, 60)
   }
 
   _loop() {
+    // El helper PivotControls sigue al plano antes de pintar.
+    this.section?.updatePivotGizmo?.()
     // El atenuado del gizmo pide frames mientras transiciona.
     if (this.section?.updateGizmoFade?.()) this._dirty = true
     // controls.update() devuelve true mientras la camara se mueve (arrastre

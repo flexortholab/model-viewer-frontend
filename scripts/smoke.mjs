@@ -16,6 +16,10 @@ const BASE = process.argv[2] ?? 'http://localhost:4173'
 const EXTRA_QUERY = process.argv[3] ? `&${process.argv[3]}` : ''
 const URL_TEST = `${BASE}/?model=samples/disyuntor-4-pilares.stl&embed=0${EXTRA_QUERY}`
 
+// HEADED=1 abre el Chromium con ventana para poder ver la prueba con tus ojos.
+// Por defecto es headless (rápido y sin Occupying la pantalla).
+const HEADED = process.env.HEADED === '1' || process.env.HEADED === 'true'
+
 const profile = mkdtempSync(join(tmpdir(), 'dental-smoke-'))
 const userDataDir = join(profile, 'profile')
 
@@ -37,14 +41,17 @@ if (!chromium) {
 
 const port = 9222 + Math.floor(Math.random() * 500)
 const chrome = spawn(chromium, [
-  '--headless=new',
+  // En headed quitamos --headless para que haya ventana; y no forzamos
+  // SwiftShader, asi se usa la GPU real y se ven los cortes con color.
+  ...(HEADED ? [] : ['--headless=new', '--use-gl=swiftshader', '--enable-unsafe-swiftshader']),
   `--remote-debugging-port=${port}`,
   `--user-data-dir=${userDataDir}`,
+  '--no-first-run',
+  '--no-default-browser-check',
   '--no-sandbox',
   '--disable-gpu-sandbox',
-  '--use-gl=swiftshader',
-  '--enable-unsafe-swiftshader',
-  '--window-size=1280,800',
+  '--window-size=1280,860',
+  '--window-position=40,40',
   '--disable-dev-shm-usage',
   'about:blank',
 ], { stdio: 'ignore' })
@@ -229,21 +236,41 @@ check('genera el grupo de stencil (caras traseras y delanteras)', section.stenci
 check('los materiales recortan con el plano', section.planes === 1)
 check('stencil activo en el capping y en los strokes', section.capWrite === true && section.stencilWrite === true)
 
-// Gizmo tipo Meshmixer: flechas gruesas y anillos gruesos
+// Gizmo original (TransformControls) + filtro por botones Mover/Rotar.
+// Por defecto gizmoMode = null: corte activo pero gizmo oculto (escena limpia).
 const gizmo = await evaluate(`
   (() => {
     const v = window.dentalViewer
-    const handles = v.section.gizmo3d?._handles
-    return {
-      hasGizmo: !!v.section.gizmo3d,
-      translateHandles: handles ? Array.from(handles.keys()).filter(k => k.startsWith('translate-')).length : 0,
-      rotateHandles: handles ? Array.from(handles.keys()).filter(k => k.startsWith('rotate-')).length : 0,
-    }
+    const s = v.section
+    const snap = () => ({
+      mode: s.gizmoMode,
+      translate: s._helperT.visible,
+      rotate: s._helperR.visible,
+    })
+    const initial = snap()
+    // Boton Mover: solo flechas.
+    s.setGizmoMode('translate')
+    const mover = snap()
+    // Boton Rotar: solo anillos.
+    s.setGizmoMode('rotate')
+    const rotar = snap()
+    // Volver a pulsar el mismo lo apaga: escena limpia.
+    s.setGizmoMode('rotate')
+    const apagado = snap()
+    s.setGizmoMode(null)
+    return { initial, mover, rotar, apagado, hasT: !!s.transformT, hasR: !!s.transformR }
   })()
 `)
-check('gizmo plano: 3 flechas de mover y 3 anillos de rotar',
-  gizmo.hasGizmo && gizmo.translateHandles >= 3 && gizmo.rotateHandles >= 3,
-  `${gizmo.translateHandles} flechas, ${gizmo.rotateHandles} anillos`)
+check('el gizmo arranca oculto con el corte activo (gizmoMode null)',
+  gizmo.hasT && gizmo.hasR && gizmo.initial.mode === null &&
+  gizmo.initial.translate === false && gizmo.initial.rotate === false,
+  `modo=${gizmo.initial.mode}`)
+check('el boton Mover muestra solo las flechas',
+  gizmo.mover.mode === 'translate' && gizmo.mover.translate === true && gizmo.mover.rotate === false)
+check('el boton Rotar muestra solo los anillos',
+  gizmo.rotar.mode === 'rotate' && gizmo.rotar.rotate === true && gizmo.rotar.translate === false)
+check('volver a pulsar el mismo boton apaga el gizmo',
+  gizmo.apagado.mode === null && gizmo.apagado.translate === false && gizmo.apagado.rotate === false)
 
 // Encuadre al pulsar las tijeras: activa el corte SIN acercarse, la escena
 // entera debe seguir entrando en el encuadre y el angulo actual se conserva.
@@ -1001,6 +1028,14 @@ check('sin excepciones sin capturar', mainPageErrors.length === 0, mainPageError
 
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${results.length - failed.length}/${results.length} comprobaciones correctas`)
+
+// En headed damos unos segundos para que se vea el resultado final antes de
+// cerrar el navegador. PAUSE=<segundos> lo ajusta.
+if (HEADED) {
+  const pause = Number(process.env.PAUSE ?? 10) * 1000
+  console.log(`\n(headed) se cierra en ${pause / 1000}s — mira la ventana de Chrome`)
+  await sleep(pause)
+}
 
 ws.close()
 cleanup()

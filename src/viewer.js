@@ -221,7 +221,6 @@ this.camera.position.set(40, 30, 60)
     this.renderer.setSize(width, height, false)
     this.measure?.setResolution(width, height)
     this.section?.setResolution?.(width, height)
-    this.section?.gizmo3d?.setResolution(width, height)
     this.requestRender()
     this.emit('resize', { width, height })
   }

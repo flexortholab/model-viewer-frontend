@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { FlatGizmo } from './flat-gizmo.js'
+import { TransformControls } from 'three/addons/controls/TransformControls.js'
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js'
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
@@ -9,11 +9,13 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
  *
  * El plano esta anclado al MODELO (es hijo de modelRoot), no a la escena ni a
  * la camara: girar el foco no desplaza el corte; el corte es propiedad de la
- * pieza y gira con ella. Se coloca con un gizmo tipo Meshmixer (flechas y
- * anillos gruesos) con dos modos:
+ * pieza y gira con ella. Se coloca con un gizmo (TransformControls):
  *
  *   - Modo MOVER: arrastra el plano por el espacio.
  *   - Modo ROTAR: gira el plano sobre si mismo (espacio local).
+ *
+ * Los botones Mover/Rotar del panel de corte filtran cual de los dos se ve;
+ * con los dos apagados el gizmo no se dibuja (escena limpia).
  *
  * La superficie de corte se tapa con capping por stencil (caras traseras
  * incrementan el contador, delanteras lo decrementan y un quad coplanar pinta
@@ -24,6 +26,9 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
  * asi que arrastrar no reconstruye nada.
  */
 
+// Tamano del gizmo de mover/rotar del plano de corte. TransformControls usa
+// 1 por defecto, que resulta enorme sobre la pieza.
+const GIZMO_SIZE = 0.55
 
 export class SectionPlaneTool {
   /**
@@ -118,30 +123,72 @@ export class SectionPlaneTool {
     this.cutGroup.name = 'section-cut-lines'
     modelRoot.add(this.cutGroup)
     this._cutMaterials = new Set()
+    this._dragging = false
     this._linesDirty = false
     this._lastVisible = []
 
-    // Gizmo plano tipo cinta: lineas gruesas + golpes invisibles gruesos.
-    // Modo activo: 'translate', 'rotate' o null (gizmo oculto pero corte
-    // visible). Los botones de la UI actuan como interruptores.
+    // Atenuado del gizmo: a plena vista al arrastrar o al pasar el raton,
+    // casi transparente en reposo (15%). Sin raton no hay hover (tactil): se
+    // muestra al tocar/arrastrar igualmente.
+    this._fadeMats = null
+    this._fadeLevel = 1
+    this._pointerInside = false
+    renderer.domElement.addEventListener('pointerenter', () => {
+      this._pointerInside = true
+      this._frameTick?.()
+    })
+    renderer.domElement.addEventListener('pointerleave', () => {
+      this._pointerInside = false
+      this._frameTick?.()
+    })
+
+    // Dos gizmos de three sobre el mismo plano: flechas (mover) y anillos
+    // (rotar). Los botones Mover/Rotar de la UI filtran cual se ve.
+    this.transformT = new TransformControls(camera, renderer.domElement)
+    this.transformT.setMode?.('translate')
+    this.transformT.attach(this.gizmo)
+    this.transformT.setSize?.(GIZMO_SIZE)
+    this._helperT = this.transformT.getHelper ? this.transformT.getHelper() : this.transformT
+    scene.add(this._helperT)
+
+    this.transformR = new TransformControls(camera, renderer.domElement)
+    this.transformR.setMode?.('rotate')
+    this.transformR.setSpace?.('local')
+    this.transformR.attach(this.gizmo)
+    this.transformR.setSize?.(GIZMO_SIZE)
+    this._helperR = this.transformR.getHelper ? this.transformR.getHelper() : this.transformR
+    scene.add(this._helperR)
+
+    // Modo visible: 'translate', 'rotate' o null (gizmo oculto, corte visible).
+    // null = escena limpia sin gizmo ni atenuado.
     this.gizmoMode = null
     this._gizmoVisible = true
-    this.gizmo3d = new FlatGizmo(camera, renderer.domElement, this.gizmo, controls, {
-      radius: this.radius,
-      onChange: () => {
-        if (this.enabled) this.apply({ lines: false })
-        this.onChange?.()
-      },
-      onEnd: () => {
-        if (this.enabled) {
+
+    this._onGizmoChange = () => {
+      // Arrastrar recalcula el capping cada frame (barato en GPU) pero las
+      // curvas de corte se reconstruyen al SOLTAR (recorrer 1M triangulos en
+      // cada frame bloquearia el arrastre).
+      if (this.enabled) this.apply({ lines: !this._dragging })
+      if (this._dragging) this._linesDirty = true
+      this.onChange?.()
+    }
+    for (const [own, other] of [[this.transformT, this.transformR], [this.transformR, this.transformT]]) {
+      own.addEventListener('change', this._onGizmoChange)
+      own.addEventListener('dragging-changed', (event) => {
+        // Mientras se arrastra un gizmo: orbita quieta y el otro bloqueado.
+        // Al soltar solo se reactiva el helper del modo activo; el inactivo
+        // se queda oculto para que las asas no se solapen.
+        if (this.controls) this.controls.enabled = !event.value
+        const activeControl = this.gizmoMode === 'rotate' ? this.transformR : this.transformT
+        other.enabled = !event.value && other === activeControl
+        this._dragging = !!event.value
+        if (!event.value && this._linesDirty && this.enabled) {
+          this._linesDirty = false
           this._syncPlane()
           this._buildCutLines(this._lastVisible.length ? this._lastVisible : this.meshes)
         }
-        this.onChange?.()
-      },
-      tick: () => this._frameTick?.(),
-    })
-
+      })
+    }
     this.setEnabled(false)
   }
 
@@ -158,7 +205,7 @@ export class SectionPlaneTool {
 
   /**
    * Activa/desactiva un modo de gizmo como interruptor.
-   * Si se pide el modo activo, se apaga (modo null).
+   * Si se pide el modo activo, se apaga (modo null = sin gizmo).
    */
   setGizmoMode(mode) {
     if (this.gizmoMode === mode) this.gizmoMode = null
@@ -166,13 +213,17 @@ export class SectionPlaneTool {
     this._applyGizmoMode()
   }
 
+  /** Muestra solo el helper del modo activo. null = gizmo oculto. */
   _applyGizmoMode() {
-    const mode = this.gizmoMode ?? 'translate'
-    this.gizmo3d?.setMode(mode)
+    const activeT = this.gizmoMode === 'translate'
     let visible = this.enabled && this._gizmoVisible && this.gizmoMode != null
     if (this._gizmoForced === false) visible = false
     else if (this._gizmoForced === true) visible = true
-    this.gizmo3d?.setVisible(visible)
+
+    this.transformT.enabled = visible && activeT
+    this.transformR.enabled = visible && !activeT
+    this._helperT.visible = visible && activeT
+    this._helperR.visible = visible && !activeT
   }
 
   /** Muestra u oculta los gizmos sin perder la posicion del plano. */
@@ -185,6 +236,48 @@ export class SectionPlaneTool {
   setGizmoVisible(visible) {
     this._gizmoForced = visible === false || visible === true ? visible : null
     this._setGizmoVisible(this._gizmoVisible)
+  }
+
+  /**
+   * Atenua el gizmo y el visual del plano cuando el raton no esta encima.
+   * Devuelve true mientras la transicion sigue en curso (el visor le da
+   * frames hasta que se asienta). Solo opacidades: nada del pipeline cambia.
+   */
+  updateGizmoFade() {
+    if (!this._fadeMats) {
+      this._fadeMats = []
+      const collect = (root) => {
+        root.traverse((node) => {
+          const list = Array.isArray(node.material) ? node.material : [node.material]
+          for (const material of list) {
+            if (!material || this._fadeMats.some((e) => e.material === material)) continue
+            material.transparent = true
+            this._fadeMats.push({ material, base: material.opacity })
+          }
+        })
+      }
+      collect(this._helperT)
+      collect(this._helperR)
+      collect(this.planeMesh)
+      collect(this.ringMesh)
+    }
+    const hovering = this._pointerInside &&
+      (this.transformT.axis != null || this.transformR.axis != null)
+    const dragging = this.transformT.dragging || this.transformR.dragging
+    // Con el gizmo apagado no hay nada que atenuar.
+    const target = !this.enabled || this.gizmoMode == null ? 1 : (hovering || dragging ? 1 : 0.15)
+    const next = this._fadeLevel + (target - this._fadeLevel) * 0.25
+    const settled = Math.abs(next - target) < 0.01
+    this._fadeLevel = settled ? target : next
+    for (const { material, base } of this._fadeMats) {
+      // _opacity: el propio TransformControls restaura la opacidad de sus
+      // asas en cada updateMatrixWorld; hay que escribir ahi tambien o el
+      // atenuado no se ve. El resaltado del eje bajo el cursor (opacity 1)
+      // sigue funcionando porque al pasar el raton el objetivo es 1.
+      material.opacity = base * this._fadeLevel
+      if ('_opacity' in material) material._opacity = base * this._fadeLevel
+    }
+    return !settled
   }
 
   setCapColor(hex) {
@@ -531,7 +624,14 @@ export class SectionPlaneTool {
   }
 
   dispose() {
-    this.gizmo3d?.dispose?.()
+    for (const transform of [this.transformT, this.transformR]) {
+      transform.removeEventListener('change', this._onGizmoChange)
+      transform.detach()
+      transform.dispose?.()
+    }
+    for (const helper of [this._helperT, this._helperR]) {
+      if (helper.parent) helper.parent.remove(helper)
+    }
     this._teardownStencil()
     this._capGeometry.dispose()
     this.planeMesh.geometry.dispose()

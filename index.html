@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Visor de disyuntores sinterizados</title>
-    <script type="module" crossorigin src="./assets/index-CPqKksZd.js"></script>
+    <script type="module" crossorigin src="./assets/index-BBj9u24f.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-DvVdjzw6.css">
   </head>
   <body>
@@ -77,10 +77,6 @@
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.5S3.8 10.2 3.8 6.9A4.2 4.2 0 0 1 8 2.7a4.2 4.2 0 0 1 4.2 4.2c0 3.3-4.2 7.6-4.2 7.6z"/><circle cx="8" cy="6.9" r="1.5"/></svg>
                 Marcador
               </button>
-              <button type="button" data-action="clear-markers" title="Borrar todos los marcadores">
-                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.5S3.8 10.2 3.8 6.9A4.2 4.2 0 0 1 8 2.7a4.2 4.2 0 0 1 4.2 4.2c0 3.3-4.2 7.6-4.2 7.6z"/><path d="M11.5 1.5l3 3m0-3-3 3"/></svg>
-                Borrar marcadores
-              </button>
             </div>
             <div class="tb-group">
               <button type="button" data-action="export" title="Descargar anotaciones (E)">
@@ -103,13 +99,9 @@
               <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4" cy="4" r="2.2"/><circle cx="4" cy="12" r="2.2"/><path d="M5.8 5.8 14 14M5.8 10.2 14 2"/></svg>
               Activar corte
             </button>
-            <button type="button" class="wide" id="gizmo-translate" data-action="gizmo-translate" aria-pressed="false" title="Mover el plano de corte">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v11M8 2.5l3 3M8 2.5l-3 3"/><path d="M2.5 8h11M2.5 8 5.5 5M2.5 8l3 3"/></svg>
-              Mover
-            </button>
-            <button type="button" class="wide" id="gizmo-rotate" data-action="gizmo-rotate" aria-pressed="false" title="Rotar el plano de corte">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-2-4.2"/><path d="M13.5 1.5v4h-4"/></svg>
-              Rotar
+            <button type="button" class="wide" id="gizmo-toggle" data-action="gizmo-toggle" aria-pressed="false" title="Muestra u oculta el gizmo del plano: flechas en los 3 ejes para mover y anillos para rotar">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v11M8 2.5l3 3M8 2.5l-3 3"/><path d="M2.5 8h11M2.5 8 5.5 5M2.5 8l3 3"/><ellipse cx="8" cy="8" rx="6.5" ry="2.6"/></svg>
+              Gizmo
             </button>
 
             <button type="button" class="wide" data-action="section-reset" title="Coloca el plano en el centro de la pieza, perpendicular a la vista actual">

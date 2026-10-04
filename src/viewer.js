@@ -749,7 +749,7 @@ this.camera.position.set(40, 30, 60)
     return marker
   }
 
-  /** Sale del paso enfocado y limpia medidas, corte y marcadores. */
+  /** Sale del marcador enfocado y limpia medidas, corte y marcadores. */
   exitMarkerFocus() {
     this._preservingMeasures = true
     this.measure?.clear()

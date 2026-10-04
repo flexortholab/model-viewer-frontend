@@ -177,22 +177,29 @@ function renderMobileObjects() {
     const li = document.createElement('li')
     li.className = 'obj-item' + (object.visible ? '' : ' is-hidden')
 
-    const eye = document.createElement('button')
-    eye.type = 'button'
+    // Toda la fila es un unico boton grande (ojo + nombre), para acertar con
+    // el dedo: no hace falta apuntar al ojo.
+    const toggle = document.createElement('button')
+    toggle.type = 'button'
+    toggle.className = 'obj-toggle'
+    toggle.title = object.visible ? 'Ocultar' : 'Mostrar'
+    toggle.setAttribute('aria-pressed', String(object.visible))
+
+    const eye = document.createElement('span')
     eye.className = 'obj-eye' + (object.visible ? '' : ' is-off')
+    eye.setAttribute('aria-hidden', 'true')
     setIcon(eye, object.visible ? ICON_EYE : ICON_EYE_OFF)
-    eye.title = object.visible ? 'Ocultar' : 'Mostrar'
-    eye.setAttribute('aria-pressed', String(object.visible))
-    eye.addEventListener('click', () => {
-      viewer.setMeshVisible(object.index, !object.visible)
-      renderObjects()
-    })
 
     const name = document.createElement('span')
     name.className = 'obj-name'
     name.textContent = object.name
 
-    li.append(eye, name)
+    toggle.append(eye, name)
+    toggle.addEventListener('click', () => {
+      viewer.setMeshVisible(object.index, !object.visible)
+      renderObjects()
+    })
+    li.append(toggle)
     mobileObjectsList.append(li)
   })
 }
@@ -216,7 +223,7 @@ function renderMarkers() {
 
     const text = document.createElement('span')
     text.className = 'marker-text' + (marker.text ? '' : ' is-empty')
-    text.textContent = marker.text || `Paso ${index + 1}`
+    text.textContent = marker.text || `Marcador ${index + 1}`
     text.title = 'Doble clic para editar el texto'
     text.addEventListener('dblclick', (event) => {
       event.stopPropagation()
@@ -251,7 +258,7 @@ function renderMarkers() {
       if (result) {
         activeMarkerId = marker.id
         renderMarkers()
-        showHint(`Paso ${index + 1}${result.text ? `: ${result.text}` : ''}`, 3200)
+        showHint(`Marcador ${index + 1}${result.text ? `: ${result.text}` : ''}`, 3200)
       }
     })
     markersList.append(li)
@@ -275,7 +282,7 @@ function renderMobileMarkers() {
 
     const text = document.createElement('span')
     text.className = 'marker-text' + (marker.text ? '' : ' is-empty')
-    text.textContent = marker.text || `Paso ${index + 1}`
+    text.textContent = marker.text || `Marcador ${index + 1}`
 
     li.append(idx, text)
 
@@ -287,7 +294,7 @@ function renderMobileMarkers() {
         activeMarkerId = marker.id
         renderMarkers()
         closeMobileModals()
-        showHint(`Paso ${index + 1}${result.text ? `: ${result.text}` : ''}`, 3200)
+        showHint(`Marcador ${index + 1}${result.text ? `: ${result.text}` : ''}`, 3200)
       }
     })
     mobileMarkersList.append(li)
@@ -521,7 +528,7 @@ function confirmMarkerDialog() {
     return
   }
   viewer.addMarker({ position: pendingMarkerPoint, text, kind: selectedMarkerKind })
-  showHint(`Paso guardado: ${text}`)
+  showHint(`Marcador guardado: ${text}`)
   closeMarkerDialog()
   // Un marcador por pulsacion del boton, igual que las medidas.
   if (markerMode) toggleMarkerTool()
@@ -788,7 +795,7 @@ document.addEventListener('click', (event) => {
       viewer.exitMarkerFocus()
       activeMarkerId = null
       renderMarkers()
-      showHint('Vista libre: se ocultan las mediciones y el marcador del paso')
+      showHint('Vista libre: se ocultan mediciones, corte y marcadores')
       break
   }
 })
@@ -865,7 +872,7 @@ const releaseDrag = (event) => {
     const moved = start ? Math.hypot((event?.clientX ?? start.x) - start.x, (event?.clientY ?? start.y) - start.y) : 10
     const marker = viewer.releaseMarker?.()
     container.style.cursor = ''
-    // Si fue un clic corto sin mover, enfocar el paso (comportamiento de lista).
+      // Si fue un clic corto sin mover, enfocar el marcador (comportamiento de lista).
     if (marker && moved < 4) {
       activeMarkerId = marker.id
       viewer.focusMarker(marker.id)

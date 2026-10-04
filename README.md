@@ -192,7 +192,7 @@ Visualmente comparten escala y estilo con las medidas: punto pequeño, tallo de 
 
 En cámara libre se pueden arrastrar para recolocarlos sobre la superficie.
 
-Cada marcador hace de **paso de presentación**: guarda el snapshot del momento (posición y objetivo de cámara, **zoom**, plano de corte, mediciones y visibilidad de objetos) y lo restaura al pulsarlo. El zoom se guarda como `camera.zoom`, que es donde lo deja `ArcballControls` en cámara ortográfica (allá la distancia no magnifica nada), y se restaura *antes* de colocar la cámara para que el control no imponga su valor cacheado. En el JSON es opcional: los pasos guardados antes de este cambio se siguen restaurando, conservando el zoom que haya en ese momento.
+Cada marcador es un **elemento guardado de la presentación**: guarda el snapshot del momento (posición y objetivo de cámara, **zoom**, plano de corte, mediciones y visibilidad de objetos) y lo restaura al pulsarlo. El zoom se guarda como `camera.zoom`, que es donde lo deja `ArcballControls` en cámara ortográfica (allá la distancia no magnifica nada), y se restaura *antes* de colocar la cámara para que el control no imponga su valor cacheado. En el JSON es opcional: los marcadores guardados antes de este cambio se siguen restaurando, conservando el zoom que haya en ese momento.
 
 Botón **Exportar** (atajo `E`) descarga `<modelo>.annotations.json`. Los documentos se validan y normalizan al cargar: mediciones sin `a`/`b` válidos se descartan, ids duplicados se renumeran, `kind` desconocido cae a `note`.
 
@@ -231,7 +231,7 @@ Seguridad: solo se aceptan mensajes de `window.parent`/`window` y con origen en 
 **Columna derecha**:
 
 - **Objetos** (248 px, plegable): lista de piezas con ojo visible/oculto y tijera para centrar el corte.
-- **Presentación** (248 px, plegable): pasos de la presentación con vista libre.
+- **Presentación** (248 px, plegable): marcadores de la presentación con vista libre.
 
 | Atajo | Acción |
 |---|---|
@@ -395,8 +395,8 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 
 **Sesión del 02/10/2026 (tarde; smoke 81/81):**
 
-1. **UI móvil para doctores**: toolbar inferior con **Inicio**, **Objetos** y **Presentación**; `Inicio` limpia la vista (mediciones, marcadores, corte, paso activo) y reencuadra.
-2. **Presentación por pasos**: cada marcador guarda y restaura su vista, corte, mediciones, visibilidad de objetos y visibilidad de su propio marcador; al salir del paso se oculta todo.
+1. **UI móvil para doctores**: toolbar inferior con **Inicio**, **Objetos** y **Presentación**; `Inicio` limpia la vista (mediciones, marcadores, corte, marcador activo) y reencuadra. Los tres botones superiores y el título son flotantes (sin panel) en gris oscuro. En la lista de objetos cada fila es un único botón grande (ojo + nombre) con una leyenda que explica el gesto.
+2. **Presentación por marcadores**: cada marcador guarda y restaura su vista, corte, mediciones, visibilidad de objetos y visibilidad de su propio marcador; al salir del marcador se oculta todo.
 3. **Gizmo de corte oculto en móvil**: se fuerza a invisible e inutilizable en pantallas táctiles.
 4. **Modales móviles más legibles**: tipografía, botones y aspa de cierre agrandados.
 5. **Modelo decimado `Test1.glb`**: copiado a `public/samples/Test1.glb` (~5 MB, ~415 k triángulos, menos del 40 % de B1); `Iniciar-Visor.bat` ahora abre `Test1.glb`; el smoke lo carga y verifica que no supere 500 k triángulos.
@@ -409,7 +409,7 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 12. **Curva de corte con profundidad**: el perímetro del corte pasa a `depthTest: true`, así que la geometría sólida por delante lo tapa y las piezas se leen macizas en vez de transparentar las líneas del corte.
 13. **Cotas sobre la cara cortada**: `pickCap()` permite medir directamente en la superficie del corte (el capping por stencil no es malla, así que el rayo se resuelve contra el plano y se valida el punto). `pick()` elige el punto más cercano, de modo que la cara cortada prevalece sobre la pared del fondo. `isPointVisible()` admite una tolerancia mínima para que las etiquetas de esas cotas no se oculten por estar en el plano.
 14. **Fuera el botón "Borrar marcadores"** del panel Herramientas (redundante: se borran con `Supr` sobre el marcador).
-15. **Los pasos de presentación guardan el zoom**: `marker.view.zoom` (`camera.zoom`) se guarda al crear el marcador y se restaura al pulsarlo, antes de colocar la cámara. Opcional en el JSON, compatible con los pasos ya guardados.
+15. **Los marcadores guardan el zoom**: `marker.view.zoom` (`camera.zoom`) se guarda al crear el marcador y se restaura al pulsarlo, antes de colocar la cámara. Opcional en el JSON, compatible con los marcadores ya guardados.
 16. **Disco del plano oculto**: al activar el corte no aparece la superficie gris del plano; solo se conserva su anillo de borde junto con el capping, las curvas y el gizmo.
 17. **Clase de marcador con botones**: el diálogo de nuevo marcador sustituye los prompts por cuadro de texto con foco directo y tres botones seleccionables (**Nota**, **Aviso** y **Tornillo**), con **Nota** por defecto y confirmación/cancelación explícitas. El texto es obligatorio: en vacío no crea el marcador y avisa en el propio diálogo.
 18. **Globos siempre visibles y selección azul**: los globos de medidas y marcadores ya no se ocultan tras el modelo ni tras el corte; el botón de clase elegido lleva contorno azul.

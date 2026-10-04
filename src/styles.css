@@ -522,9 +522,9 @@ button.obj-cut:hover {
   justify-content: center;
   font-size: 11px;
   font-weight: 600;
-  color: #78350f;
-  background: #ffe6ac;
-  border: 1px solid rgba(180, 120, 20, 0.35);
+  color: #166534;
+  background: #d9f2e3;
+  border: 1px solid rgba(34, 197, 94, 0.45);
 }
 
 .marker-item[data-kind='warning'] .marker-idx {
@@ -534,9 +534,9 @@ button.obj-cut:hover {
 }
 
 .marker-item[data-kind='screw'] .marker-idx {
-  color: var(--accent-ink);
-  background: #d9f1f7;
-  border-color: rgba(27, 138, 163, 0.45);
+  color: #6b21a8;
+  background: #e9d5ff;
+  border-color: rgba(168, 85, 247, 0.45);
 }
 
 .marker-item .marker-text {
@@ -925,15 +925,14 @@ button[data-marker-kind='screw'] .kind-dot {
 
   .mobile-title {
     padding: 8px 10px;
-    border-radius: var(--radius);
-    background: var(--panel);
+    border-radius: 8px;
+    background: #fff;
     border: 1px solid var(--border);
-    backdrop-filter: blur(8px);
     font-size: 13px;
     font-weight: 700;
-    color: var(--brand-ink);
+    color: var(--muted);
     text-align: center;
-    box-shadow: 0 1px 8px rgba(20, 22, 26, 0.08);
+    box-shadow: 0 2px 10px rgba(20, 22, 26, 0.14);
   }
 
   .mobile-title:empty {
@@ -944,12 +943,11 @@ button[data-marker-kind='screw'] .kind-dot {
     display: flex;
     justify-content: space-between;
     gap: 8px;
-    padding: 8px;
-    border-radius: var(--radius);
-    background: var(--panel);
-    border: 1px solid var(--border);
-    backdrop-filter: blur(8px);
-    box-shadow: 0 1px 8px rgba(20, 22, 26, 0.08);
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
   }
 
   .mobile-toolbar button {
@@ -963,10 +961,12 @@ button[data-marker-kind='screw'] .kind-dot {
     font-size: 14px;
     font-weight: 600;
     line-height: 1.2;
+    color: var(--muted);
     border: 1px solid var(--border);
     background: #fff;
     border-radius: 8px;
     white-space: normal;
+    box-shadow: 0 2px 10px rgba(20, 22, 26, 0.14);
   }
 
   .mobile-toolbar button svg {
@@ -1054,6 +1054,51 @@ button[data-marker-kind='screw'] .kind-dot {
   .mobile-modal-body .marker-item {
     font-size: 15px;
     padding: 8px 10px;
+  }
+
+  /* En el movil cada fila de pieza es un unico boton grande: ojo + nombre. */
+  .mobile-modal-body .obj-list .obj-item {
+    padding: 0;
+  }
+
+  .mobile-modal-body .obj-toggle {
+    width: 100%;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    font-size: 15px;
+    text-align: left;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .mobile-modal-body .obj-toggle .obj-eye {
+    font-size: 15px;
+  }
+
+  .mobile-modal-body .obj-toggle .obj-eye svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .mobile-modal-body .obj-toggle .obj-eye.is-off {
+    color: var(--muted);
+  }
+
+  .mobile-modal-body .obj-item.is-hidden .obj-toggle {
+    background: transparent;
+  }
+
+  .mobile-modal-body .obj-toggle[aria-pressed='true'] {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+
+  .mobile-modal-body .panel-note {
+    margin: 0 0 8px;
   }
 
   .mobile-modal-body .obj-eye,

@@ -1043,6 +1043,99 @@ const objectsListTest = await evaluate(`
 check('la lista de objetos lista la pieza', objectsListTest.before.name.length > 0, objectsListTest.before.name)
 check('el ojo oculta y muestra la pieza', objectsListTest.hidden.visible === false && objectsListTest.restored.visible === true)
 
+// --- Movil: filas de objetos como boton unico + leyenda -------------------
+const mobileObjectsFlow = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    const rows = [...document.querySelectorAll('#mobile-objects-list .obj-item')]
+    const toggles = [...document.querySelectorAll('#mobile-objects-list .obj-toggle')]
+    const first = toggles[0]
+    const ojo = first?.querySelector('.obj-eye')
+    const nombre = first?.querySelector('.obj-name')
+    const antes = v.listObjects()[0]?.visible
+    first?.click()
+    const despues = v.listObjects()[0]?.visible
+    // El clic re-renderiza la lista: hay que releer el boton antes de pulsar.
+    const releido = document.querySelector('#mobile-objects-list .obj-toggle')
+    releido?.click()
+    const restaurado = v.listObjects()[0]?.visible
+    const leyenda = document.querySelector('#mobile-objects .panel-note')?.textContent.trim() ?? ''
+    return {
+      filas: rows.length,
+      botones: toggles.length,
+      compuesto: !!ojo && !!nombre,
+      antes,
+      despues,
+      restaurado,
+      leyenda,
+    }
+  })()
+`)
+check('cada fila movil es un unico boton ojo+nombre',
+  mobileObjectsFlow.filas > 0 &&
+  mobileObjectsFlow.botones === mobileObjectsFlow.filas &&
+  mobileObjectsFlow.compuesto === true,
+  `${mobileObjectsFlow.botones}/${mobileObjectsFlow.filas} botones`)
+check('el boton de fila conmuta la pieza',
+  mobileObjectsFlow.antes === true && mobileObjectsFlow.despues === false &&
+  mobileObjectsFlow.restaurado === true,
+  `visible=${mobileObjectsFlow.antes}->${mobileObjectsFlow.despues}->${mobileObjectsFlow.restaurado}`)
+check('la leyenda explica el gesto',
+  mobileObjectsFlow.leyenda === 'Toca un objeto para mostrarlo u ocultarlo.',
+  mobileObjectsFlow.leyenda)
+
+// Vista movil real (390 px de ancho): la media query aplica y se verifica el
+// CSS movil con el viewport emulado; despues se restaura el escritorio.
+await send('Emulation.setDeviceMetricsOverride', {
+  width: 390, height: 844, deviceScaleFactor: 2, mobile: true,
+}, sessionId)
+await sleep(500)
+const movilCss = await evaluate(`
+  (() => {
+    // La leyenda vive en el modal: hay que abrirlo para medir visibilidad.
+    document.querySelector('#mobile-toolbar [data-mobile="objects"]').click()
+    const barra = document.querySelector('#mobile-toolbar')
+    const barraCss = getComputedStyle(barra)
+    const botonBarra = barra.querySelector('button')
+    const botonBarraCss = botonBarra ? getComputedStyle(botonBarra) : null
+    const titulo = document.getElementById('mobile-title')
+    const tituloCss = titulo ? getComputedStyle(titulo) : null
+    const boton = document.querySelector('#mobile-objects-list .obj-toggle')
+    const botonCss = boton ? getComputedStyle(boton) : null
+    const leyenda = document.querySelector('#mobile-objects .panel-note')
+    const salida = {
+      barraVisible: barra.offsetParent !== null,
+      barraFondo: barraCss.backgroundColor,
+      barraBorde: barraCss.borderTopWidth,
+      barraSombra: barraCss.boxShadow,
+      botonSombra: botonBarraCss ? botonBarraCss.boxShadow : null,
+      botonTexto: botonBarraCss ? botonBarraCss.color : null,
+      tituloFondo: tituloCss ? tituloCss.backgroundColor : null,
+      tituloSombra: tituloCss ? tituloCss.boxShadow : null,
+      tituloTexto: tituloCss ? tituloCss.color : null,
+      alturaMinima: botonCss ? botonCss.minHeight : null,
+      leyendaVisible: leyenda && leyenda.offsetParent !== null,
+    }
+    document.querySelector('#mobile-objects .mobile-close').click()
+    return salida
+  })()
+`)
+check('sin panel: la barra movil es transparente y sin borde',
+  movilCss.barraVisible === true &&
+  movilCss.barraFondo === 'rgba(0, 0, 0, 0)' &&
+  movilCss.barraBorde === '0px' && movilCss.barraSombra === 'none',
+  `fondo=${movilCss.barraFondo} borde=${movilCss.barraBorde} sombra=${movilCss.barraSombra}`)
+check('botones y titulo flotantes en gris, y fila tactil (>=44px) en movil',
+  movilCss.botonSombra !== null && movilCss.botonSombra !== 'none' &&
+  movilCss.botonTexto === 'rgb(90, 96, 104)' &&
+  movilCss.tituloFondo === 'rgb(255, 255, 255)' &&
+  movilCss.tituloSombra === movilCss.botonSombra &&
+  movilCss.tituloTexto === 'rgb(90, 96, 104)' &&
+  movilCss.alturaMinima === '44px' && movilCss.leyendaVisible === true,
+  `texto=${movilCss.botonTexto} sombra=${movilCss.botonSombra} titulo=${movilCss.tituloFondo}/${movilCss.tituloTexto} min-height=${movilCss.alturaMinima}`)
+await send('Emulation.clearDeviceMetricsOverride', {}, sessionId)
+await sleep(300)
+
 // --- Presentacion: dialogo de clase con botones -----------------------------
 const markerDialogFlow = await evaluate(`
   (async () => {
@@ -1101,7 +1194,7 @@ const markerDialogFlow = await evaluate(`
         sigueAbierto: dialog.hidden === false,
         errorVisible: document.getElementById('marker-dialog-error').hidden === false,
       }
-      input.value = 'paso dialogo'
+      input.value = 'marcador dialogo'
       input.dispatchEvent(new Event('input', { bubbles: true }))
       dialog.querySelector('[data-marker-kind="screw"]').click()
       selected = dialog.querySelector('[data-marker-kind="screw"]').getAttribute('aria-pressed')
@@ -1153,12 +1246,36 @@ check('el texto es obligatorio: en vacio no crea marcador y avisa',
 check('la clase elegida con boton se guarda en el marcador',
   markerDialogFlow.selected === 'true' &&
   markerDialogFlow.hidden === true && markerDialogFlow.toolOff === true &&
-  markerDialogFlow.text === 'paso dialogo' && markerDialogFlow.kind === 'screw',
+  markerDialogFlow.text === 'marcador dialogo' && markerDialogFlow.kind === 'screw',
   `clase=${markerDialogFlow.kind}`)
 check('la clase seleccionada se contornea en azul',
   markerDialogFlow.selectedOutline?.border === 'rgb(37, 99, 235)' &&
   (markerDialogFlow.selectedOutline?.shadow ?? '').includes('rgba(37, 99, 235, 0.35)'),
   `borde=${markerDialogFlow.selectedOutline?.border}`)
+
+// Coherencia: el numero de cada marcador lleva el color de su clase.
+const markerColores = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    const ids = [
+      v.addMarker({ position: [0, 0, 0], text: 'a', kind: 'note', snapshot: false }),
+      v.addMarker({ position: [0, 0, 0], text: 'b', kind: 'warning', snapshot: false }),
+      v.addMarker({ position: [0, 0, 0], text: 'c', kind: 'screw', snapshot: false }),
+    ].map((m) => m.id)
+    const lee = (kind) => {
+      const el = document.querySelector('#markers-list .marker-item[data-kind="' + kind + '"] .marker-idx')
+      return el ? getComputedStyle(el).backgroundColor : null
+    }
+    const colores = { note: lee('note'), warning: lee('warning'), screw: lee('screw') }
+    for (const id of ids) v.removeMarker(id)
+    return colores
+  })()
+`)
+check('el numero del marcador lleva el color de su clase',
+  markerColores.note === 'rgb(217, 242, 227)' &&
+  markerColores.warning === 'rgb(255, 212, 205)' &&
+  markerColores.screw === 'rgb(233, 213, 255)',
+  `note=${markerColores.note} warning=${markerColores.warning} screw=${markerColores.screw}`)
 
 // --- Presentacion: marcadores con snapshot de vista+corte ------------------
 const markerFlow = await evaluate(`
@@ -1174,7 +1291,7 @@ const markerFlow = await evaluate(`
     // Zoom del paso: en ortografica es camera.zoom (la distancia no magnifica).
     v.camera.zoom = 2.5
     v.camera.updateProjectionMatrix()
-    const marker = v.addMarker({ position: [2, 0, 0], text: 'paso test', kind: 'warning' })
+    const marker = v.addMarker({ position: [2, 0, 0], text: 'marcador test', kind: 'warning' })
     const saved = {
       hasView: !!marker.view,
       hasSection: !!marker.section,

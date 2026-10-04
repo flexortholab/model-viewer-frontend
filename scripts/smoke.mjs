@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Prueba de humo en un navegador real (headless Chromium).
  *

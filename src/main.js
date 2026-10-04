@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import * as THREE from 'three'
 import { DentalViewer } from './viewer.js'
 import { createBridge } from './bridge.js'
 import { download, suggestedFilename, createDocument } from './annotations.js'
 import { formatMm } from './units.js'
+import { BRAND, applyBrand } from './brand.js'
+
+applyBrand()
 
 const _cuboQ = new THREE.Quaternion()
 const _cuboM = new THREE.Matrix4()
@@ -346,11 +350,11 @@ viewer.on('loaded', (info) => {
   const base = String(info.name ?? '').split('/').pop().split('?')[0].split('#')[0]
   const title = base.includes('.') ? base.slice(0, base.lastIndexOf('.')) : base
   if (docTitle) {
-    docTitle.textContent = title || 'Visor dental'
+    docTitle.textContent = title || BRAND.name
     docTitle.hidden = false
   }
   if (mobileTitle) {
-    mobileTitle.textContent = title || 'Visor dental'
+    mobileTitle.textContent = title || BRAND.name
   }
   if (loader) loader.hidden = true
   const { x, y, z } = info.sizeMm

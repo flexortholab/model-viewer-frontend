@@ -74,7 +74,8 @@ Estado del plan: **implementado en su totalidad**; la interfaz se ha pulido en l
 - [x] Deploy estático (Cloudflare Pages / Vercel; `base './'` ya soporta subcarpeta)
 - [ ] Manifiesto con casos para el enlace directo al doctor
 - [x] CI: `npm test` + build + smoke en cada PR
-- [x] LICENSE
+- [x] LICENSE (GPL-3.0-or-later desde 2026-10-04; antes MIT)
+- [x] Marca centralizada en `src/brand.js` para que otro laboratorio lo adapte
 - [ ] (Si acaso) i18n — todo el texto está en español
 
 Fuera de alcance por decisión: comentarios en línea/login (requeriría backend), edición del

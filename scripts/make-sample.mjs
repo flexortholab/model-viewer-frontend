@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Genera una pieza de prueba: un disyuntor sinterizado tipo barra de Tornillo
  * sobre cuatro pilares, con una geometria sencilla pero cerrada (watertight)

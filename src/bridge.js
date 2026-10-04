@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Puente postMessage para embeber el visor en un webclip.
  *

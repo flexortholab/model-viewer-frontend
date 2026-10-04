@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Deteccion y normalizacion de unidades a milimetros.
  *

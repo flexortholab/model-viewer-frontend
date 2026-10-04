@@ -3,11 +3,14 @@
 Visor web 3D tipo Autodesk Viewer para compartir diseños dentales con clientes y doctores.
 Pensado para **disyuntores sinterizados con anclaje esquelético** diseñados en Blender, pero acepta cualquier modelo 3D estático.
 
+Software libre con licencia **GPL-3.0-or-later** (ver `LICENSE`): puedes usarlo, modificarlo y compartirlo, y quien lo reciba tiene los mismos derechos.
+
 - unidades en **milímetros** con detección automática
 - **corte seccional** con plano único y gizmo PivotControls (mover+rotar, sin escala), capping sólido por pieza (stencil buffer) con anillo de contorno
--  estilo plano de taller con etiquetas proyectadas
+- estilo plano de taller con etiquetas proyectadas
 - **anotaciones** exportables como sidecar JSON
 - embebible en un **webclip / iframe** vía `postMessage`, o por enlace directo
+- marca personalizable en un solo fichero (`src/brand.js`): nombre, logo y color de acento
 
 Estado actual: **v0.3.7** funcional (cámara **ortográfica** — sin perspectiva ni "ojo de pez"—, plano de corte único con gizmo PivotControls de flechas, planos y arcos de rotación a la vez, con un solo botón, capping por pieza con curva de corte exacta por objeto, lista de objetos con iconos propios y corte por pieza, presentación con marcadores editables, medidas compactas de una en una en mm con 1 decimal con globos HTML fijos en pantalla, selección y nota de medidas, cubo de vistas clicable en la esquina con las caras bien orientadas, **giro libre sin topes** — ArcballControls, se puede pasar de largo por superior e inferior—, paneles separados Vistas (en cruz), Herramientas, Corte seccional, Objetos y Presentación con estética unificada, logo oficial del laboratorio con su teal y gris de marca, título del caso sin marco, render bajo demanda). Ver [docs/PLAN.md](docs/PLAN.md) para el plan original y la hoja de ruta. Casos reales verificados: `B1.glb` (8 piezas, mm auto 0.99), `Final1.glb` (7 piezas, mm auto 0.99) y escena FBX (misma que Final1 pero en cm: usar `?units=cm`).
 
@@ -86,13 +89,26 @@ npm run preview    # sirve dist/ en http://localhost:4173
 | `npm run build` | Build de producción en `dist/` |
 | `npm run preview` | Sirve `dist/` en el puerto 4173 |
 | `npm run sample` | Genera las STL de muestra en `public/samples/` |
-| `npm test` | Tests unitarios (runner nativo de Node, 15 tests) |
+| `npm test` | Tests unitarios (runner nativo de Node, 28 tests) |
 | `node scripts/smoke.mjs` | Smoke test headless con Chromium (ver más abajo) |
+
+## Personalizar la marca
+
+Toda la marca vive en **`src/brand.js`** (objeto `BRAND`): no hay que perseguir colores por el CSS.
+
+| Quiero cambiar… | Hago esto |
+|---|---|
+| Nombre corto / título de la pestaña | `name` y `title` en `BRAND` |
+| Logo de la esquina | Sustituir `public/logo.svg` (o apuntar `logo` a otro fichero) y ajustar `logoAlt` |
+| Color de acento (botones, iconos, resaltados, cursor) | Cambiar solo `accent` (p. ej. `'#7c3aed'`): los tonos `accentSoft`, `accentStrong` y `accentInk` se recalculan solos |
+| Tonos exactos a mano | Fijar `accentSoft`, `accentStrong` y/o `accentInk` en `BRAND` (tienen prioridad sobre el cálculo) |
+
+`applyBrand()` se llama al arrancar (`src/main.js`) y escribe las variables `--accent*` en `:root`, el `<title>`, el logo y el cursor de medición. Los valores por defecto de `src/styles.css` quedan como respaldo. Nota: el logo original es marca del laboratorio — si reutilizas el visor, sustitúyelo por el tuyo.
 
 ## Tests
 
-- **Unitarios** (`test/units.test.js`): detección de unidades, formato `formatMm`, y validación del formato de anotaciones. `npm test`.
-- **Smoke test** (`scripts/smoke.mjs`): prueba end-to-end headless. Requiere `npm run preview` corriendo en el 4173 y Chromium instalado (`CHROME_PATH` para una ruta no estándar). Carga la muestra STL y el GLB decimado `Test1.glb` en un Chromium headless (SwiftShader, sin GPU) y valida carga, unidades, corte con stencil, mediciones, round-trip de anotaciones, estabilidad de la escena y que el modelo decimado tiene menos de 500 k triángulos. En entornos donde el headless no compone pixeles al canvas, los checks visuales del capping se omiten con aviso. Ultimo resultado: **81/81**.
+- **Unitarios** (`test/`): detección de unidades, formato `formatMm`, validación del formato de anotaciones, geometría de corte y configuración del gizmo. `npm test` (28 tests).
+- **Smoke test** (`scripts/smoke.mjs`): prueba end-to-end headless. Requiere `npm run preview` corriendo en el 4173 y Chromium instalado (`CHROME_PATH` para una ruta no estándar). Carga la muestra STL y el GLB decimado `Test1.glb` en un Chromium headless (SwiftShader, sin GPU) y valida carga, unidades, corte con stencil, mediciones, round-trip de anotaciones, estabilidad de la escena y que el modelo decimado tiene menos de 500 k triángulos. En entornos donde el headless no compone pixeles al canvas, los checks visuales del capping se omiten con aviso. Ultimo resultado: **115/115**.
 
 ---
 
@@ -254,6 +270,7 @@ En pantallas ≤ 640 px los paneles bajan a la parte inferior. Todo el texto est
 ```
 index.html
 └─ src/main.js            arranque, UI, params URL, acciones del host
+   ├─ src/brand.js        marca en un solo sitio (nombre, logo, acento)
    ├─ src/viewer.js       clase DentalViewer: escena, cámara, render loop, herramientas
    │  ├─ src/loaders.js   carga por formato, Draco/KTX2/Meshopt, normalización, materiales
    │  │  └─ src/units.js  heurística de unidades (puro, sin three)
@@ -290,7 +307,7 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 5. Botones **Lingual** e **Isometrica** en la toolbar (ya existian en `setView`).
 6. Aviso en pantalla cuando un corte cae fuera de la geometria (`planeIntersectsBounds` cableado en el evento `section`).
 7. `npm test` arreglado para Windows: `node --test test/*.test.js` (el comodin no resuelve la carpeta en Node 22).
-8. CI con GitHub Actions (tests + build + smoke en cada push/PR) y LICENSE MIT.
+8. CI con GitHub Actions (tests + build + smoke en cada push/PR) y LICENSE GPL-3.0.
 
 **Sesión del 30/09–01/10/2026 (smoke 42/42, unitarios 18/18):**
 
@@ -417,6 +434,7 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 18. **Globos siempre visibles y selección azul**: los globos de medidas y marcadores ya no se ocultan tras el modelo ni tras el corte; el botón de clase elegido lleva contorno azul.
 19. **Cotas cercanas en lados opuestos**: al dibujar una cota, si su línea quedaría a menos de 64 px de otra ya dibujada, se coloca al lado contrario; la primera manda y el criterio se reevalúa al mover la cámara.
 20. **Giros de 90° relativos al gizmo**: **Girar** y **Rotar** rotan sobre los ejes propios del plano (X e Y locales), no sobre los de la vista; valen igual tras Alinear, las tijeras o el gizmo, y nunca son un no-op.
+21. **Software libre (GPL-3.0-or-later)**: `LICENSE` con el texto completo, campo `license` en `package.json` y cabeceras SPDX en todas las fuentes. Marca centralizada en `src/brand.js` (nombre, logo, acento con tonos derivados) para que otro laboratorio lo adapte en un solo sitio.
 
 **Pendiente:**
 
@@ -424,6 +442,14 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 2. Sin backend ni despliegue productivo: la demo es estatica (Pages).
 
 Nota sobre el smoke: en un Chromium headless con SwiftShader los triángulos se emiten (sin errores GL) pero los pixeles no llegan al canvas compuesto; por eso los checks visuales del capping se basan en conteo de pixeles y se omiten si el entorno no rasteriza.
+
+## Licencia
+
+**GPL-3.0-or-later** (texto completo en `LICENSE`). En la práctica:
+
+- Puedes usar, modificar y compartir el visor libremente, también con fines comerciales.
+- Si lo distribuyes (modificado o no), debes hacerlo bajo la misma licencia, mantener los avisos de copyright e incluir una copia de la licencia y el código fuente.
+- Sin garantía de ningún tipo.
 
 ## Próximos pasos
 

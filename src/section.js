@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import * as THREE from 'three'
 import { PivotControls } from 'three-pivot-controls'
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js'

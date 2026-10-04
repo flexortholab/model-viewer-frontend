@@ -25,6 +25,7 @@ const loaderText = document.getElementById('loader-text')
 const markerDialog = document.getElementById('marker-dialog')
 const markerDialogText = document.getElementById('marker-dialog-text')
 const markerKindButtons = [...document.querySelectorAll('[data-marker-kind]')]
+const markerDialogError = document.getElementById('marker-dialog-error')
 
 const mobileUi = document.getElementById('mobile-ui')
 const mobileToolbar = document.getElementById('mobile-toolbar')
@@ -470,12 +471,37 @@ function setSelectedMarkerKind(kind) {
   }
 }
 
+function clearMarkerDialogError() {
+  if (!markerDialogError) return
+  markerDialogError.hidden = true
+  markerDialogText?.classList.remove('is-invalid')
+}
+
+function showMarkerDialogError() {
+  if (markerDialogError) markerDialogError.hidden = false
+  markerDialogText?.classList.add('is-invalid')
+  focusMarkerDialogText()
+}
+
+function focusMarkerDialogText() {
+  // El foco se pide dos veces: en el propio gesto y en el siguiente frame.
+  // Con raton real la accion por defecto del pointerdown mueve el foco tras
+  // los handlers, y sin el segundo intento habria que pinchar en el cuadro.
+  markerDialogText?.focus({ preventScroll: true })
+  requestAnimationFrame(() => {
+    if (!markerDialog.hidden && markerDialog.contains(document.activeElement) === false) {
+      markerDialogText?.focus({ preventScroll: true })
+    }
+  })
+}
+
 function openMarkerDialog(point) {
   pendingMarkerPoint = point
   if (markerDialogText) markerDialogText.value = ''
+  clearMarkerDialogError()
   setSelectedMarkerKind('note')
   markerDialog.hidden = false
-  markerDialogText?.focus()
+  focusMarkerDialogText()
 }
 
 function closeMarkerDialog() {
@@ -489,8 +515,13 @@ function confirmMarkerDialog() {
     return
   }
   const text = (markerDialogText?.value ?? '').trim()
+  if (!text) {
+    // El texto es obligatorio: no se crea el marcador y se mantiene el dialogo.
+    showMarkerDialogError()
+    return
+  }
   viewer.addMarker({ position: pendingMarkerPoint, text, kind: selectedMarkerKind })
-  showHint('Paso guardado' + (text ? `: ${text}` : ''))
+  showHint(`Paso guardado: ${text}`)
   closeMarkerDialog()
   // Un marcador por pulsacion del boton, igual que las medidas.
   if (markerMode) toggleMarkerTool()
@@ -512,6 +543,7 @@ markerDialog?.addEventListener('keydown', (event) => {
     closeMarkerDialog()
   }
 })
+markerDialogText?.addEventListener('input', clearMarkerDialogError)
 markerDialogText?.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     event.preventDefault()
@@ -546,6 +578,9 @@ function addMarkerAt(event) {
     showHint('No hay pieza bajo el cursor', 1500)
     return
   }
+  // Sin esto el navegador mueve el foco tras el handler y el cuadro de texto
+  // no recibe lo que se escribe nada mas abrir el dialogo.
+  event.preventDefault()
   openMarkerDialog(hit.point.toArray())
 }
 

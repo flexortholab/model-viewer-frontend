@@ -389,7 +389,7 @@ export class MeasureTool {
     return true
   }
 
-  /** Oculta lo que el corte o la camara dejan fuera. Sprites + overlays HTML. */
+  /** Los globos siempre se ven, aunque el punto quede tras el modelo o el corte. Sprites + overlays HTML. */
   update() {
     // Si la camara giro o hizo zoom, la cota hay que reconstruirla porque el
     // offset se calcula en el plano de la vista.
@@ -401,10 +401,9 @@ export class MeasureTool {
     if (!this.labels.length) return
     for (const entry of this.labels) {
       const mid = entry.position
-      const visible = !this.section || this.section.isPointVisible(mid)
       this._tmp.copy(mid).project(this.camera)
       const offscreen = this._tmp.z > 1
-      const shown = visible && !offscreen
+      const shown = !offscreen
 
       if (entry.el) {
         entry.el.style.display = shown ? '' : 'none'
@@ -526,7 +525,7 @@ export class MeasureTool {
     }
     const text = formatMm(a.distanceTo(point))
     const mid = new THREE.Vector3().addVectors(a, point).multiplyScalar(0.5)
-    const shown = (!this.section || this.section.isPointVisible(mid)) && this._inFront(mid)
+    const shown = this._inFront(mid)
     if (!this._preview.chip) {
       const el = document.createElement('div')
       el.className = 'measure-label'

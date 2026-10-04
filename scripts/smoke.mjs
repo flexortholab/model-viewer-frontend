@@ -906,7 +906,7 @@ check('arrastrar el extremo cambia la distancia', edicion.movido > 0.01, edicion
 check('la camara no se mueve al editar la medida', edicion.camaraIgual === true)
 check('al soltar se reactiva la camara', edicion.soltado === true)
 
-// Las etiquetas se ocultan cuando el corte elimina la pieza.
+// Los globos se ven aunque el corte elimine la pieza.
 // La pieza va de y = -3.6 a y = +3.6: un plano en y = 40 no deja nada visible.
 const hidden = await evaluate(`
   (() => {
@@ -932,8 +932,8 @@ const hidden = await evaluate(`
     return { visible, visibleAfter }
   })()
 `)
-check('las etiquetas se ocultan con la pieza recortada', hidden.visible === 0)
-check('vuelven a verse al retirar el corte', hidden.visibleAfter === 1)
+check('los globos se ven con la pieza recortada', hidden.visible === 1)
+check('siguen viendose al retirar el corte', hidden.visibleAfter === 1)
 
 // Edicion de medidas: seleccionar, nota y Supr (sin prompt, apto headless).
 // OJO: este bloque deja cero medidas; lo que venga despues no debe contarlas.
@@ -1045,7 +1045,7 @@ check('el ojo oculta y muestra la pieza', objectsListTest.hidden.visible === fal
 
 // --- Presentacion: dialogo de clase con botones -----------------------------
 const markerDialogFlow = await evaluate(`
-  (() => {
+  (async () => {
     const v = window.dentalViewer
     const toolButton = document.querySelector('[data-action="add-marker"]')
     if (toolButton.getAttribute('aria-pressed') !== 'true') toolButton.click()
@@ -1083,14 +1083,39 @@ const markerDialogFlow = await evaluate(`
       defaultNote: dialog.querySelector('[data-marker-kind="note"]').getAttribute('aria-pressed'),
     }
     let selected = null
+    let selectedOutline = null
     let hidden = dialog.hidden === true
     let created = null
+    let focoTexto = false
+    let textoObligatorio = null
     if (opened.visible) {
       const input = document.getElementById('marker-dialog-text')
+      // El cuadro recibe el foco solo: se puede escribir nada mas abrir.
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+      focoTexto = document.activeElement === input
+      // El texto es obligatorio: confirmar en vacio no crea nada y avisa.
+      const antes = v.doc.markers.length
+      dialog.querySelector('[data-marker-dialog="confirm"]').click()
+      textoObligatorio = {
+        creados: v.doc.markers.length - antes,
+        sigueAbierto: dialog.hidden === false,
+        errorVisible: document.getElementById('marker-dialog-error').hidden === false,
+      }
       input.value = 'paso dialogo'
       input.dispatchEvent(new Event('input', { bubbles: true }))
       dialog.querySelector('[data-marker-kind="screw"]').click()
       selected = dialog.querySelector('[data-marker-kind="screw"]').getAttribute('aria-pressed')
+      // El estilo se resuelve en el siguiente pintado y el borde lleva una
+      // transicion de 120 ms: se ceden frames y se espera a que asiente, igual
+      // que lo veria el doctor.
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+      await new Promise((r) => setTimeout(r, 250))
+      const screwButton = dialog.querySelector('[data-marker-kind="screw"]')
+      const selectedStyle = getComputedStyle(screwButton)
+      selectedOutline = {
+        border: selectedStyle.borderColor,
+        shadow: selectedStyle.boxShadow,
+      }
       dialog.querySelector('[data-marker-dialog="confirm"]').click()
       created = v.doc.markers[v.doc.markers.length - 1]
       hidden = dialog.hidden === true
@@ -1099,7 +1124,10 @@ const markerDialogFlow = await evaluate(`
     if (toolButton.getAttribute('aria-pressed') === 'true') toolButton.click()
     const result = {
       opened,
+      focoTexto,
+      textoObligatorio,
       selected,
+      selectedOutline,
       hidden,
       toolOff: toolButton.getAttribute('aria-pressed') === 'false',
       text: created?.text,
@@ -1116,11 +1144,21 @@ check('el dialogo de marcador ofrece las 3 clases como botones',
   markerDialogFlow.opened.defaultNote === 'true',
   `${markerDialogFlow.opened.labels.join('/')} ` +
   `visible=${markerDialogFlow.opened.visible} pieza=${markerDialogFlow.opened.picked}`)
+check('el cuadro de texto recibe el foco al abrir (se escribe directo)',
+  markerDialogFlow.focoTexto === true)
+check('el texto es obligatorio: en vacio no crea marcador y avisa',
+  markerDialogFlow.textoObligatorio?.creados === 0 &&
+  markerDialogFlow.textoObligatorio?.sigueAbierto === true &&
+  markerDialogFlow.textoObligatorio?.errorVisible === true)
 check('la clase elegida con boton se guarda en el marcador',
   markerDialogFlow.selected === 'true' &&
   markerDialogFlow.hidden === true && markerDialogFlow.toolOff === true &&
   markerDialogFlow.text === 'paso dialogo' && markerDialogFlow.kind === 'screw',
   `clase=${markerDialogFlow.kind}`)
+check('la clase seleccionada se contornea en azul',
+  markerDialogFlow.selectedOutline?.border === 'rgb(37, 99, 235)' &&
+  (markerDialogFlow.selectedOutline?.shadow ?? '').includes('rgba(37, 99, 235, 0.35)'),
+  `borde=${markerDialogFlow.selectedOutline?.border}`)
 
 // --- Presentacion: marcadores con snapshot de vista+corte ------------------
 const markerFlow = await evaluate(`

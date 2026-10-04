@@ -634,6 +634,20 @@ button.obj-cut:hover {
   background: #fff;
 }
 
+.modal-field input.is-invalid {
+  border-color: #dc4437;
+  box-shadow: 0 0 0 2px rgba(220, 68, 55, 0.25);
+}
+
+.modal-error {
+  font-size: 12px;
+  color: #b3261e;
+}
+
+.modal-error[hidden] {
+  display: none;
+}
+
 .kind-buttons {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -646,6 +660,12 @@ button.obj-cut:hover {
   justify-content: center;
   gap: 7px;
   border: 1px solid var(--border);
+  background: #fff;
+}
+
+.kind-buttons button[data-marker-kind][aria-pressed='true'] {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35);
   background: #fff;
 }
 

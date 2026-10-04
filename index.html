@@ -208,8 +208,9 @@
           <button type="button" class="modal-close" data-marker-dialog="cancel" aria-label="Cerrar">×</button>
         </div>
         <label class="modal-field" for="marker-dialog-text">
-          <span>Texto (opcional)</span>
-          <input id="marker-dialog-text" name="marker-text" type="text" maxlength="120" autocomplete="off" />
+          <span>Texto (obligatorio)</span>
+          <input id="marker-dialog-text" name="marker-text" type="text" maxlength="120" autocomplete="off" required aria-required="true" />
+          <span class="modal-error" id="marker-dialog-error" hidden>Escribe el texto del marcador.</span>
         </label>
         <div class="modal-field">
           <span id="marker-dialog-kind-label">Clase</span>

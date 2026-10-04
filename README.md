@@ -162,7 +162,7 @@ Dos clics sobre la superficie (raycast contra las mallas visibles; los puntos oc
 - Grosores: larguero 1 px, postes 1,6 px, puntos 0,55 mm de diámetro.
 - La cota se desplaza al lado más legible respecto a la cámara.
 - **Doble clic en la cifra** edita la nota; `Supr` borra la medición seleccionada.
-- Las etiquetas se ocultan si el punto queda tras un corte activo o detrás de la cámara.
+- Los globos de medidas y marcadores siempre se ven, aunque el punto quede tras el modelo o tras un corte activo; solo se ocultan si quedan fuera de cámara.
 
 ## Anotaciones
 
@@ -182,7 +182,7 @@ Todas las anotaciones (mediciones, marcadores, corte) se guardan en un **JSON ap
 
 ### Marcadores
 
-Un marcador por pulsación del botón **Marcador** (igual que las medidas): tras colocarlo se sale sola del modo marcador. El diálogo pide un texto opcional y la clase con tres botones seleccionables: **Nota**, **Aviso** y **Tornillo** (`note`, `warning`, `screw`). Cada marcador guarda un punto en la pieza, el texto y el tipo elegido.
+Un marcador por pulsación del botón **Marcador** (igual que las medidas): tras colocarlo se sale sola del modo marcador. El diálogo pide el texto (obligatorio) y la clase con tres botones seleccionables: **Nota**, **Aviso** y **Tornillo** (`note`, `warning`, `screw`). El cuadro de texto recibe el foco al abrir, así se escribe directo; la clase elegida se contornea en azul. Cada marcador guarda un punto en la pieza, el texto y el tipo elegido.
 
 Visualmente comparten escala y estilo con las medidas: punto pequeño, tallo de 1,6 px y globo con fondo blanco. El contorno del globo indica el tipo:
 
@@ -411,7 +411,8 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 14. **Fuera el botón "Borrar marcadores"** del panel Herramientas (redundante: se borran con `Supr` sobre el marcador).
 15. **Los pasos de presentación guardan el zoom**: `marker.view.zoom` (`camera.zoom`) se guarda al crear el marcador y se restaura al pulsarlo, antes de colocar la cámara. Opcional en el JSON, compatible con los pasos ya guardados.
 16. **Disco del plano oculto**: al activar el corte no aparece la superficie gris del plano; solo se conserva su anillo de borde junto con el capping, las curvas y el gizmo.
-17. **Clase de marcador con botones**: el diálogo de nuevo marcador sustituye el prompt de texto por tres botones seleccionables (**Nota**, **Aviso** y **Tornillo**), con **Nota** por defecto y confirmación/cancelación explícitas.
+17. **Clase de marcador con botones**: el diálogo de nuevo marcador sustituye los prompts por cuadro de texto con foco directo y tres botones seleccionables (**Nota**, **Aviso** y **Tornillo**), con **Nota** por defecto y confirmación/cancelación explícitas. El texto es obligatorio: en vacío no crea el marcador y avisa en el propio diálogo.
+18. **Globos siempre visibles y selección azul**: los globos de medidas y marcadores ya no se ocultan tras el modelo ni tras el corte; el botón de clase elegido lleva contorno azul.
 
 **Pendiente:**
 

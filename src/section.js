@@ -388,17 +388,40 @@ export class SectionPlaneTool {
   }
 
   /**
-   * Rota el plano 90 grados sobre el eje horizontal de la vista (pivote en su
-   * posicion actual): un corte de frente pasa a quedar de perfil, y viceversa.
-   * Cada pulsacion gira otro 90 grados en el mismo sentido.
+   * Gira el plano 90 grados sobre un eje propio del gizmo (pivote en su
+   * posicion actual). Los ejes son los del plano, no los de la vista: el
+   * resultado es el mismo lo coloque quien lo coloque (Alinear, tijeras o el
+   * propio gizmo). Como el eje de giro siempre es perpendicular a la normal
+   * (Z local), el giro nunca es un no-op. Cada pulsacion gira otros 90 grados
+   * en el mismo sentido; a las 4 se vuelve al origen.
+   *
+   * `camera` se conserva por compatibilidad con la API anterior (ya no decide
+   * el eje).
    */
-  orientToCamera(camera) {
-    const cam = camera ?? this.camera
-    const axis = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion).normalize()
-    const quarter = new THREE.Quaternion().setFromAxisAngle(axis, Math.PI / 2)
-    this.gizmo.quaternion.premultiply(quarter)
+  _quarterTurnLocal(x, y, z) {
+    const quarter = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(x, y, z), Math.PI / 2,
+    )
+    this.gizmo.quaternion.multiply(quarter)
     if (this.enabled) this.apply()
     this.onChange?.()
+  }
+
+  /**
+   * Rota el plano 90 grados sobre su propio eje vertical (Y local).
+   * Complementa a orientToCamera (eje propio horizontal): entre los dos
+   * botones se cubren todas las orientaciones del plano sin tocar el gizmo.
+   */
+  rotateVertical(camera) {
+    this._quarterTurnLocal(0, 1, 0)
+  }
+
+  /**
+   * Rota el plano 90 grados sobre su propio eje horizontal (X local): un corte
+   * de frente pasa a quedar de perfil, y viceversa.
+   */
+  orientToCamera(camera) {
+    this._quarterTurnLocal(1, 0, 0)
   }
 
   /** Recalcula el plano de recorte a partir de la posicion del gizmo. */

@@ -107,9 +107,13 @@
               <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/></svg>
               Alinear con la vista
             </button>
-            <button type="button" class="wide" data-action="section-orient" title="Rota el plano 90 grados en el sitio (de frente a perfil y viceversa)">
+            <button type="button" class="wide" data-action="section-orient" title="Gira el plano 90 grados sobre su propio eje horizontal, en su sitio">
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-2-4.2"/><path d="M13.5 1.5v4h-4"/></svg>
               Girar 90 grados
+            </button>
+            <button type="button" class="wide" data-action="section-rotate" title="Rota el plano 90 grados sobre su propio eje vertical, en su sitio">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8a5.5 5.5 0 1 0 2-4.2"/><path d="M2.5 1.5v4h4"/></svg>
+              Rotar 90 grados
             </button>
           </div>
         </div>
@@ -155,7 +159,7 @@
               Vista libre (salir del marcador)
             </button>
             <ul id="markers-list" class="marker-list"></ul>
-            <p class="panel-note">Pulsa un marcador: restaura vista, corte, medidas y objetos visibles guardados. ✂ en Objetos centra el corte en una pieza.</p>
+            <p class="panel-note">Pulsa un marcador: restaura vista, corte, medidas y objetos visibles guardados.</p>
           </div>
         </div>
         </div>
@@ -196,6 +200,7 @@
             <button type="button" class="mobile-close" data-mobile-close aria-label="Cerrar">×</button>
           </div>
           <div class="mobile-modal-body">
+            <p class="panel-note">Pulsa un marcador: restaura vista, corte, medidas y objetos visibles guardados.</p>
             <ul id="mobile-markers-list" class="marker-list"></ul>
           </div>
         </div>

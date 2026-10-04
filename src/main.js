@@ -771,7 +771,11 @@ document.addEventListener('click', (event) => {
       break
     case 'section-orient':
       viewer.orientSectionPlane()
-      showHint('Plano girado 90 grados en su sitio', 2200)
+      showHint('Plano girado 90 grados sobre su eje', 2200)
+      break
+    case 'section-rotate':
+      viewer.rotateSectionPlane()
+      showHint('Plano rotado 90 grados sobre su eje', 2200)
       break
     case 'gizmo-toggle': {
       viewer.section?.setGizmoMode('combined')

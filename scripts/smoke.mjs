@@ -313,6 +313,44 @@ check('volver a pulsar el mismo boton apaga el gizmo',
   gizmo.apagado.mode === null &&
   gizmo.apagado.helper === false && gizmo.apagado.attached === false)
 
+// Rotar 90 grados: gira el plano sobre su propio eje vertical (Y local), en
+// su sitio y sin mover su punto. Al ser ejes del gizmo y no de la vista, el
+// resultado no depende de como se coloco el plano (Alinear, tijeras o gizmo)
+// y nunca es un no-op: el eje siempre es perpendicular a la normal.
+const giroVertical = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    v.camera.position.set(0, 0, 80)
+    v.controls.target.set(0, 0, 0)
+    v.controls.update()
+    v.setSection({ enabled: true, plane: { point: [1, 2, 3], normal: [0, 0, 1] } })
+    const antes = v.section.serialize()
+    document.querySelector('[data-action="section-rotate"]').click()
+    const despues = v.section.serialize()
+    const normal = despues.normal
+    // Con el gizmo en identidad, el giro local +90 sobre Y lleva (0,0,1) a (1,0,0).
+    const ok = Math.abs(Math.abs(normal[0]) - 1) < 1e-2 && Math.abs(normal[1]) < 1e-2 && Math.abs(normal[2]) < 1e-2
+    // Regresion del no-op: con la normal en vertical, Rotar tiene que moverla.
+    v.setSection({ enabled: true, plane: { point: [1, 2, 3], normal: [0, 1, 0] } })
+    const verticalAntes = v.section.serialize().normal
+    document.querySelector('[data-action="section-rotate"]').click()
+    const verticalDespues = v.section.serialize().normal
+    const dot = verticalAntes[0] * verticalDespues[0] +
+      verticalAntes[1] * verticalDespues[1] + verticalAntes[2] * verticalDespues[2]
+    return {
+      puntoIgual: JSON.stringify(despues.point) === JSON.stringify(antes.point),
+      normal: normal.map((n) => +n.toFixed(3)),
+      ok,
+      mueveVertical: Math.abs(dot) < 0.99,
+    }
+  })()
+`)
+check('Rotar 90 grados gira el plano sobre su propio eje sin moverlo',
+  giroVertical.puntoIgual === true && giroVertical.ok === true,
+  `normal=${giroVertical.normal.join(',')}`)
+check('Rotar 90 grados tambien mueve una normal vertical (sin no-ops)',
+  giroVertical.mueveVertical === true)
+
 // Configuracion PivotControls y geometria real de sus asas: cada asa
 // interactiva lleva `userData.tpc`, asi que se lee el inventario sin depender
 // de rutas internas del paquete.
@@ -905,6 +943,56 @@ check('en camara libre se puede agarrar un extremo', edicion.agarrado === true)
 check('arrastrar el extremo cambia la distancia', edicion.movido > 0.01, edicion.etiquetaDespues)
 check('la camara no se mueve al editar la medida', edicion.camaraIgual === true)
 check('al soltar se reactiva la camara', edicion.soltado === true)
+
+// Cotas cercanas: la segunda se dibuja al lado contrario para no solaparse.
+const lados = await evaluate(`
+  (() => {
+    const v = window.dentalViewer
+    const V = v.camera.position.constructor
+    const camAntes = {
+      position: v.camera.position.toArray(),
+      target: v.controls.target.toArray(),
+      zoom: v.camera.zoom,
+    }
+    const previas = v.measure.serialize()
+    v.measure.clear()
+    v.camera.position.set(0, 0, 80)
+    v.controls.target.set(0, 0, 0)
+    v.camera.zoom = 1
+    v.camera.updateProjectionMatrix()
+    v.controls.update()
+    const m1 = v.measure.add(new V(0, 0, 0), new V(12, 0, 0))
+    const m2 = v.measure.add(new V(0, 1, 0), new V(12, 1, 0))
+    const m3 = v.measure.add(new V(0, 30, 0), new V(12, 30, 0))
+    const rect = v.renderer.domElement.getBoundingClientRect()
+    const px = (p) => {
+      const q = p.clone().project(v.camera)
+      return [(q.x * 0.5 + 0.5) * rect.width, (-q.y * 0.5 + 0.5) * rect.height]
+    }
+    const mid = (m) => {
+      const a = px(m._seg.a)
+      const b = px(m._seg.b)
+      return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+    }
+    const c1 = mid(m1)
+    const c2 = mid(m2)
+    const separacion = Math.hypot(c2[0] - c1[0], c2[1] - c1[1])
+    const salida = { lado1: m1._side, lado2: m2._side, lado3: m3._side, separacion }
+    v.measure.restore(previas)
+    v.camera.position.fromArray(camAntes.position)
+    v.controls.target.fromArray(camAntes.target)
+    v.camera.zoom = camAntes.zoom
+    v.camera.updateProjectionMatrix()
+    v.controls.update()
+    return salida
+  })()
+`)
+check('la primera cota manda y la cercana va al lado contrario',
+  lados.lado1 === 1 && lados.lado2 === -1 && lados.lado3 === 1,
+  `lados=${lados.lado1}/${lados.lado2}/${lados.lado3}`)
+check('las cotas cercanas quedan separadas en pantalla',
+  lados.separacion > 40,
+  `separacion=${lados.separacion.toFixed(0)}px`)
 
 // Los globos se ven aunque el corte elimine la pieza.
 // La pieza va de y = -3.6 a y = +3.6: un plano en y = 40 no deja nada visible.

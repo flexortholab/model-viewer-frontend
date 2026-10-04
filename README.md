@@ -135,8 +135,10 @@ Un plano único anclado al modelo, colocado con un gizmo PivotControls que trae 
 la vez las flechas y los planos para mover, y los arcos de un cuarto de círculo
 de X, Y y Z para rotar. No incluye escala. Un solo botón **Gizmo** lo enciende y
 apaga; no hay botones Mover/Rotar separados. El disco del plano queda oculto y
-solo se conserva su anillo de borde. Botones **Alinear con la vista** y
-**Girar 90 grados**.
+solo se conserva su anillo de borde. Botones **Alinear con la vista**,
+**Girar 90 grados** (eje propio horizontal) y **Rotar 90 grados** (eje propio
+vertical): los giros son relativos al gizmo, no a la vista, asi que funcionan
+igual los coloque Alinear, las tijeras o el propio gizmo.
 La superficie del corte se tapa en solido (stencil) y su perimetro se dibuja con la
 curva exacta de interseccion plano↔malla por pieza (calculada en CPU al activar el
 corte y al soltar el gizmo; durante el arrastre solo se mueve el capping para no
@@ -160,7 +162,7 @@ Dos clics sobre la superficie (raycast contra las mallas visibles; los puntos oc
 
 - Paleta coherente con los marcadores: puntos y trazos en gris muy oscuro, globo con borde azul y fondo blanco.
 - Grosores: larguero 1 px, postes 1,6 px, puntos 0,55 mm de diámetro.
-- La cota se desplaza al lado más legible respecto a la cámara.
+- La cota se desplaza al lado más legible respecto a la cámara; si otra cota cercana ya ocupa ese lado, se dibuja al contrario para no solaparse.
 - **Doble clic en la cifra** edita la nota; `Supr` borra la medición seleccionada.
 - Los globos de medidas y marcadores siempre se ven, aunque el punto quede tras el modelo o tras un corte activo; solo se ocultan si quedan fuera de cámara.
 
@@ -226,7 +228,7 @@ Seguridad: solo se aceptan mensajes de `window.parent`/`window` y con origen en 
 
 - **Vistas** (280 px): rejilla con Superior, Izquierda, Frontal, Derecha, Inferior e **Isométrica**.
 - **Herramientas** (248 px): Medir, Borrar última, Marcador, Exportar.
-- **Corte seccional** (248 px, plegable): Activar corte, Alinear con la vista, Girar 90 grados, y el interruptor **Gizmo** (flechas, planos y arcos a la vez, sin escala; apagado = gizmo oculto, el corte sigue visible).
+- **Corte seccional** (248 px, plegable): Activar corte, Alinear con la vista, Girar 90 grados, Rotar 90 grados, y el interruptor **Gizmo** (flechas, planos y arcos a la vez, sin escala; apagado = gizmo oculto, el corte sigue visible).
 
 **Columna derecha**:
 
@@ -413,6 +415,8 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 16. **Disco del plano oculto**: al activar el corte no aparece la superficie gris del plano; solo se conserva su anillo de borde junto con el capping, las curvas y el gizmo.
 17. **Clase de marcador con botones**: el diálogo de nuevo marcador sustituye los prompts por cuadro de texto con foco directo y tres botones seleccionables (**Nota**, **Aviso** y **Tornillo**), con **Nota** por defecto y confirmación/cancelación explícitas. El texto es obligatorio: en vacío no crea el marcador y avisa en el propio diálogo.
 18. **Globos siempre visibles y selección azul**: los globos de medidas y marcadores ya no se ocultan tras el modelo ni tras el corte; el botón de clase elegido lleva contorno azul.
+19. **Cotas cercanas en lados opuestos**: al dibujar una cota, si su línea quedaría a menos de 64 px de otra ya dibujada, se coloca al lado contrario; la primera manda y el criterio se reevalúa al mover la cámara.
+20. **Giros de 90° relativos al gizmo**: **Girar** y **Rotar** rotan sobre los ejes propios del plano (X e Y locales), no sobre los de la vista; valen igual tras Alinear, las tijeras o el gizmo, y nunca son un no-op.
 
 **Pendiente:**
 

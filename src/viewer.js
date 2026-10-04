@@ -529,6 +529,13 @@ this.camera.position.set(40, 30, 60)
     this.emit('section', this.section.serialize())
   }
 
+  /** Gira el plano 90 grados sobre el eje vertical de la vista, en su sitio. */
+  rotateSectionPlane() {
+    this.section?.rotateVertical(this.camera)
+    this._syncDoc()
+    this.emit('section', this.section.serialize())
+  }
+
   // --- Lista de objetos -------------------------------------------------------
 
   listObjects() {

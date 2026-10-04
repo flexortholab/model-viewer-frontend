@@ -6,9 +6,46 @@ import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
 import { formatMm } from './units.js'
 
 const OFFSET_PX = 36
+// Distancia minima en pantalla entre dos lineas de cota: por debajo, la
+// segunda se dibuja al lado contrario para que no se solapen.
+const NEAR_PX = 64
 const DARK_GREY = 0x333333
 const MEASURE_BLUE = 0x1b8aa3
 const BALLOON_HEIGHT = 0.027
+
+/**
+ * Distancia minima en pixeles entre dos segmentos [p,q] y [r,s].
+ * Pura (sin three), para poder testearla en node.
+ */
+export function segSegDistPx(p, q, r, s) {
+  const orient = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+  const onSeg = (a, b, c) =>
+    Math.min(a[0], c[0]) <= b[0] && b[0] <= Math.max(a[0], c[0]) &&
+    Math.min(a[1], c[1]) <= b[1] && b[1] <= Math.max(a[1], c[1])
+  const o1 = orient(p, q, r)
+  const o2 = orient(p, q, s)
+  const o3 = orient(r, s, p)
+  const o4 = orient(r, s, q)
+  if ((o1 === 0 && onSeg(p, r, q)) || (o2 === 0 && onSeg(p, s, q)) ||
+      (o3 === 0 && onSeg(r, p, s)) || (o4 === 0 && onSeg(r, q, s)) ||
+      (o1 * o2 < 0 && o3 * o4 < 0)) {
+    return 0
+  }
+  const distPointSeg = (u, a, b) => {
+    const dx = b[0] - a[0]
+    const dy = b[1] - a[1]
+    const lenSq = dx * dx + dy * dy
+    let t = lenSq > 0 ? ((u[0] - a[0]) * dx + (u[1] - a[1]) * dy) / lenSq : 0
+    t = Math.max(0, Math.min(1, t))
+    return Math.hypot(u[0] - (a[0] + dx * t), u[1] - (a[1] + dy * t))
+  }
+  return Math.min(
+    distPointSeg(p, r, s),
+    distPointSeg(q, r, s),
+    distPointSeg(r, p, q),
+    distPointSeg(s, p, q),
+  )
+}
 
 /**
  * Mediciones sobre la superficie del modelo.
@@ -153,7 +190,11 @@ export class MeasureTool {
     // plano de la vista, como una porteria de futbol pegada a la pantalla.
     const lengthPx = this._segmentLengthPx(a, b)
     const offsetPx = Math.min(Math.max(OFFSET_PX, lengthPx * 0.04), 120)
-    const { a2, b2 } = this._screenSpaceOffset(a, b, offsetPx)
+    // Si otra cota cercana ya ocupa el lado por defecto, esta se dibuja al
+    // lado contrario para que no se solapen ni confundan.
+    const side = this._pickOffsetSide(a, b, offsetPx, measurement)
+    measurement._side = side
+    const { a2, b2 } = this._screenSpaceOffset(a, b, offsetPx, side)
 
     nodes.dim = this._makeLine([a2.x, a2.y, a2.z, b2.x, b2.y, b2.z], { width: 2.0, color: selected ? MEASURE_BLUE : DARK_GREY })
     nodes.extA = this._makeLine([a.x, a.y, a.z, a2.x, a2.y, a2.z], { width: 3.2, color: selected ? MEASURE_BLUE : DARK_GREY })
@@ -232,8 +273,11 @@ export class MeasureTool {
    * Offset perpendicular al segmento proyectado en pantalla, expresado en
    * pixeles y convertido a unidades de mundo. Asi la cota siempre se ve
    * paralela al plano de la vista, sin rotar con la escena.
+   *
+   * `side` elige el lado: +1 el de por defecto, -1 el contrario (para cotas
+   * que quedarian pegadas a otra ya dibujada).
    */
-  _screenSpaceOffset(a, b, offsetPx) {
+  _screenSpaceOffset(a, b, offsetPx, side = 1) {
     const cam = this.camera
     cam.updateMatrixWorld()
     const width = this.container.clientWidth || 1
@@ -256,8 +300,8 @@ export class MeasureTool {
     const sy = by - ay
     const len = Math.hypot(sx, sy) || 1
     // Perpendicular en pantalla (sentido arbitrario; da igual).
-    const px = (-sy / len) * offsetPx
-    const py = (sx / len) * offsetPx
+    const px = (-sy / len) * offsetPx * side
+    const py = (sx / len) * offsetPx * side
 
     // Para una camara ortografica, pasar de pixeles a unidades de mundo.
     // El eje Y de la pantalla esta invertido respecto al eje Y de la camara.
@@ -265,6 +309,42 @@ export class MeasureTool {
     const oy = py * (h / height)
     const offset = new THREE.Vector3().addScaledVector(right, ox).addScaledVector(up, -oy)
     return { a2: a.clone().add(offset), b2: b.clone().add(offset) }
+  }
+
+  /** Proyecta un punto a pixeles de pantalla, o null si queda tras la camara. */
+  _projectPx(v) {
+    const width = this.container.clientWidth || 1
+    const height = this.container.clientHeight || 1
+    this._tmp.copy(v).project(this.camera)
+    if (this._tmp.z > 1) return null
+    return [(this._tmp.x * 0.5 + 0.5) * width, (-this._tmp.y * 0.5 + 0.5) * height]
+  }
+
+  /**
+   * Elige el lado del offset (+1 por defecto, -1 el contrario) comparando la
+   * linea de cota candidata con las ya dibujadas, en pixeles de pantalla. Si
+   * el lado por defecto queda lejos de todas, se queda; si no, se usa el lado
+   * con mas separacion. Determinista por orden de creacion: la primera manda.
+   */
+  _pickOffsetSide(a, b, offsetPx, self) {
+    const clearance = (side) => {
+      const { a2, b2 } = this._screenSpaceOffset(a, b, offsetPx, side)
+      const p = this._projectPx(a2)
+      const q = this._projectPx(b2)
+      if (!p || !q) return Infinity
+      let min = Infinity
+      for (const other of this.measurements) {
+        if (other === self || !other.__nodes || !other._seg) continue
+        const r = this._projectPx(other._seg.a)
+        const s = this._projectPx(other._seg.b)
+        if (!r || !s) continue
+        min = Math.min(min, segSegDistPx(p, q, r, s))
+      }
+      return min
+    }
+    const forward = clearance(1)
+    if (forward >= NEAR_PX) return 1
+    return clearance(-1) > forward ? -1 : 1
   }
 
   /** Reajusta el anillo de snap a la resolucion actual (zoom, resize, encuadre). */

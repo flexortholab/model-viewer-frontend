@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import { detectUnits, formatMm, round, PLAUSIBLE_MIN, PLAUSIBLE_MAX } from '../src/units.js'
 import { validateDocument, createDocument } from '../src/annotations.js'
+import { segSegDistPx } from '../src/measure.js'
 
 test('un STL en mm se detecta como mm', () => {
   const r = detectUnits(50.2)
@@ -213,4 +214,13 @@ test('createDocument genera un documento vacio coherente', () => {
   assert.equal(doc.version, 1)
   assert.deepEqual(doc.measurements, [])
   assert.equal(doc.section.enabled, false)
+})
+
+test('segSegDistPx mide la separacion entre cotas', () => {
+  // Paralelas a 10 px: la distancia es el hueco entre ellas.
+  assert.equal(segSegDistPx([0, 0], [10, 0], [0, 10], [10, 10]), 10)
+  // Cruzadas: distancia cero.
+  assert.equal(segSegDistPx([0, 0], [10, 10], [0, 10], [10, 0]), 0)
+  // Lejanas en x: la distancia entre extremos.
+  assert.equal(segSegDistPx([0, 0], [0, 10], [30, 0], [30, 10]), 30)
 })

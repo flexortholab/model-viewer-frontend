@@ -177,10 +177,21 @@ body {
   box-shadow: 0 1px 8px rgba(20, 22, 26, 0.08);
 }
 
-/* La barra de Vistas necesita algo mas de ancho para no cortar los botones. */
+/* Columna izquierda: Vistas, Herramientas y Corte con el mismo ancho estrecho. */
 #views-bar {
-  width: 300px;
-  max-width: min(300px, calc(100vw - 24px));
+  width: 200px;
+  max-width: min(200px, calc(100vw - 24px));
+}
+
+/* Vistas solo con iconos: sin etiquetas de texto. Cada boton conserva su
+   title como ayuda contextual. */
+#views-bar .btn-label {
+  display: none;
+}
+
+#tools-bar,
+#panel {
+  width: 200px;
 }
 
 /* Botones de toolbar y de paneles con el mismo lenguaje visual */
@@ -790,12 +801,17 @@ button[data-marker-kind='screw'] .kind-dot {
 /* Cruz de vistas: superior/arriba, inferior/abajo, laterales y frontal al centro */
 .views-cross {
   display: grid;
-  grid-template-columns: repeat(3, auto);
+  grid-template-columns: repeat(3, 1fr);
   grid-template-areas:
     '. sup .'
     'izq fro der'
     '. inf .';
   gap: 4px;
+  justify-content: stretch;
+}
+
+.views-cross button {
+  width: 100%;
   justify-content: center;
 }
 

@@ -351,6 +351,28 @@ check('Rotar 90 grados gira el plano sobre su propio eje sin moverlo',
 check('Rotar 90 grados tambien mueve una normal vertical (sin no-ops)',
   giroVertical.mueveVertical === true)
 
+// Estetica de la columna izquierda: Vistas solo con iconos y los tres
+// paneles con el mismo ancho estrecho.
+const columnas = await evaluate(`
+  (() => {
+    const px = (sel) => getComputedStyle(document.querySelector(sel)).width
+    const etiquetas = [...document.querySelectorAll('#views-bar .btn-label')]
+    return {
+      vistas: px('#views-bar'),
+      herramientas: px('#tools-bar'),
+      corte: px('#panel'),
+      etiquetas: etiquetas.length,
+      ocultas: etiquetas.filter((el) => getComputedStyle(el).display === 'none').length,
+    }
+  })()
+`)
+check('Vistas, Herramientas y Corte miden lo mismo (200 px)',
+  columnas.vistas === '200px' && columnas.herramientas === '200px' && columnas.corte === '200px',
+  `${columnas.vistas} / ${columnas.herramientas} / ${columnas.corte}`)
+check('Vistas es solo iconos (etiquetas ocultas)',
+  columnas.etiquetas > 0 && columnas.ocultas === columnas.etiquetas,
+  `${columnas.ocultas}/${columnas.etiquetas} ocultas`)
+
 // Configuracion PivotControls y geometria real de sus asas: cada asa
 // interactiva lleva `userData.tpc`, asi que se lee el inventario sin depender
 // de rutas internas del paquete.

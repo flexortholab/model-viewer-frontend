@@ -226,9 +226,9 @@ Seguridad: solo se aceptan mensajes de `window.parent`/`window` y con origen en 
 
 **Columna izquierda**:
 
-- **Vistas** (280 px): rejilla con Superior, Izquierda, Frontal, Derecha, Inferior e **Isométrica**.
-- **Herramientas** (248 px): Medir, Borrar última, Marcador, Exportar.
-- **Corte seccional** (248 px, plegable): Activar corte, Alinear con la vista, Girar 90 grados, Rotar 90 grados, y el interruptor **Gizmo** (flechas, planos y arcos a la vez, sin escala; apagado = gizmo oculto, el corte sigue visible).
+- **Vistas** (200 px, solo iconos con ayuda contextual): rejilla con Superior, Izquierda, Frontal, Derecha, Inferior e **Isométrica**.
+- **Herramientas** (200 px): Medir, Borrar última, Marcador, Exportar.
+- **Corte seccional** (200 px, plegable): Activar corte, Alinear con la vista, Girar 90 grados, Rotar 90 grados, y el interruptor **Gizmo** (flechas, planos y arcos a la vez, sin escala; apagado = gizmo oculto, el corte sigue visible).
 
 **Columna derecha**:
 

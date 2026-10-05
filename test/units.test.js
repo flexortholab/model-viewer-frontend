@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { detectUnits, formatMm, round, PLAUSIBLE_MIN, PLAUSIBLE_MAX } from '../src/units.js'
-import { validateDocument, createDocument } from '../src/annotations.js'
+import { validateDocument, createDocument, toStoredConfig } from '../src/annotations.js'
 import { segSegDistPx } from '../src/measure.js'
 
 test('un STL en mm se detecta como mm', () => {
@@ -224,4 +224,48 @@ test('segSegDistPx mide la separacion entre cotas', () => {
   assert.equal(segSegDistPx([0, 0], [10, 10], [0, 10], [10, 0]), 0)
   // Lejanas en x: la distancia entre extremos.
   assert.equal(segSegDistPx([0, 0], [0, 10], [30, 0], [30, 10]), 30)
+})
+
+test('un marcador importado conserva sus medidas y la visibilidad de piezas', () => {
+  const doc = validateDocument({
+    markers: [
+      {
+        id: 'k1',
+        position: [1, 2, 3],
+        text: 'Paso 1',
+        kind: 'note',
+        measurements: [{ id: 'm1', a: [0, 0, 0], b: [3, 4, 0], distance: 5, note: 'ancho' }],
+        objects: [{ index: 0, visible: true }, { index: 1, visible: false }],
+      },
+    ],
+  })
+
+  assert.deepEqual(doc.markers[0].measurements, [{ id: 'm1', a: [0, 0, 0], b: [3, 4, 0], note: 'ancho' }])
+  assert.deepEqual(doc.markers[0].objects, [{ index: 0, visible: true }, { index: 1, visible: false }])
+})
+
+test('un marcador sin snapshot sigue sin medidas ni piezas', () => {
+  const doc = validateDocument({ markers: [{ id: 'k1', position: [1, 2, 3] }] })
+
+  assert.equal('measurements' in doc.markers[0], false)
+  assert.equal('objects' in doc.markers[0], false)
+})
+
+test('la configuracion guardada en la API no lleva la URL del modelo ni toca el documento', () => {
+  const doc = createDocument({ model: 'https://s3.test/model.glb?X-Amz-Signature=abc' })
+  const original = structuredClone(doc)
+
+  const config = toStoredConfig(doc)
+
+  assert.equal('model' in config, false)
+  assert.deepEqual(config.markers, doc.markers)
+  assert.deepEqual(doc, original)
+})
+
+test('una configuracion vacia de la API es un documento sin anotaciones', () => {
+  const doc = validateDocument({})
+
+  assert.deepEqual(doc.markers, [])
+  assert.deepEqual(doc.measurements, [])
+  assert.equal(doc.section.enabled, false)
 })

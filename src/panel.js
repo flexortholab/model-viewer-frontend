@@ -7,7 +7,7 @@
 import { applyBrand, BRAND } from './brand.js'
 import { api, session } from './app-session.js'
 import { authorizedCall } from './authorized.js'
-import { formatDate, formatSize, sortCases, statusLabel, validateNewCase } from './cases.js'
+import { caseEditorUrl, formatDate, formatSize, sortCases, statusLabel, validateNewCase } from './cases.js'
 import { LOGIN_PAGE, loginUrl, PANEL_PAGE } from './navigation.js'
 
 applyBrand()
@@ -50,6 +50,13 @@ function caseRow(item) {
     row.appendChild(cell)
   }
   row.cells[1].dataset.status = item.status
+  const actions = document.createElement('td')
+  actions.className = 'case-actions'
+  const open = document.createElement('a')
+  open.href = caseEditorUrl(item.id)
+  open.textContent = 'Abrir'
+  actions.appendChild(open)
+  row.appendChild(actions)
   return row
 }
 

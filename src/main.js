@@ -2,7 +2,11 @@
 import * as THREE from 'three'
 import { DentalViewer } from './viewer.js'
 import { createBridge } from './bridge.js'
-import { download, suggestedFilename, createDocument } from './annotations.js'
+import { download, suggestedFilename, createDocument, toStoredConfig } from './annotations.js'
+import { api, session } from './app-session.js'
+import { authorizedCall } from './authorized.js'
+import { configBytes, MAX_CONFIG_BYTES } from './cases.js'
+import { loginUrl } from './navigation.js'
 import { formatMm } from './units.js'
 import { BRAND, applyBrand } from './brand.js'
 
@@ -34,6 +38,8 @@ const markerDialogError = document.getElementById('marker-dialog-error')
 const mobileUi = document.getElementById('mobile-ui')
 const mobileToolbar = document.getElementById('mobile-toolbar')
 const mobileTitle = document.getElementById('mobile-title')
+const caseMessage = document.getElementById('case-message')
+const saveCaseButton = document.querySelector('[data-action="save-case"]')
 const mobileObjectsList = document.getElementById('mobile-objects-list')
 const mobileMarkersList = document.getElementById('mobile-markers-list')
 
@@ -346,9 +352,10 @@ viewer.on('loaded', (info) => {
   currentModel = info
   panelVisibility(true)
   collapsePanelsOnMobile()
-  // Titulo: nombre del archivo sin extension.
+  // Titulo: nombre del caso si viene del panel; si no, nombre del archivo
+  // sin extension. Solo en el contenido de la pagina, nunca en <title>.
   const base = String(info.name ?? '').split('/').pop().split('?')[0].split('#')[0]
-  const title = base.includes('.') ? base.slice(0, base.lastIndexOf('.')) : base
+  const title = openedCase?.name ?? (base.includes('.') ? base.slice(0, base.lastIndexOf('.')) : base)
   if (docTitle) {
     docTitle.textContent = title || BRAND.name
     docTitle.hidden = false
@@ -757,6 +764,9 @@ document.addEventListener('click', (event) => {
     case 'export':
       exportAnnotations()
       break
+    case 'save-case':
+      saveCase()
+      break
     case 'toggle-panel':
       togglePanelContent(panel)
       break
@@ -930,6 +940,73 @@ window.addEventListener('keydown', (event) => {
   }
 })
 
+// --- Caso abierto desde el panel (?case=) ----------------------------------
+//
+// El modelo llega por una URL firmada de S3 que caduca en minutos, y la
+// configuracion (marcadores, medidas, corte) por la API. Guardar sustituye
+// la configuracion entera del caso.
+
+/** Caso abierto: { id, name }. Null cuando el visor se usa con ?model=. */
+let openedCase = null
+
+function showCaseMessage(text) {
+  if (loader) loader.hidden = true
+  caseMessage.textContent = text
+  caseMessage.hidden = false
+}
+
+async function openCase(caseId) {
+  if (loader) {
+    loader.hidden = false
+    if (loaderText) loaderText.textContent = 'Abriendo caso…'
+  }
+  const hadSession = session.email() !== null
+  const result = await authorizedCall(session, (token) => api.getCase(token, caseId))
+  if (result._tag === 'SignedOut') {
+    window.location.replace(loginUrl(`index.html?case=${encodeURIComponent(caseId)}`, { expired: hadSession }))
+    return
+  }
+  if (result._tag === 'NotFound') {
+    showCaseMessage('Este caso no existe. Vuelve al panel para abrir otro.')
+    return
+  }
+  if (result._tag !== 'Found') {
+    showCaseMessage('No se ha podido abrir el caso. Recarga la página para volver a probar.')
+    return
+  }
+  openedCase = { id: caseId, name: result.case.name }
+  for (const element of document.querySelectorAll('.case-only')) element.hidden = false
+  await loadModel(result.case.model.url)
+  // Sin `model`: una configuracion guardada nunca debe recargar otra URL.
+  await applyAnnotations(toStoredConfig(result.case.config ?? {}))
+}
+
+async function saveCase() {
+  if (!openedCase || !viewer.model) return
+  const config = toStoredConfig(viewer.getAnnotations())
+  if (configBytes(config) > MAX_CONFIG_BYTES) {
+    showHint('No se puede guardar: hay demasiadas anotaciones para un caso.', 5000)
+    return
+  }
+  saveCaseButton.disabled = true
+  try {
+    const result = await authorizedCall(session, (token) =>
+      api.saveConfig(token, openedCase.id, config),
+    )
+    if (result._tag === 'Saved') showHint('Caso guardado')
+    else if (result._tag === 'SignedOut')
+      // No se sale de la pagina: se perderian los cambios. Con la sesion
+      // compartida entre pestanas, basta con entrar en otra y volver a guardar.
+      showHint('La sesión ha caducado. Entra en el panel en otra pestaña y vuelve a guardar.', 8000)
+    else if (result._tag === 'NotFound') showHint('Este caso ya no existe.', 5000)
+    else showHint('No se ha podido guardar. Vuelve a probar en un momento.', 5000)
+  } catch {
+    showHint('No se ha podido guardar: revisa la conexión.', 5000)
+  } finally {
+    saveCaseButton.disabled = false
+  }
+}
+
 // --- Arranque --------------------------------------------------------------
 
 async function boot() {
@@ -941,9 +1018,12 @@ async function boot() {
 
   const model = params.get('model')
   const annotations = params.get('annotations')
+  const caseId = params.get('case')
 
   if (model) {
     await loadModel(model, { annotations })
+  } else if (caseId) {
+    await openCase(caseId)
   } else {
     viewer.doc = createDocument()
     panelVisibility(false)

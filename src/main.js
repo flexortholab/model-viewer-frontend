@@ -385,16 +385,18 @@ viewer.on('markers', () => renderMarkers())
 
 viewer.on('objects', () => renderObjects())
 
-viewer.on('progress', ({ fraction, phase }) => {
-  if (phase === 'loading') {
-    if (loader) {
-      loader.hidden = false
-      if (loaderText && Number.isFinite(fraction)) {
-        loaderText.textContent = `Cargando modelo… ${Math.round(fraction * 100)}%`
-      }
+function showLoadProgress(fraction) {
+  if (loader) {
+    loader.hidden = false
+    if (loaderText && Number.isFinite(fraction)) {
+      loaderText.textContent = `Cargando modelo… ${Math.round(fraction * 100)}%`
     }
-    if (Number.isFinite(fraction)) setStatus(`Cargando ${Math.round(fraction * 100)}%`)
   }
+  if (Number.isFinite(fraction)) setStatus(`Cargando ${Math.round(fraction * 100)}%`)
+}
+
+viewer.on('progress', ({ fraction, phase }) => {
+  if (phase === 'loading') showLoadProgress(fraction)
 })
 
 viewer.on('section', () => syncSectionUI())
@@ -985,7 +987,11 @@ function showCaseMessage(text) {
 async function loadCaseModel(key, signedUrl) {
   let source = null
   try {
-    if (window.caches) source = await createModelCache({ cacheStorage: window.caches }).getModel(key, signedUrl)
+    if (window.caches) {
+      source = await createModelCache({ cacheStorage: window.caches }).getModel(key, signedUrl, {
+        onProgress: showLoadProgress,
+      })
+    }
   } catch {
     source = null
   }

@@ -14,8 +14,9 @@ test('los casos se ordenan por ultima actualizacion, sin tocar la lista original
   assert.deepEqual(cases, original)
 })
 
-test('las fechas se muestran en hora de Madrid', () => {
-  assert.equal(formatDate('2026-10-05T10:30:00.000Z'), '05/10/2026, 12:30')
+test('las fechas se muestran en la zona horaria pedida', () => {
+  assert.equal(formatDate('2026-10-05T10:30:00.000Z', { timeZone: 'Europe/Madrid' }), '05/10/2026, 12:30')
+  assert.equal(formatDate('2026-10-05T10:30:00.000Z', { timeZone: 'Europe/London' }), '05/10/2026, 11:30')
 })
 
 test('una fecha invalida no rompe la lista', () => {

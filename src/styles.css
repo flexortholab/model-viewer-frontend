@@ -1220,3 +1220,27 @@ a.case-back:hover {
 .is-read-only {
   display: none !important;
 }
+
+/* Deshacer/rehacer y estado del autoguardado del caso (?case=). */
+.history-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.save-status {
+  display: block;
+  padding: 2px 4px 4px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.save-status[data-status='saved'] {
+  color: var(--accent-ink);
+}
+
+.save-status[data-status='retrying'],
+.save-status[data-status='signed-out'],
+.save-status[data-status='gone'] {
+  color: #b3261e;
+}

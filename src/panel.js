@@ -15,7 +15,7 @@ import {
   formatSize,
   shareActionLabel,
   sortCases,
-  statusLabel,
+  linkLabel,
   validateNewCase,
 } from './cases.js'
 import { LOGIN_PAGE, loginUrl, PANEL_PAGE, viewerRedirectUrl } from './navigation.js'
@@ -57,13 +57,12 @@ function showCasesMessage(message) {
 /** Fila de un caso. El nombre puede llevar datos del paciente: siempre como texto, nunca como HTML. */
 function caseRow(item) {
   const row = document.createElement('tr')
-  const cells = [item.name, statusLabel(item.status), formatDate(item.createdAt), formatDate(item.updatedAt)]
+  const cells = [item.name, linkLabel(item), formatDate(item.createdAt), formatDate(item.updatedAt)]
   for (const text of cells) {
     const cell = document.createElement('td')
     cell.textContent = text
     row.appendChild(cell)
   }
-  row.cells[1].dataset.status = item.status
   const actions = document.createElement('td')
   actions.className = 'case-actions'
   const open = document.createElement('a')

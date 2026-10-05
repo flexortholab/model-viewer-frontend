@@ -108,11 +108,6 @@
   border-bottom: 0;
 }
 
-.cases-table td[data-status='linked'] {
-  color: var(--accent-ink);
-  font-weight: 600;
-}
-
 @media (max-width: 640px) {
   .cases-table th:nth-child(3),
   .cases-table td:nth-child(3) {

@@ -3,13 +3,9 @@
  * Presentacion de los casos del panel, sin DOM para poder probarla.
  */
 
-const STATUS_LABELS = {
-  draft: 'Borrador',
-  linked: 'Enlace generado',
-}
-
-export function statusLabel(status) {
-  return STATUS_LABELS[status] ?? status
+/** Columna "Enlace": cuando se genero el enlace del doctor, o un guion si no lo tiene. */
+export function linkLabel(item) {
+  return item.status === 'linked' && item.linkGeneratedAt ? formatDate(item.linkGeneratedAt) : '—'
 }
 
 /** Lo ultimo tocado, primero. */

@@ -8,6 +8,8 @@ import { authorizedCall } from './authorized.js'
 import { configBytes, MAX_CONFIG_BYTES } from './cases.js'
 import { loginUrl } from './navigation.js'
 import { createModelCache } from './model-cache.js'
+import { createAutosave } from './autosave.js'
+import { createCaseHistory } from './case-history.js'
 import { formatMm } from './units.js'
 import { BRAND, applyBrand } from './brand.js'
 
@@ -41,6 +43,9 @@ const mobileToolbar = document.getElementById('mobile-toolbar')
 const mobileTitle = document.getElementById('mobile-title')
 const caseMessage = document.getElementById('case-message')
 const saveCaseButton = document.querySelector('[data-action="save-case"]')
+const undoButton = document.querySelector('[data-action="undo-case"]')
+const redoButton = document.querySelector('[data-action="redo-case"]')
+const saveStatus = document.getElementById('save-status')
 const mobileObjectsList = document.getElementById('mobile-objects-list')
 const mobileMarkersList = document.getElementById('mobile-markers-list')
 
@@ -379,6 +384,7 @@ viewer.on('loaded', (info) => {
 viewer.on('changed', (doc) => {
   bridge.changed(doc)
   renderMarkers()
+  scheduleAutosave(doc)
 })
 
 viewer.on('markers', () => renderMarkers())
@@ -772,6 +778,12 @@ document.addEventListener('click', (event) => {
     case 'save-case':
       saveCase()
       break
+    case 'undo-case':
+      undoCase()
+      break
+    case 'redo-case':
+      redoCase()
+      break
     case 'toggle-panel':
       togglePanelContent(panel)
       break
@@ -918,6 +930,16 @@ window.addEventListener('pointerup', releaseDrag)
 
 window.addEventListener('keydown', (event) => {
   if (event.target?.matches?.('input, textarea')) return
+  // Atajos del caso abierto: deshacer, rehacer y guardar.
+  if (caseHistory && (event.metaKey || event.ctrlKey)) {
+    const key = event.key.toLowerCase()
+    if (key === 'z' && !event.shiftKey) undoCase()
+    else if ((key === 'z' && event.shiftKey) || key === 'y') redoCase()
+    else if (key === 's') saveCase()
+    else return
+    event.preventDefault()
+    return
+  }
   switch (event.key.toLowerCase()) {
     case 'm':
       toggleMeasure()
@@ -1028,6 +1050,7 @@ async function openCase(caseId) {
   await loadCaseModel(`case/${caseId}`, result.case.model.url)
   // Sin `model`: una configuracion guardada nunca debe recargar otra URL.
   await applyAnnotations(toStoredConfig(result.case.config ?? {}))
+  startCaseHistory()
 }
 
 async function openShare(shareId) {
@@ -1058,31 +1081,119 @@ async function openShare(shareId) {
   await applyAnnotations(toStoredConfig(result.shared.config ?? {}))
 }
 
-async function saveCase() {
-  if (!openedCase || !viewer.model) return
-  const config = toStoredConfig(viewer.getAnnotations())
+// --- Autoguardado y deshacer (solo con ?case=) ---
+//
+// Cuenta como cambio el contenido (marcadores y medidas), no la vista: al
+// pulsar un marcador el visor restaura su corte y emite 'changed', y eso no
+// debe guardar nada (src/case-history.js, contentKey). Cada guardado es un
+// paso de deshacer, sin limite, solo durante la sesion.
+
+/** Historial y autoguardado del caso abierto; null fuera del modo caso. */
+let caseHistory = null
+let autosave = null
+/** Mientras se aplica un paso de deshacer/rehacer, sus 'changed' no cuentan. */
+let applyingHistory = false
+/**
+ * getAnnotations() sincroniza el documento y emite 'changed': mientras el
+ * autoguardado lee la configuracion, ese 'changed' no debe volver a programar
+ * un guardado (ni entrar en bucle).
+ */
+let readingConfig = false
+
+const SAVE_STATUS_TEXT = {
+  saved: 'Guardado',
+  pending: 'Cambios sin guardar',
+  saving: 'Guardando…',
+  retrying: 'Sin conexión · reintentando',
+  'signed-out': 'Sesión caducada · entra en el panel en otra pestaña',
+  gone: 'Este caso ya no existe',
+}
+
+function currentConfig() {
+  readingConfig = true
+  try {
+    return toStoredConfig(viewer.getAnnotations())
+  } finally {
+    readingConfig = false
+  }
+}
+
+function updateHistoryButtons() {
+  undoButton.disabled = !caseHistory?.canUndo()
+  redoButton.disabled = !caseHistory?.canRedo()
+}
+
+function showSaveStatus(status) {
+  saveStatus.textContent = SAVE_STATUS_TEXT[status] ?? ''
+  saveStatus.dataset.status = status
+}
+
+/** Guarda la configuracion actual y la registra como paso. Devuelve el `_tag` de la API. */
+async function saveCurrentConfig() {
+  const config = currentConfig()
   if (configBytes(config) > MAX_CONFIG_BYTES) {
     showHint('No se puede guardar: hay demasiadas anotaciones para un caso.', 5000)
-    return
+    return 'Invalid'
   }
+  caseHistory.record(config)
+  updateHistoryButtons()
+  const result = await authorizedCall(session, (token) => api.saveConfig(token, openedCase.id, config))
+  return result._tag
+}
+
+function startCaseHistory() {
+  caseHistory = createCaseHistory(currentConfig())
+  autosave = createAutosave({ save: saveCurrentConfig, onStatus: showSaveStatus })
+  showSaveStatus('saved')
+  updateHistoryButtons()
+}
+
+function scheduleAutosave(doc) {
+  if (!caseHistory || applyingHistory || readingConfig || readOnly) return
+  if (!caseHistory.isCurrent(toStoredConfig(doc))) autosave.schedule()
+}
+
+async function applyHistoryStep(config) {
+  if (!config) return
+  applyingHistory = true
+  try {
+    activeMarkerId = null
+    await applyAnnotations(config)
+    renderMarkers()
+  } finally {
+    applyingHistory = false
+  }
+  updateHistoryButtons()
+  autosave.flush()
+}
+
+function undoCase() {
+  if (!caseHistory) return
+  // Lo que aun no se haya guardado pasa a ser un paso, para poder rehacerlo.
+  caseHistory.record(currentConfig())
+  applyHistoryStep(caseHistory.undo())
+}
+
+function redoCase() {
+  if (!caseHistory) return
+  applyHistoryStep(caseHistory.redo())
+}
+
+/** Boton "Guardar" y Ctrl+S: guardar ya, sin esperar al autoguardado. */
+async function saveCase() {
+  if (!autosave || !viewer.model) return
   saveCaseButton.disabled = true
   try {
-    const result = await authorizedCall(session, (token) =>
-      api.saveConfig(token, openedCase.id, config),
-    )
-    if (result._tag === 'Saved') showHint('Caso guardado')
-    else if (result._tag === 'SignedOut')
-      // No se sale de la pagina: se perderian los cambios. Con la sesion
-      // compartida entre pestanas, basta con entrar en otra y volver a guardar.
-      showHint('La sesión ha caducado. Entra en el panel en otra pestaña y vuelve a guardar.', 8000)
-    else if (result._tag === 'NotFound') showHint('Este caso ya no existe.', 5000)
-    else showHint('No se ha podido guardar. Vuelve a probar en un momento.', 5000)
-  } catch {
-    showHint('No se ha podido guardar: revisa la conexión.', 5000)
+    await autosave.flush()
   } finally {
     saveCaseButton.disabled = false
   }
 }
+
+// Avisa antes de cerrar o recargar con cambios sin guardar.
+window.addEventListener('beforeunload', (event) => {
+  if (autosave?.hasUnsavedChanges()) event.preventDefault()
+})
 
 // --- Arranque --------------------------------------------------------------
 

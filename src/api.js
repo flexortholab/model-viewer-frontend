@@ -51,6 +51,40 @@ export function createApi({ base, fetch: doFetch = (...args) => globalThis.fetch
       return { _tag: 'Failed', status }
     },
 
+    /**
+     * Crea un caso en borrador y devuelve la subida firmada de su GLB.
+     * `sizeBytes` tiene que ser el tamano exacto del fichero: va firmado.
+     */
+    async createCase(token, { name, sizeBytes }) {
+      const { status, result } = await call('/cases', {
+        method: 'POST',
+        token,
+        body: { name, sizeBytes },
+      })
+      if (status === 201) return { _tag: 'Created', caseId: result.id, upload: result.upload }
+      if (status === 400) return { _tag: 'Invalid' }
+      if (status === 401) return { _tag: 'Unauthorized' }
+      return { _tag: 'Failed', status }
+    },
+
+    /**
+     * Sube el GLB directamente a S3 con la URL firmada de `createCase`, con
+     * las cabeceras exactas que devolvio la API. No pasa por la API: la URL
+     * firmada ya lleva el permiso.
+     */
+    async uploadModel(upload, file) {
+      const response = await doFetch(upload.url, {
+        method: upload.method,
+        headers: upload.headers,
+        body: file,
+      })
+      if (response.ok) return { _tag: 'Uploaded' }
+      // 403: la URL firmada caduco (5 minutos). 412: ya habia un modelo.
+      if (response.status === 403) return { _tag: 'Expired' }
+      if (response.status === 412) return { _tag: 'AlreadyUploaded' }
+      return { _tag: 'Failed', status: response.status }
+    },
+
     /** Cambia el refresh token por un par nuevo. El refresh token usado deja de valer. */
     async refresh(refreshToken) {
       const { status, result } = await call('/auth/refresh', {

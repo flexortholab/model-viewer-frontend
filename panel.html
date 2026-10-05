@@ -15,12 +15,32 @@
 
       <section id="signed-in" class="panel-section" hidden>
         <header class="panel-header">
-          <strong>Casos</strong>
+          <span class="panel-title">
+            <strong>Casos</strong>
+            <button type="button" class="primary" data-action="new-case">Nuevo caso</button>
+          </span>
           <span class="panel-user">
             <span id="user-email"></span>
             <button type="button" data-action="logout">Cerrar sesión</button>
           </span>
         </header>
+        <form id="new-case" class="modal-card panel-card new-case" novalidate hidden>
+          <div class="modal-head"><strong>Nuevo caso</strong></div>
+          <label class="modal-field">
+            Nombre del caso
+            <input name="name" type="text" maxlength="200" autocomplete="off" required />
+          </label>
+          <label class="modal-field">
+            Modelo (GLB, hasta 500 MB)
+            <input name="model" type="file" accept=".glb,model/gltf-binary" required />
+          </label>
+          <p id="new-case-status" class="new-case-status" role="status" hidden></p>
+          <p id="new-case-error" class="modal-error" role="alert" hidden></p>
+          <div class="modal-actions">
+            <button type="button" data-action="cancel-new-case">Cancelar</button>
+            <button type="submit" class="primary">Crear y subir</button>
+          </div>
+        </form>
         <p id="cases-message" class="panel-empty" role="status">Cargando casos…</p>
         <table id="cases" class="cases-table" hidden>
           <thead>

@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 import { FreeOrbitControls } from './free-controls.js'
-import { loadModel, normalizeModel, applyDentalMaterial, prepareMaterialsForReview, isSupported, extensionOf } from './loaders.js'
+import { loadModel, normalizeModel, applyDentalMaterial, prepareMaterialsForReview, isSupported, isSupportedFormat, extensionOf } from './loaders.js'
 import { SectionPlaneTool } from './section.js'
 import { MeasureTool } from './measure.js'
 import { Line2 } from 'three/addons/lines/Line2.js'
@@ -228,16 +228,19 @@ this.camera.position.set(40, 30, 60)
 
   /**
    * @param {string} url .glb | .gltf | .stl | .obj | .fbx | .3mf
-   * @param {{forcedUnits?:string|null, merge?:boolean, keepMaterials?:boolean}} options
+   * @param {{forcedUnits?:string|null, merge?:boolean, keepMaterials?:boolean, format?:string}} options
+   *   `format` fuerza el formato cuando la URL no lo dice (URL blob: de la cache).
    */
   async load(url, options = {}) {
     if (!url) throw new Error('Falta la URL del modelo.')
-    if (!isSupported(url)) throw new Error(`Formato no soportado: ${url}`)
+    const supported = options.format ? isSupportedFormat(options.format) : isSupported(url)
+    if (!supported) throw new Error(`Formato no soportado: ${url}`)
 
     this.emit('progress', { phase: 'loading', url })
 
     const root = await loadModel(url, {
       renderer: this.renderer,
+      format: options.format,
       onProgress: (fraction, label) => this.emit('progress', { phase: 'loading', fraction, label }),
     })
 

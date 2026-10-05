@@ -18,6 +18,7 @@ import {
   validateNewCase,
 } from './cases.js'
 import { LOGIN_PAGE, loginUrl, PANEL_PAGE } from './navigation.js'
+import { createModelCache } from './model-cache.js'
 
 applyBrand()
 document.title = `Panel · ${BRAND.name}`
@@ -253,7 +254,11 @@ document.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-action]')
   if (button?.dataset.action === 'logout') {
     session.end()
-    window.location.replace(LOGIN_PAGE)
+    // Los modelos guardados son datos de salud: fuera al cerrar sesion.
+    const clearModels = window.caches
+      ? createModelCache({ cacheStorage: window.caches }).clear().catch(() => {})
+      : Promise.resolve()
+    clearModels.then(() => window.location.replace(LOGIN_PAGE))
   }
   if (button?.dataset.action === 'new-case') openNewCase()
   if (button?.dataset.action === 'cancel-new-case') closeNewCase()

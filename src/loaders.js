@@ -27,8 +27,12 @@ export function extensionOf(url = '') {
   return ext.toLowerCase()
 }
 
+export function isSupportedFormat(format) {
+  return SUPPORTED.includes(format)
+}
+
 export function isSupported(url) {
-  return SUPPORTED.includes(extensionOf(url))
+  return isSupportedFormat(extensionOf(url))
 }
 
 let dracoLoader = null
@@ -55,8 +59,12 @@ function getKtx2(renderer) {
 /**
  * Carga un modelo por extension. Devuelve el objeto raiz de three.
  */
-export async function loadModel(url, { renderer, onProgress } = {}) {
-  const ext = extensionOf(url)
+/**
+ * `format` fuerza el formato cuando la URL no lo dice (p. ej. una URL blob:
+ * de la cache de modelos); sin el, se deduce de la extension.
+ */
+export async function loadModel(url, { renderer, onProgress, format } = {}) {
+  const ext = format ?? extensionOf(url)
   const report = (fraction, label) => onProgress?.(fraction, label)
 
   switch (ext) {

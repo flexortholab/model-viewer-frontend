@@ -7,6 +7,7 @@ import { api, session } from './app-session.js'
 import { authorizedCall } from './authorized.js'
 import { configBytes, MAX_CONFIG_BYTES } from './cases.js'
 import { loginUrl } from './navigation.js'
+import { createModelCache } from './model-cache.js'
 import { formatMm } from './units.js'
 import { BRAND, applyBrand } from './brand.js'
 
@@ -424,6 +425,7 @@ async function loadModel(url, options = {}) {
   forcedUnits = options.forcedUnits ?? forcedUnits
   if (typeof options.material === 'string') materialMode = options.material
   const info = await viewer.load(url, {
+    format: options.format,
     forcedUnits,
     merge: options.merge ?? false,
     keepMaterials: materialMode !== 'dental',
@@ -975,6 +977,27 @@ function showCaseMessage(text) {
   caseMessage.hidden = false
 }
 
+/**
+ * Carga el GLB de un caso o de un enlace pasando por la cache de 5 minutos
+ * (src/model-cache.js). Si el navegador no tiene Cache Storage o falla, se
+ * descarga de la URL firmada como siempre.
+ */
+async function loadCaseModel(key, signedUrl) {
+  let source = null
+  try {
+    if (window.caches) source = await createModelCache({ cacheStorage: window.caches }).getModel(key, signedUrl)
+  } catch {
+    source = null
+  }
+  if (!source || source._tag === 'Failed') return loadModel(signedUrl)
+  const objectUrl = URL.createObjectURL(source.blob)
+  try {
+    return await loadModel(objectUrl, { format: 'glb' })
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
+}
+
 async function openCase(caseId) {
   if (loader) {
     loader.hidden = false
@@ -996,7 +1019,7 @@ async function openCase(caseId) {
   }
   openedCase = { id: caseId, name: result.case.name }
   for (const element of document.querySelectorAll('.case-only')) element.hidden = false
-  await loadModel(result.case.model.url)
+  await loadCaseModel(`case/${caseId}`, result.case.model.url)
   // Sin `model`: una configuracion guardada nunca debe recargar otra URL.
   await applyAnnotations(toStoredConfig(result.case.config ?? {}))
 }
@@ -1025,7 +1048,7 @@ async function openShare(shareId) {
   // siendo el de la marca (lo ve la vista previa de WhatsApp).
   openedCase = { id: null, name: result.shared.name }
   setReadOnly()
-  await loadModel(result.shared.model.url)
+  await loadCaseModel(`share/${shareId}`, result.shared.model.url)
   await applyAnnotations(toStoredConfig(result.shared.config ?? {}))
 }
 

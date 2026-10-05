@@ -1222,10 +1222,23 @@ a.case-back:hover {
 }
 
 /* Deshacer/rehacer y estado del autoguardado del caso (?case=). */
-.history-buttons {
+.save-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr auto auto;
   gap: 4px;
+}
+
+#tools-bar .tb-group .save-row button.icon-only {
+  width: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#tools-bar .tb-group .save-row button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .save-status {

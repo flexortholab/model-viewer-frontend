@@ -1,0 +1,45 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <title>Panel del visor</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+    <link rel="stylesheet" href="./src/panel.css" />
+  </head>
+  <body class="panel-page">
+    <main class="panel-main">
+      <img class="panel-logo" src="./logo.svg" alt="Flex Ortholab, laboratorio digital" />
+
+      <form id="login" class="modal-card panel-card" novalidate hidden>
+        <div class="modal-head"><strong>Acceso al panel</strong></div>
+        <label class="modal-field">
+          Email
+          <input name="email" type="email" autocomplete="username" required />
+        </label>
+        <label class="modal-field">
+          Contraseña
+          <input name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <p id="login-error" class="modal-error" role="alert" hidden></p>
+        <div class="modal-actions">
+          <button type="submit" class="primary">Entrar</button>
+        </div>
+      </form>
+
+      <section id="signed-in" class="panel-section" hidden>
+        <header class="panel-header">
+          <strong>Casos</strong>
+          <span class="panel-user">
+            <span id="user-email"></span>
+            <button type="button" data-action="logout">Cerrar sesión</button>
+          </span>
+        </header>
+        <p class="panel-empty">Aquí aparecerá la lista de casos.</p>
+      </section>
+    </main>
+    <script type="module" src="./src/panel.js"></script>
+  </body>
+</html>

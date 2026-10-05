@@ -112,6 +112,14 @@ Toda la marca vive en **`src/brand.js`** (objeto `BRAND`): no hay que perseguir 
 
 ---
 
+## Panel de administración
+
+`panel.html` es el panel del laboratorio, conectado a la API del visor ([model-viewer-backend](https://github.com/flexortholab/model-viewer-backend)): acceso con email y contraseña. Los usuarios los da de alta Sergio con un script del backend; no hay registro abierto.
+
+- La sesión dura mientras se use: el access token (15 min) se renueva solo con el refresh token (30 días) y se guarda en `localStorage`. La contraseña nunca se guarda.
+- En producción el panel llama a la API directamente. En `npm run dev`, las llamadas pasan por un proxy de Vite (`/dev-api`, ver `vite.config.js`), porque la API solo acepta en CORS el origen de GitHub Pages.
+- El visor (`index.html`) sigue funcionando igual que antes, con `?model=`.
+
 ## Uso por URL
 
 Todos los parámetros son opcionales y combinables:

@@ -1,6 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Panel de administracion: mismas variables y controles que el visor. */
 
+/* Que `hidden` oculte siempre, aunque la clase del elemento fije su display. */
+.panel-page [hidden] {
+  display: none !important;
+}
+
 .panel-page {
   height: auto;
   min-height: 100%;

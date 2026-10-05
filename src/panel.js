@@ -15,7 +15,6 @@ import {
   formatSize,
   shareActionLabel,
   sortCases,
-  linkLabel,
   validateNewCase,
 } from './cases.js'
 import { LOGIN_PAGE, loginUrl, PANEL_PAGE, viewerRedirectUrl } from './navigation.js'
@@ -28,6 +27,10 @@ const userEmail = document.getElementById('user-email')
 const casesTable = document.getElementById('cases')
 const casesBody = casesTable.querySelector('tbody')
 const casesMessage = document.getElementById('cases-message')
+const casesEmpty = document.getElementById('cases-empty')
+const casesCount = document.getElementById('cases-count')
+const panelUser = document.getElementById('panel-user')
+const toast = document.getElementById('toast')
 const loadMoreButton = document.getElementById('load-more')
 /** Casos cargados hasta ahora y cursor de la pagina siguiente (null en la ultima). */
 let loadedCases = []
@@ -37,10 +40,6 @@ const newCaseStatus = document.getElementById('new-case-status')
 const newCaseError = document.getElementById('new-case-error')
 const newCaseSubmit = newCaseForm.querySelector('button[type="submit"]')
 let uploading = false
-const shareResult = document.getElementById('share-result')
-const shareResultText = document.getElementById('share-result-text')
-const shareResultUrl = document.getElementById('share-result-url')
-const shareError = document.getElementById('share-error')
 
 function goToLogin({ expired = false } = {}) {
   window.location.replace(loginUrl(PANEL_PAGE, { expired }))
@@ -48,45 +47,120 @@ function goToLogin({ expired = false } = {}) {
 
 function showSignedIn() {
   userEmail.textContent = session.email() ?? ''
+  panelUser.hidden = false
   signedIn.hidden = false
   loadCases()
 }
 
 function showCasesMessage(message) {
   casesTable.hidden = true
+  casesEmpty.hidden = true
   casesMessage.textContent = message
   casesMessage.hidden = false
 }
 
-/** Fila de un caso. El nombre puede llevar datos del paciente: siempre como texto, nunca como HTML. */
+function showCasesEmpty() {
+  casesTable.hidden = true
+  casesMessage.hidden = true
+  casesEmpty.hidden = false
+  casesCount.textContent = ''
+}
+
+/** Aviso breve abajo de la pantalla (copiado, errores). */
+function showToast(message, { error = false } = {}) {
+  toast.textContent = message
+  toast.classList.toggle('is-error', error)
+  toast.hidden = false
+  clearTimeout(showToast.timer)
+  showToast.timer = setTimeout(() => {
+    toast.hidden = true
+  }, error ? 6000 : 3000)
+}
+
+const ICON_COPY =
+  '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/></svg>'
+const ICON_CHECK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7"/></svg>'
+const ICON_TRASH =
+  '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5v-2h3v2M4.5 4.5l.6 9h5.8l.6-9"/></svg>'
+
+function iconButton({ action, caseId, icon, label, className = '' }) {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = `icon-button ${className}`.trim()
+  button.dataset.action = action
+  button.dataset.caseId = caseId
+  button.title = label
+  button.setAttribute('aria-label', label)
+  // Iconos fijos del propio codigo, nunca datos del caso.
+  button.innerHTML = icon
+  return button
+}
+
+/**
+ * Fila de un caso. Toda la fila abre el caso (ver el listener de la tabla);
+ * el nombre es ademas un enlace de verdad, para abrirlo en otra pestana o con
+ * el teclado. El nombre puede llevar datos del paciente: siempre como texto,
+ * nunca como HTML.
+ */
 function caseRow(item) {
   const row = document.createElement('tr')
-  const cells = [item.name, linkLabel(item), formatDate(item.createdAt), formatDate(item.updatedAt)]
-  for (const text of cells) {
-    const cell = document.createElement('td')
-    cell.textContent = text
-    row.appendChild(cell)
+  row.className = 'case-row'
+  row.dataset.href = caseEditorUrl(item.id)
+
+  const name = document.createElement('td')
+  const open = document.createElement('a')
+  open.className = 'case-open'
+  open.href = caseEditorUrl(item.id)
+  open.textContent = item.name
+  const created = document.createElement('div')
+  created.className = 'case-sub'
+  created.textContent = `Creado ${formatDate(item.createdAt)}`
+  name.append(open, created)
+
+  const updated = document.createElement('td')
+  updated.className = 'col-updated'
+  updated.textContent = formatDate(item.updatedAt)
+
+  const link = document.createElement('td')
+  link.className = 'case-link'
+  if (item.status === 'linked' && item.linkGeneratedAt) {
+    const date = document.createElement('span')
+    date.className = 'link-date'
+    date.textContent = formatDate(item.linkGeneratedAt)
+    const cell = document.createElement('span')
+    cell.className = 'link-cell'
+    cell.append(date, iconButton({ action: 'share-case', caseId: item.id, icon: ICON_COPY, label: 'Copiar enlace' }))
+    link.append(cell)
+  } else {
+    const generate = document.createElement('button')
+    generate.type = 'button'
+    generate.className = 'secondary'
+    generate.dataset.action = 'share-case'
+    generate.dataset.caseId = item.id
+    generate.textContent = shareActionLabel(item.status)
+    link.append(generate)
   }
+
   const actions = document.createElement('td')
   actions.className = 'case-actions'
-  const open = document.createElement('a')
-  open.href = caseEditorUrl(item.id)
-  open.textContent = 'Abrir'
-  const share = document.createElement('button')
-  share.type = 'button'
-  share.dataset.action = 'share-case'
-  share.dataset.caseId = item.id
-  share.textContent = shareActionLabel(item.status)
-  const remove = document.createElement('button')
-  remove.type = 'button'
-  remove.className = 'danger'
-  remove.dataset.action = 'delete-case'
-  remove.dataset.caseId = item.id
-  remove.textContent = 'Borrar'
-  actions.append(open, share, remove)
-  row.appendChild(actions)
+  const chevron = document.createElement('span')
+  chevron.className = 'case-chevron'
+  chevron.setAttribute('aria-hidden', 'true')
+  chevron.textContent = '›'
+  actions.append(
+    iconButton({ action: 'delete-case', caseId: item.id, icon: ICON_TRASH, label: 'Borrar caso', className: 'delete' }),
+    chevron,
+  )
+
+  row.append(name, updated, link, actions)
   return row
 }
+
+casesBody.addEventListener('click', (event) => {
+  if (event.target.closest('a, button')) return
+  const row = event.target.closest('tr.case-row')
+  if (row) window.location.href = row.dataset.href
+})
 
 async function fetchCasesPage(cursor) {
   try {
@@ -99,8 +173,10 @@ async function fetchCasesPage(cursor) {
 function renderCases() {
   casesBody.replaceChildren(...sortCases(loadedCases).map(caseRow))
   casesMessage.hidden = true
+  casesEmpty.hidden = true
   casesTable.hidden = false
   loadMoreButton.hidden = !nextCursor
+  casesCount.textContent = `${loadedCases.length}${nextCursor ? '+' : ''}`
 }
 
 /** Primera pagina: al entrar y tras crear, compartir o borrar un caso. */
@@ -122,8 +198,8 @@ async function loadCases() {
   }
   loadedCases = result.cases
   nextCursor = result.nextCursor
-  if (loadedCases.length === 0) {
-    showCasesMessage('Todavía no hay casos.')
+  if (loadedCases.length === 0 && !nextCursor) {
+    showCasesEmpty()
     return
   }
   renderCases()
@@ -139,7 +215,7 @@ async function loadMoreCases() {
     return
   }
   if (result._tag !== 'Cases') {
-    showShareError('No se han podido cargar más casos. Vuelve a probar en un momento.')
+    showToast('No se han podido cargar más casos. Vuelve a probar en un momento.', { error: true })
     return
   }
   loadedCases = [...loadedCases, ...result.cases]
@@ -160,6 +236,7 @@ function showNewCaseError(message) {
 }
 
 function openNewCase() {
+  casesEmpty.hidden = true
   newCaseForm.reset()
   showNewCaseStatus(null)
   showNewCaseError(null)
@@ -170,6 +247,7 @@ function openNewCase() {
 function closeNewCase() {
   if (uploading) return
   newCaseForm.hidden = true
+  if (loadedCases.length === 0 && !nextCursor && casesMessage.hidden) casesEmpty.hidden = false
 }
 
 function setUploading(value) {
@@ -237,33 +315,37 @@ newCaseForm.addEventListener('submit', async (event) => {
 
 // --- Enlace del doctor ---
 
-function showShareError(message) {
-  shareError.hidden = !message
-  shareError.textContent = message ?? ''
+/** Copia al portapapeles; si el navegador no deja, se muestra para copiarlo a mano. */
+async function copyToClipboard(url) {
+  try {
+    await navigator.clipboard.writeText(url)
+    return true
+  } catch {
+    window.prompt('Copia el enlace del doctor:', url)
+    return false
+  }
 }
 
-/** Copia al portapapeles; si el navegador no deja, el enlace queda seleccionado para copiarlo a mano. */
-async function copyShareLink() {
-  try {
-    await navigator.clipboard.writeText(shareResultUrl.value)
-    shareResultText.textContent = `${shareResultText.dataset.caseName}: enlace copiado. Pégalo en WhatsApp o donde quieras enviarlo.`
-  } catch {
-    shareResultUrl.select()
-    shareResultText.textContent = `${shareResultText.dataset.caseName}: copia el enlace seleccionado (Ctrl+C o Cmd+C).`
-  }
+/** Icono de copiar en ✓ durante un momento, como confirmacion en la propia fila. */
+function flashCopied(button) {
+  if (!button.classList.contains('icon-button')) return
+  button.innerHTML = ICON_CHECK
+  button.classList.add('is-done')
+  setTimeout(() => {
+    button.innerHTML = ICON_COPY
+    button.classList.remove('is-done')
+  }, 1500)
 }
 
 async function shareCase(button) {
   const caseId = button.dataset.caseId
-  const caseName = button.closest('tr')?.cells[0]?.textContent ?? ''
-  showShareError(null)
-  shareResult.hidden = true
+  const caseName = loadedCases.find((c) => c.id === caseId)?.name ?? ''
   button.disabled = true
   let result
   try {
     result = await authorizedCall(session, (token) => api.shareCase(token, caseId))
   } catch {
-    showShareError('No se ha podido contactar con el servidor. Vuelve a probar en un momento.')
+    showToast('No se ha podido contactar con el servidor. Vuelve a probar en un momento.', { error: true })
     return
   } finally {
     button.disabled = false
@@ -273,17 +355,18 @@ async function shareCase(button) {
     return
   }
   if (result._tag === 'ModelNotUploaded') {
-    showShareError(`${caseName}: el modelo no llegó a subirse. Crea el caso de nuevo.`)
+    showToast(`${caseName}: el modelo no llegó a subirse. Crea el caso de nuevo.`, { error: true })
     return
   }
   if (result._tag !== 'Shared') {
-    showShareError('No se ha podido obtener el enlace. Vuelve a probar en un momento.')
+    showToast('No se ha podido obtener el enlace. Vuelve a probar en un momento.', { error: true })
     return
   }
-  shareResultUrl.value = doctorLinkUrl(result.sharePath, window.location.href)
-  shareResultText.dataset.caseName = caseName
-  shareResult.hidden = false
-  await copyShareLink()
+  const copied = await copyToClipboard(doctorLinkUrl(result.sharePath, window.location.href))
+  if (copied) {
+    flashCopied(button)
+    showToast(result.generatedNow ? 'Enlace generado y copiado al portapapeles' : 'Enlace copiado al portapapeles')
+  }
   if (result.generatedNow) loadCases()
 }
 
@@ -334,10 +417,9 @@ async function confirmDelete() {
     return
   }
   closeDeleteDialog()
-  shareResult.hidden = true
   if (window.caches) createModelCache({ cacheStorage: window.caches }).remove(`case/${id}`).catch(() => {})
   loadedCases = loadedCases.filter((c) => c.id !== id)
-  if (loadedCases.length === 0 && !nextCursor) showCasesMessage('Todavía no hay casos.')
+  if (loadedCases.length === 0 && !nextCursor) showCasesEmpty()
   else renderCases()
 }
 
@@ -367,7 +449,6 @@ document.addEventListener('click', (event) => {
   if (button?.dataset.action === 'new-case') openNewCase()
   if (button?.dataset.action === 'cancel-new-case') closeNewCase()
   if (button?.dataset.action === 'share-case') shareCase(button)
-  if (button?.dataset.action === 'copy-share') copyShareLink()
   if (button?.dataset.action === 'load-more') loadMoreCases()
   if (button?.dataset.action === 'delete-case') openDeleteDialog(button.dataset.caseId)
   if (button?.dataset.action === 'cancel-delete') closeDeleteDialog()

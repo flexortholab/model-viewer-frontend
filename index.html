@@ -10,53 +10,65 @@
     <link rel="stylesheet" href="./src/panel.css" />
   </head>
   <body class="panel-page">
-    <main class="panel-main">
-      <img class="panel-logo" src="./logo.svg" alt="Flex Ortholab, laboratorio digital" />
+    <header class="app-header">
+      <div class="app-header-inner">
+        <a class="app-brand" href="./">
+          <img class="app-logo" src="./logo.svg" alt="Flex Ortholab, laboratorio digital" />
+          <span class="app-brand-text">Panel del laboratorio</span>
+        </a>
+        <span id="panel-user" class="panel-user" hidden>
+          <span id="user-email"></span>
+          <button type="button" class="link-button" data-action="logout">Cerrar sesión</button>
+        </span>
+      </div>
+    </header>
 
-      <section id="signed-in" class="panel-section" hidden>
-        <header class="panel-header">
-          <span class="panel-title">
-            <strong>Casos</strong>
-            <button type="button" class="primary" data-action="new-case">Nuevo caso</button>
-          </span>
-          <span class="panel-user">
-            <span id="user-email"></span>
-            <button type="button" data-action="logout">Cerrar sesión</button>
-          </span>
+    <main class="panel-main">
+      <section id="signed-in" class="cases-card" hidden>
+        <header class="cases-card-head">
+          <h1 class="cases-title">Casos <span id="cases-count" class="cases-count"></span></h1>
+          <button type="button" class="button-solid" data-action="new-case">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+            Nuevo caso
+          </button>
         </header>
-        <form id="new-case" class="modal-card panel-card new-case" novalidate hidden>
-          <div class="modal-head"><strong>Nuevo caso</strong></div>
-          <label class="modal-field">
-            Nombre del caso
-            <input name="name" type="text" maxlength="200" autocomplete="off" required />
-          </label>
-          <label class="modal-field">
-            Modelo (GLB, hasta 500 MB)
-            <input name="model" type="file" accept=".glb,model/gltf-binary" required />
-          </label>
+
+        <form id="new-case" class="new-case" novalidate hidden>
+          <div class="new-case-fields">
+            <label class="modal-field">
+              Nombre del caso
+              <input name="name" type="text" maxlength="200" autocomplete="off" required />
+            </label>
+            <label class="modal-field">
+              Modelo (GLB, hasta 500 MB)
+              <input name="model" type="file" accept=".glb,model/gltf-binary" required />
+            </label>
+          </div>
           <p id="new-case-status" class="new-case-status" role="status" hidden></p>
           <p id="new-case-error" class="modal-error" role="alert" hidden></p>
           <div class="modal-actions">
             <button type="button" data-action="cancel-new-case">Cancelar</button>
-            <button type="submit" class="primary">Crear y subir</button>
+            <button type="submit" class="button-solid">Crear y subir</button>
           </div>
         </form>
-        <div id="share-result" class="share-result" role="status" hidden>
-          <p id="share-result-text" class="share-result-text"></p>
-          <div class="share-result-link">
-            <input id="share-result-url" type="text" readonly aria-label="Enlace del doctor" />
-            <button type="button" class="primary" data-action="copy-share">Copiar</button>
-          </div>
+
+        <p id="cases-message" class="cases-message" role="status">Cargando casos…</p>
+
+        <div id="cases-empty" class="cases-empty" hidden>
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M10 14h11l3 4h14v18H10z" />
+            <path d="M24 23v8M20 27h8" />
+          </svg>
+          <p>Todavía no hay casos</p>
+          <button type="button" class="button-solid" data-action="new-case">Crear el primer caso</button>
         </div>
-        <p id="share-error" class="modal-error share-error" role="alert" hidden></p>
-        <p id="cases-message" class="panel-empty" role="status">Cargando casos…</p>
+
         <table id="cases" class="cases-table" hidden>
           <thead>
             <tr>
               <th scope="col">Caso</th>
-              <th scope="col">Enlace</th>
-              <th scope="col">Creado</th>
-              <th scope="col">Actualizado</th>
+              <th scope="col" class="col-updated">Actualizado</th>
+              <th scope="col">Enlace del doctor</th>
               <th scope="col"><span class="visually-hidden">Acciones</span></th>
             </tr>
           </thead>
@@ -65,6 +77,8 @@
         <button type="button" id="load-more" class="load-more" data-action="load-more" hidden>Cargar más</button>
       </section>
     </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
     <div id="delete-dialog" class="modal" hidden>
       <div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="delete-title">

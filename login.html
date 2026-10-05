@@ -9,12 +9,15 @@
     <link rel="stylesheet" href="./src/styles.css" />
     <link rel="stylesheet" href="./src/panel.css" />
   </head>
-  <body class="panel-page">
-    <main class="panel-main">
-      <img class="panel-logo" src="./logo.svg" alt="Flex Ortholab, laboratorio digital" />
+  <body class="panel-page login-page">
+    <main class="login-main">
+      <div class="login-brand">
+        <img class="login-logo" src="./logo.svg" alt="Flex Ortholab, laboratorio digital" />
+        <p class="login-subtitle">Panel del laboratorio</p>
+      </div>
 
-      <form id="login" class="modal-card panel-card" novalidate hidden>
-        <div class="modal-head"><strong>Acceso al panel</strong></div>
+      <form id="login" class="login-card" novalidate hidden>
+        <h1 class="login-title">Acceso</h1>
         <label class="modal-field">
           Email
           <input name="email" type="email" autocomplete="username" required />
@@ -24,11 +27,10 @@
           <input name="password" type="password" autocomplete="current-password" required />
         </label>
         <p id="login-error" class="modal-error" role="alert" hidden></p>
-        <div class="modal-actions">
-          <button type="submit" class="primary">Entrar</button>
-        </div>
+        <button type="submit" class="button-solid button-wide">Entrar</button>
       </form>
     </main>
+    <footer class="login-footer">Flex Ortholab · Laboratorio digital</footer>
     <script type="module" src="./src/login.js"></script>
   </body>
 </html>

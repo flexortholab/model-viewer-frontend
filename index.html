@@ -65,6 +65,21 @@
         <button type="button" id="load-more" class="load-more" data-action="load-more" hidden>Cargar más</button>
       </section>
     </main>
+
+    <div id="delete-dialog" class="modal" hidden>
+      <div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="delete-title">
+        <div class="modal-head"><strong id="delete-title">Borrar caso</strong></div>
+        <p class="delete-text">
+          ¿Borrar el caso <strong id="delete-case-name"></strong>? Se borran el modelo y los marcadores, y si tiene enlace
+          el doctor dejará de poder abrirlo. No se puede deshacer.
+        </p>
+        <p id="delete-error" class="modal-error" role="alert" hidden></p>
+        <div class="modal-actions">
+          <button type="button" data-action="cancel-delete">Cancelar</button>
+          <button type="button" class="danger" data-action="confirm-delete">Borrar</button>
+        </div>
+      </div>
+    </div>
     <script type="module" src="./src/panel.js"></script>
   </body>
 </html>

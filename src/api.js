@@ -82,6 +82,18 @@ export function createApi({ base, fetch: doFetch = (...args) => globalThis.fetch
       return { _tag: 'Failed', status }
     },
 
+    /**
+     * Borra el caso: su GLB en S3 y su registro. El enlace del doctor deja de
+     * funcionar. Un caso que ya no existe cuenta como borrado (NotFound).
+     */
+    async deleteCase(token, caseId) {
+      const { status } = await call(`/cases/${encodeURIComponent(caseId)}`, { method: 'DELETE', token })
+      if (status === 204) return { _tag: 'Deleted' }
+      if (status === 400 || status === 404) return { _tag: 'NotFound' }
+      if (status === 401) return { _tag: 'Unauthorized' }
+      return { _tag: 'Failed', status }
+    },
+
     /** Sustituye la configuracion entera del caso (marcadores, medidas, corte). */
     async saveConfig(token, caseId, config) {
       const { status, result } = await call(`/cases/${encodeURIComponent(caseId)}/config`, {

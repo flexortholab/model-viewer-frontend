@@ -197,3 +197,19 @@ test('listCases con cursor pide la pagina siguiente', async () => {
   assert.equal(calls[0].url, '/api/v1/cases?cursor=a%2Bb%2Fc%3D')
   assert.equal(result.nextCursor, null)
 })
+
+test('deleteCase borra el caso con DELETE y el access token', async () => {
+  const { fetch, calls } = fakeFetch(204, null)
+  const result = await createApi({ base: '', fetch }).deleteCase('access-1', 'c1')
+
+  assert.equal(calls[0].url, '/api/v1/cases/c1')
+  assert.equal(calls[0].init.method, 'DELETE')
+  assert.equal(calls[0].init.headers.Authorization, 'Bearer access-1')
+  assert.deepEqual(result, { _tag: 'Deleted' })
+})
+
+test('deleteCase de un caso que ya no existe es NotFound', async () => {
+  const { fetch } = fakeFetch(404, { message: 'KO' })
+
+  assert.deepEqual(await createApi({ base: '', fetch }).deleteCase('a', 'c1'), { _tag: 'NotFound' })
+})

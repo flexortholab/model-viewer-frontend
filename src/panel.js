@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Panel de administracion (index.html, la raiz): lista de casos, alta de un caso
- * nuevo con su GLB y enlace del doctor. Sin sesion, manda a login.html, que vuelve aqui al
+ * nuevo con su GLB, enlace del doctor y borrado. Sin sesion, manda a login.html, que vuelve aqui al
  * entrar. El resto de acciones se iran anadiendo aqui.
  */
 import { applyBrand, BRAND } from './brand.js'
@@ -77,7 +77,13 @@ function caseRow(item) {
   share.dataset.action = 'share-case'
   share.dataset.caseId = item.id
   share.textContent = shareActionLabel(item.status)
-  actions.append(open, share)
+  const remove = document.createElement('button')
+  remove.type = 'button'
+  remove.className = 'danger'
+  remove.dataset.action = 'delete-case'
+  remove.dataset.caseId = item.id
+  remove.textContent = 'Borrar'
+  actions.append(open, share, remove)
   row.appendChild(actions)
   return row
 }
@@ -281,6 +287,68 @@ async function shareCase(button) {
   if (result.generatedNow) loadCases()
 }
 
+// --- Borrar un caso ---
+
+const deleteDialog = document.getElementById('delete-dialog')
+const deleteCaseName = document.getElementById('delete-case-name')
+const deleteError = document.getElementById('delete-error')
+const confirmDeleteButton = deleteDialog.querySelector('[data-action="confirm-delete"]')
+/** Caso pendiente de confirmar: { id, name }. */
+let caseToDelete = null
+
+function openDeleteDialog(caseId) {
+  const item = loadedCases.find((c) => c.id === caseId)
+  if (!item) return
+  caseToDelete = { id: item.id, name: item.name }
+  // El nombre puede llevar datos del paciente: como texto, nunca como HTML.
+  deleteCaseName.textContent = item.name
+  deleteError.hidden = true
+  confirmDeleteButton.disabled = false
+  deleteDialog.hidden = false
+  deleteDialog.querySelector('[data-action="cancel-delete"]').focus()
+}
+
+function closeDeleteDialog() {
+  caseToDelete = null
+  deleteDialog.hidden = true
+}
+
+async function confirmDelete() {
+  if (!caseToDelete) return
+  const { id } = caseToDelete
+  confirmDeleteButton.disabled = true
+  let result
+  try {
+    result = await authorizedCall(session, (token) => api.deleteCase(token, id))
+  } catch {
+    result = { _tag: 'Unavailable' }
+  }
+  if (result._tag === 'SignedOut') {
+    goToLogin({ expired: true })
+    return
+  }
+  if (result._tag !== 'Deleted' && result._tag !== 'NotFound') {
+    deleteError.textContent = 'No se ha podido borrar el caso. Vuelve a probar en un momento.'
+    deleteError.hidden = false
+    confirmDeleteButton.disabled = false
+    return
+  }
+  closeDeleteDialog()
+  shareResult.hidden = true
+  if (window.caches) createModelCache({ cacheStorage: window.caches }).remove(`case/${id}`).catch(() => {})
+  loadedCases = loadedCases.filter((c) => c.id !== id)
+  if (loadedCases.length === 0 && !nextCursor) showCasesMessage('Todavía no hay casos.')
+  else renderCases()
+}
+
+deleteDialog.addEventListener('click', (event) => {
+  if (event.target === deleteDialog) closeDeleteDialog()
+})
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !deleteDialog.hidden) closeDeleteDialog()
+})
+
 // Avisa antes de cerrar o recargar la pagina con una subida a medias.
 window.addEventListener('beforeunload', (event) => {
   if (uploading) event.preventDefault()
@@ -301,6 +369,9 @@ document.addEventListener('click', (event) => {
   if (button?.dataset.action === 'share-case') shareCase(button)
   if (button?.dataset.action === 'copy-share') copyShareLink()
   if (button?.dataset.action === 'load-more') loadMoreCases()
+  if (button?.dataset.action === 'delete-case') openDeleteDialog(button.dataset.caseId)
+  if (button?.dataset.action === 'cancel-delete') closeDeleteDialog()
+  if (button?.dataset.action === 'confirm-delete') confirmDelete()
 })
 
 async function boot() {

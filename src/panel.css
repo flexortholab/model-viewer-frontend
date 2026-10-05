@@ -206,3 +206,24 @@
   border-color: var(--border) !important;
   padding: 6px 16px;
 }
+
+.panel-page button.danger {
+  border-color: rgba(220, 68, 55, 0.45);
+  color: #b3261e;
+}
+
+.panel-page button.danger:hover {
+  background: rgba(220, 68, 55, 0.08);
+}
+
+.modal-actions button.danger {
+  border-color: var(--danger);
+  background: rgba(220, 68, 55, 0.1);
+  font-weight: 600;
+}
+
+.delete-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}

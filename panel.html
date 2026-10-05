@@ -1,69 +1,17 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- El panel esta en la raiz desde octubre de 2026; esta pagina solo redirige
+     para no romper los marcadores del navegador. -->
 <!DOCTYPE html>
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex" />
     <title>Panel del visor</title>
-    <link rel="stylesheet" href="./src/styles.css" />
-    <link rel="stylesheet" href="./src/panel.css" />
+    <script>
+      window.location.replace('./' + window.location.search + window.location.hash)
+    </script>
   </head>
-  <body class="panel-page">
-    <main class="panel-main">
-      <img class="panel-logo" src="./logo.svg" alt="Flex Ortholab, laboratorio digital" />
-
-      <section id="signed-in" class="panel-section" hidden>
-        <header class="panel-header">
-          <span class="panel-title">
-            <strong>Casos</strong>
-            <button type="button" class="primary" data-action="new-case">Nuevo caso</button>
-          </span>
-          <span class="panel-user">
-            <span id="user-email"></span>
-            <button type="button" data-action="logout">Cerrar sesión</button>
-          </span>
-        </header>
-        <form id="new-case" class="modal-card panel-card new-case" novalidate hidden>
-          <div class="modal-head"><strong>Nuevo caso</strong></div>
-          <label class="modal-field">
-            Nombre del caso
-            <input name="name" type="text" maxlength="200" autocomplete="off" required />
-          </label>
-          <label class="modal-field">
-            Modelo (GLB, hasta 500 MB)
-            <input name="model" type="file" accept=".glb,model/gltf-binary" required />
-          </label>
-          <p id="new-case-status" class="new-case-status" role="status" hidden></p>
-          <p id="new-case-error" class="modal-error" role="alert" hidden></p>
-          <div class="modal-actions">
-            <button type="button" data-action="cancel-new-case">Cancelar</button>
-            <button type="submit" class="primary">Crear y subir</button>
-          </div>
-        </form>
-        <div id="share-result" class="share-result" role="status" hidden>
-          <p id="share-result-text" class="share-result-text"></p>
-          <div class="share-result-link">
-            <input id="share-result-url" type="text" readonly aria-label="Enlace del doctor" />
-            <button type="button" class="primary" data-action="copy-share">Copiar</button>
-          </div>
-        </div>
-        <p id="share-error" class="modal-error share-error" role="alert" hidden></p>
-        <p id="cases-message" class="panel-empty" role="status">Cargando casos…</p>
-        <table id="cases" class="cases-table" hidden>
-          <thead>
-            <tr>
-              <th scope="col">Caso</th>
-              <th scope="col">Estado</th>
-              <th scope="col">Creado</th>
-              <th scope="col">Actualizado</th>
-              <th scope="col"><span class="visually-hidden">Acciones</span></th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </section>
-    </main>
-    <script type="module" src="./src/panel.js"></script>
+  <body>
+    <p><a href="./">Ir al panel</a></p>
   </body>
 </html>

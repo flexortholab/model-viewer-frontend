@@ -509,6 +509,10 @@ const arrastre = await evaluate(`
     const s = v.section
     const el = v.renderer.domElement
     const V3 = v.camera.position.constructor
+    // Encuadre conocido antes de calcular donde cae el asa: segun lo que haya
+    // pasado antes, la camara podia quedar con el gizmo fuera de pantalla (#12).
+    v.resize()
+    v.frameModel()
     if (!s.gizmoOn) s.setGizmoMode('combined')
     s.updatePivotGizmo()
     v.scene.updateMatrixWorld(true)

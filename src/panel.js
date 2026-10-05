@@ -28,6 +28,10 @@ const userEmail = document.getElementById('user-email')
 const casesTable = document.getElementById('cases')
 const casesBody = casesTable.querySelector('tbody')
 const casesMessage = document.getElementById('cases-message')
+const loadMoreButton = document.getElementById('load-more')
+/** Casos cargados hasta ahora y cursor de la pagina siguiente (null en la ultima). */
+let loadedCases = []
+let nextCursor = null
 const newCaseForm = document.getElementById('new-case')
 const newCaseStatus = document.getElementById('new-case-status')
 const newCaseError = document.getElementById('new-case-error')
@@ -78,30 +82,63 @@ function caseRow(item) {
   return row
 }
 
+async function fetchCasesPage(cursor) {
+  try {
+    return await authorizedCall(session, (token) => api.listCases(token, { cursor }))
+  } catch {
+    return { _tag: 'Unavailable' }
+  }
+}
+
+function renderCases() {
+  casesBody.replaceChildren(...sortCases(loadedCases).map(caseRow))
+  casesMessage.hidden = true
+  casesTable.hidden = false
+  loadMoreButton.hidden = !nextCursor
+}
+
+/** Primera pagina: al entrar y tras crear, compartir o borrar un caso. */
 async function loadCases() {
   showCasesMessage('Cargando casos…')
-  let result
-  try {
-    result = await authorizedCall(session, (token) => api.listCases(token))
-  } catch {
-    showCasesMessage('No se ha podido contactar con el servidor. Recarga la página para volver a probar.')
-    return
-  }
+  loadMoreButton.hidden = true
+  const result = await fetchCasesPage(null)
   if (result._tag === 'SignedOut') {
     goToLogin({ expired: true })
+    return
+  }
+  if (result._tag === 'Unavailable') {
+    showCasesMessage('No se ha podido contactar con el servidor. Recarga la página para volver a probar.')
     return
   }
   if (result._tag !== 'Cases') {
     showCasesMessage('No se han podido cargar los casos. Recarga la página para volver a probar.')
     return
   }
-  if (result.cases.length === 0) {
+  loadedCases = result.cases
+  nextCursor = result.nextCursor
+  if (loadedCases.length === 0) {
     showCasesMessage('Todavía no hay casos.')
     return
   }
-  casesBody.replaceChildren(...sortCases(result.cases).map(caseRow))
-  casesMessage.hidden = true
-  casesTable.hidden = false
+  renderCases()
+}
+
+async function loadMoreCases() {
+  if (!nextCursor) return
+  loadMoreButton.disabled = true
+  const result = await fetchCasesPage(nextCursor)
+  loadMoreButton.disabled = false
+  if (result._tag === 'SignedOut') {
+    goToLogin({ expired: true })
+    return
+  }
+  if (result._tag !== 'Cases') {
+    showShareError('No se han podido cargar más casos. Vuelve a probar en un momento.')
+    return
+  }
+  loadedCases = [...loadedCases, ...result.cases]
+  nextCursor = result.nextCursor
+  renderCases()
 }
 
 // --- Caso nuevo ---
@@ -263,6 +300,7 @@ document.addEventListener('click', (event) => {
   if (button?.dataset.action === 'cancel-new-case') closeNewCase()
   if (button?.dataset.action === 'share-case') shareCase(button)
   if (button?.dataset.action === 'copy-share') copyShareLink()
+  if (button?.dataset.action === 'load-more') loadMoreCases()
 })
 
 async function boot() {

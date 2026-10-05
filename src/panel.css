@@ -200,3 +200,9 @@
   color: var(--text);
   background: #fafbfc;
 }
+
+.load-more {
+  align-self: center;
+  border-color: var(--border) !important;
+  padding: 6px 16px;
+}

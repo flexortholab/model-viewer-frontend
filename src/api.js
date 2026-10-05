@@ -28,7 +28,7 @@ export function createApi({ base, fetch: doFetch = (...args) => globalThis.fetch
       body: body === undefined ? undefined : JSON.stringify(body),
     })
     const data = await response.json().catch(() => null)
-    return { status: response.status, result: data?.result }
+    return { status: response.status, result: data?.result, nextCursor: data?.nextCursor }
   }
 
   return {
@@ -43,10 +43,15 @@ export function createApi({ base, fetch: doFetch = (...args) => globalThis.fetch
       return { _tag: 'Failed', status }
     },
 
-    /** Todos los casos con su estado y fechas. Exige access token. */
-    async listCases(token) {
-      const { status, result } = await call('/cases', { token })
-      if (status === 200) return { _tag: 'Cases', cases: result }
+    /**
+     * Una pagina de casos, lo modificado mas recientemente primero. Con
+     * `cursor` (el `nextCursor` de la pagina anterior) trae la siguiente;
+     * `nextCursor` falta en la ultima pagina. Exige access token.
+     */
+    async listCases(token, { cursor } = {}) {
+      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
+      const { status, result, nextCursor } = await call(`/cases${query}`, { token })
+      if (status === 200) return { _tag: 'Cases', cases: result, nextCursor: nextCursor ?? null }
       if (status === 401) return { _tag: 'Unauthorized' }
       return { _tag: 'Failed', status }
     },

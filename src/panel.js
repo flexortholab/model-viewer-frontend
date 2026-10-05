@@ -7,6 +7,7 @@
 import { applyBrand, BRAND } from './brand.js'
 import { api, session } from './app-session.js'
 import { authorizedCall } from './authorized.js'
+import { createModelCache } from './model-cache.js'
 import {
   caseEditorUrl,
   doctorLinkUrl,
@@ -18,7 +19,6 @@ import {
   validateNewCase,
 } from './cases.js'
 import { LOGIN_PAGE, loginUrl, PANEL_PAGE } from './navigation.js'
-import { createModelCache } from './model-cache.js'
 
 applyBrand()
 document.title = `Panel · ${BRAND.name}`

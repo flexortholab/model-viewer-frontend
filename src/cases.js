@@ -56,3 +56,15 @@ export function validateNewCase({ name, file }) {
     return { _tag: 'Invalid', message: `El modelo pesa ${formatSize(file.size)}; el máximo es ${formatSize(MAX_MODEL_SIZE_BYTES)}.` }
   return { _tag: 'Valid', name: trimmed, sizeBytes: file.size }
 }
+
+/** Limite de la configuracion de un caso en la API, en bytes de JSON en UTF-8. */
+export const MAX_CONFIG_BYTES = 350_000
+
+export function configBytes(config) {
+  return new TextEncoder().encode(JSON.stringify(config)).length
+}
+
+/** Pagina del visor que abre un caso del panel para editarlo. */
+export function caseEditorUrl(caseId) {
+  return `index.html?case=${encodeURIComponent(caseId)}`
+}

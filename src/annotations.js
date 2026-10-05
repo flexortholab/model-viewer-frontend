@@ -30,6 +30,31 @@ export function createDocument({ model = '', meta = {} } = {}) {
 
 const isVec3 = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => Number.isFinite(n))
 
+/** Mediciones validas con ids unicos (las del documento y las de cada marcador). */
+function normalizeMeasurements(list) {
+  const seen = new Set()
+  return list
+    .filter((m) => m && isVec3(m.a) && isVec3(m.b))
+    .map((m, i) => {
+      let id = typeof m.id === 'string' && m.id && !seen.has(m.id) ? m.id : `m${i + 1}`
+      while (seen.has(id)) id = `m${i + 1}_${seen.size}`
+      seen.add(id)
+      return {
+        id,
+        a: m.a.map(Number),
+        b: m.b.map(Number),
+        note: typeof m.note === 'string' ? m.note : '',
+      }
+    })
+}
+
+/** Visibilidad de piezas guardada en un marcador: [{ index, visible }]. */
+function normalizeObjects(list) {
+  return list
+    .filter((o) => o && Number.isInteger(o.index) && o.index >= 0)
+    .map((o) => ({ index: o.index, visible: o.visible !== false }))
+}
+
 /** Valida y normaliza un documento. Lanza si esta corrupto. */
 export function validateDocument(raw) {
   if (!raw || typeof raw !== 'object') throw new Error('Anotaciones: documento vacio o invalido.')
@@ -66,20 +91,7 @@ export function validateDocument(raw) {
   }
 
   if (Array.isArray(raw.measurements)) {
-    const seen = new Set()
-    doc.measurements = raw.measurements
-      .filter((m) => m && isVec3(m.a) && isVec3(m.b))
-      .map((m, i) => {
-        let id = typeof m.id === 'string' && m.id && !seen.has(m.id) ? m.id : `m${i + 1}`
-        while (seen.has(id)) id = `m${i + 1}_${seen.size}`
-        seen.add(id)
-        return {
-          id,
-          a: m.a.map(Number),
-          b: m.b.map(Number),
-          note: typeof m.note === 'string' ? m.note : '',
-        }
-      })
+    doc.measurements = normalizeMeasurements(raw.measurements)
   }
 
   if (Array.isArray(raw.markers)) {
@@ -106,11 +118,25 @@ export function validateDocument(raw) {
           if (isVec3(s.normal)) snap.normal = s.normal.map(Number)
           marker.section = snap
         }
+        // Resto del snapshot del paso: sin esto, al pulsar un marcador
+        // importado se perdian sus medidas y la visibilidad de las piezas.
+        if (Array.isArray(m.measurements)) marker.measurements = normalizeMeasurements(m.measurements)
+        if (Array.isArray(m.objects)) marker.objects = normalizeObjects(m.objects)
         return marker
       })
   }
 
   return doc
+}
+
+/**
+ * Copia del documento para guardarla en la API: sin `model`. La URL del
+ * modelo de un caso es una URL firmada que caduca en minutos; la API da una
+ * nueva cada vez que se abre el caso.
+ */
+export function toStoredConfig(doc) {
+  const { model, ...config } = structuredClone(doc)
+  return config
 }
 
 export function serialize(doc) {

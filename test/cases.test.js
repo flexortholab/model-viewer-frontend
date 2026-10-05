@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { formatDate, formatSize, sortCases, statusLabel, validateNewCase } from '../src/cases.js'
+import { caseEditorUrl, configBytes, formatDate, formatSize, sortCases, statusLabel, validateNewCase } from '../src/cases.js'
 
 test('los estados de la API se muestran en espanol', () => {
   assert.equal(statusLabel('draft'), 'Borrador')
@@ -53,4 +53,13 @@ test('un caso nuevo exige un .glb no vacio de hasta 500 MB', () => {
 
 test('los tamanos se muestran en MB con coma decimal', () => {
   assert.equal(formatSize(14.2 * 1024 * 1024), '14,2 MB')
+})
+
+test('el tamano de la configuracion se mide en bytes UTF-8, como en la API', () => {
+  assert.equal(configBytes({ a: 'ñ' }), JSON.stringify({ a: 'ñ' }).length + 1)
+})
+
+test('la URL del editor lleva el id del caso codificado', () => {
+  assert.equal(caseEditorUrl('2f0c4b9e-1c7a'), 'index.html?case=2f0c4b9e-1c7a')
+  assert.equal(caseEditorUrl('a&b'), 'index.html?case=a%26b')
 })

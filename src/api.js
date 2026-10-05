@@ -51,6 +51,29 @@ export function createApi({ base, fetch: doFetch = (...args) => globalThis.fetch
       return { _tag: 'Failed', status }
     },
 
+    /** Un caso con su configuracion y una URL firmada (5 min) para descargar su GLB. */
+    async getCase(token, caseId) {
+      const { status, result } = await call(`/cases/${encodeURIComponent(caseId)}`, { token })
+      if (status === 200) return { _tag: 'Found', case: result }
+      if (status === 400 || status === 404) return { _tag: 'NotFound' }
+      if (status === 401) return { _tag: 'Unauthorized' }
+      return { _tag: 'Failed', status }
+    },
+
+    /** Sustituye la configuracion entera del caso (marcadores, medidas, corte). */
+    async saveConfig(token, caseId, config) {
+      const { status, result } = await call(`/cases/${encodeURIComponent(caseId)}/config`, {
+        method: 'PUT',
+        token,
+        body: config,
+      })
+      if (status === 200) return { _tag: 'Saved', updatedAt: result.updatedAt }
+      if (status === 400) return { _tag: 'Invalid' }
+      if (status === 404) return { _tag: 'NotFound' }
+      if (status === 401) return { _tag: 'Unauthorized' }
+      return { _tag: 'Failed', status }
+    },
+
     /**
      * Crea un caso en borrador y devuelve la subida firmada de su GLB.
      * `sizeBytes` tiene que ser el tamano exacto del fichero: va firmado.

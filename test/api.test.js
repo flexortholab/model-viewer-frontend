@@ -135,3 +135,32 @@ test('uploadModel distingue la URL caducada del modelo ya subido', async () => {
     assert.equal(result._tag, tag)
   }
 })
+
+test('getCase pide el caso con el access token y lo devuelve', async () => {
+  const detail = { id: 'c/1', name: 'Caso', config: {}, model: { url: 'https://s3.test/m.glb?X-Amz-Signature=1', expiresAt: 'z' } }
+  const { fetch, calls } = fakeFetch(200, { result: detail })
+  const result = await createApi({ base: '', fetch }).getCase('access-1', 'c/1')
+
+  assert.equal(calls[0].url, '/api/v1/cases/c%2F1')
+  assert.equal(calls[0].init.headers.Authorization, 'Bearer access-1')
+  assert.deepEqual(result, { _tag: 'Found', case: detail })
+})
+
+test('getCase con 404 o un id mal formado (400) es un caso que no existe', async () => {
+  for (const status of [400, 404]) {
+    const { fetch } = fakeFetch(status, { message: 'KO' })
+
+    assert.deepEqual(await createApi({ base: '', fetch }).getCase('a', 'x'), { _tag: 'NotFound' })
+  }
+})
+
+test('saveConfig sustituye la configuracion con PUT', async () => {
+  const config = { version: 1, markers: [{ id: 'k1', position: [0, 0, 0] }] }
+  const { fetch, calls } = fakeFetch(200, { result: { id: 'c1', updatedAt: '2026-10-05T10:00:00.000Z' } })
+  const result = await createApi({ base: '', fetch }).saveConfig('access-1', 'c1', config)
+
+  assert.equal(calls[0].url, '/api/v1/cases/c1/config')
+  assert.equal(calls[0].init.method, 'PUT')
+  assert.deepEqual(JSON.parse(calls[0].init.body), config)
+  assert.deepEqual(result, { _tag: 'Saved', updatedAt: '2026-10-05T10:00:00.000Z' })
+})

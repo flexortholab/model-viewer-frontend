@@ -52,9 +52,9 @@ pieza y seguir dando la vuelta. El modo anterior (`OrbitControls`), que se queda
 clavado al llegar a superior/inferior, sigue disponible con **`?giro=orbit`**; el
 libre se puede forzar con **`?giro=libre`**. En `demo-giro.html` hay un interruptor
 en pantalla para comparar ambos modos con la escena real.
-> **Demo desplegada (GitHub Pages, rama gh-pages):** https://flexortholab.github.io/model-viewer-frontend/
-> **Demo cargada con la pieza de ejemplo (visita recomendada):** https://flexortholab.github.io/model-viewer-frontend/?model=samples/B1-draco.glb
-> **Modelo decimado para pruebas móviles:** https://flexortholab.github.io/model-viewer-frontend/?model=samples/Test1.glb (~5 MB, ~415 k triángulos)
+> **Demo desplegada (GitHub Pages):** https://flexortholab.github.io/model-viewer-frontend/visor.html
+> **Demo cargada con la pieza de ejemplo (visita recomendada):** https://flexortholab.github.io/model-viewer-frontend/visor.html?model=samples/B1-draco.glb
+> **Modelo decimado para pruebas móviles:** https://flexortholab.github.io/model-viewer-frontend/visor.html?model=samples/Test1.glb (~5 MB, ~415 k triángulos)
 > La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.
 
 ---
@@ -71,7 +71,7 @@ Probar con la muestra incluida:
 ```bash
 npm run sample     # genera public/samples/*.stl
 npm run dev
-# abrir http://localhost:5173/?model=samples/disyuntor-4-pilares.stl
+# abrir http://localhost:5173/visor.html?model=samples/disyuntor-4-pilares.stl
 ```
 
 Producción:
@@ -114,11 +114,11 @@ Toda la marca vive en **`src/brand.js`** (objeto `BRAND`): no hay que perseguir 
 
 ## Panel de administración
 
-`panel.html` es el panel del laboratorio, conectado a la API del visor ([model-viewer-backend](https://github.com/flexortholab/model-viewer-backend)), con la lista de casos. Sin sesión, manda a `login.html` (email y contraseña), que vuelve al panel al entrar. Los usuarios los da de alta Sergio con un script del backend; no hay registro abierto.
+La raíz (`index.html`) es el panel del laboratorio, conectado a la API del visor ([model-viewer-backend](https://github.com/flexortholab/model-viewer-backend)), con la lista de casos. Sin sesión, manda a `login.html` (email y contraseña), que vuelve al panel al entrar. Los usuarios los da de alta Sergio con un script del backend; no hay registro abierto.
 
 - La sesión dura mientras se use: el access token (15 min) se renueva solo con el refresh token (30 días) y se guarda en `localStorage`. La contraseña nunca se guarda.
 - En producción el panel llama a la API directamente. En `npm run dev`, las llamadas pasan por un proxy de Vite (`/dev-api`, ver `vite.config.js`), porque la API solo acepta en CORS el origen de GitHub Pages.
-- El visor (`index.html`) sigue funcionando igual que antes, con `?model=`.
+- El visor está en `visor.html` y sigue funcionando igual, con `?model=`. Los enlaces antiguos a la raíz con `?model=`, `?case=`, `?share=` o `?annotations=` redirigen al visor, y `panel.html` redirige a la raíz.
 
 ## Uso por URL
 
@@ -276,7 +276,7 @@ En pantallas ≤ 640 px los paneles bajan a la parte inferior. Todo el texto est
 ## Arquitectura
 
 ```
-index.html
+visor.html
 └─ src/main.js            arranque, UI, params URL, acciones del host
    ├─ src/brand.js        marca en un solo sitio (nombre, logo, acento)
    ├─ src/viewer.js       clase DentalViewer: escena, cámara, render loop, herramientas

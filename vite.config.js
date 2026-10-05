@@ -28,6 +28,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
+        visor: 'visor.html',
         login: 'login.html',
         panel: 'panel.html',
       },

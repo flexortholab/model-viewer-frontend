@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
- * Panel de administracion (panel.html): lista de casos, alta de un caso
+ * Panel de administracion (index.html, la raiz): lista de casos, alta de un caso
  * nuevo con su GLB y enlace del doctor. Sin sesion, manda a login.html, que vuelve aqui al
  * entrar. El resto de acciones se iran anadiendo aqui.
  */
@@ -17,7 +17,7 @@ import {
   statusLabel,
   validateNewCase,
 } from './cases.js'
-import { LOGIN_PAGE, loginUrl, PANEL_PAGE } from './navigation.js'
+import { LOGIN_PAGE, loginUrl, PANEL_PAGE, viewerRedirectUrl } from './navigation.js'
 
 applyBrand()
 document.title = `Panel · ${BRAND.name}`
@@ -275,4 +275,6 @@ async function boot() {
   showSignedIn()
 }
 
-boot()
+const viewerUrl = viewerRedirectUrl(window.location.search)
+if (viewerUrl) window.location.replace(viewerUrl)
+else boot()

@@ -234,9 +234,10 @@ function renderMarkers() {
     const text = document.createElement('span')
     text.className = 'marker-text' + (marker.text ? '' : ' is-empty')
     text.textContent = marker.text || `Marcador ${index + 1}`
-    text.title = 'Doble clic para editar el texto'
+    text.title = readOnly ? marker.text || '' : 'Doble clic para editar el texto'
     text.addEventListener('dblclick', (event) => {
       event.stopPropagation()
+      if (readOnly) return
       const next = window.prompt('Texto del marcador:', marker.text ?? '')
       if (next === null) return
       viewer.updateMarker(marker.id, { text: next.trim() })
@@ -260,7 +261,7 @@ function renderMarkers() {
       viewer.removeMarker(marker.id)
       renderMarkers()
     })
-    li.append(del)
+    if (!readOnly) li.append(del)
 
     li.addEventListener('click', (event) => {
       if (event.target.closest('.marker-delete')) return
@@ -840,6 +841,9 @@ container.addEventListener('pointerdown', (event) => {
     // A continuacion, mover un marcador.
     const marker = viewer.grabMarker?.(event)
     if (marker) {
+      // En solo lectura se agarra igual (un clic corto enfoca el marcador),
+      // pero no se mueve: ver pointermove.
+      if (readOnly) return
       container.style.cursor = 'grabbing'
       showHint('Arrastra el marcador para cambiar su posición', 3200)
       return
@@ -870,7 +874,7 @@ container.addEventListener('pointermove', (event) => {
     return
   }
   // Camara libre: arrastres de marcador o de extremo de medida.
-  if (viewer.dragMarker?.(event)) return
+  if (!readOnly && viewer.dragMarker?.(event)) return
   if (viewer.dragMeasureEndpoint?.(event)) return
   if (!event.target.closest('.panel, .toolbar, #viewcube, #mobile-ui')) {
     const grabM = viewer.measure?.findEndpoint?.(event.clientX, event.clientY)
@@ -915,13 +919,13 @@ window.addEventListener('keydown', (event) => {
       toggleMeasure()
       break
     case 'k':
-      toggleMarkerTool()
+      if (!readOnly) toggleMarkerTool()
       break
     case 'f':
       viewer.frameModel()
       break
     case 'e':
-      exportAnnotations()
+      if (!readOnly) exportAnnotations()
       break
     case 'escape':
       if (viewer.measure?.enabled) toggleMeasure()
@@ -948,6 +952,22 @@ window.addEventListener('keydown', (event) => {
 
 /** Caso abierto: { id, name }. Null cuando el visor se usa con ?model=. */
 let openedCase = null
+
+/**
+ * Solo lectura (pagina del doctor, ?share=): no se crean, editan, mueven ni
+ * borran marcadores ni se exporta. Medir, cortar y ocultar piezas sigue
+ * disponible, pero nada se guarda.
+ */
+let readOnly = false
+
+function setReadOnly() {
+  readOnly = true
+  if (markerMode) toggleMarkerTool()
+  for (const button of document.querySelectorAll('[data-action="add-marker"], [data-action="export"]')) {
+    button.classList.add('is-read-only')
+  }
+  renderMarkers()
+}
 
 function showCaseMessage(text) {
   if (loader) loader.hidden = true
@@ -979,6 +999,34 @@ async function openCase(caseId) {
   await loadModel(result.case.model.url)
   // Sin `model`: una configuracion guardada nunca debe recargar otra URL.
   await applyAnnotations(toStoredConfig(result.case.config ?? {}))
+}
+
+async function openShare(shareId) {
+  if (loader) {
+    loader.hidden = false
+    if (loaderText) loaderText.textContent = 'Abriendo caso…'
+  }
+  let result
+  try {
+    result = await api.getShare(shareId)
+  } catch {
+    showCaseMessage('No se ha podido abrir el caso. Revisa la conexión y recarga la página.')
+    return
+  }
+  if (result._tag === 'NotFound') {
+    showCaseMessage('Este enlace no es válido o ha sido revocado. Pide uno nuevo al laboratorio.')
+    return
+  }
+  if (result._tag !== 'Found') {
+    showCaseMessage('No se ha podido abrir el caso. Recarga la página para volver a probar.')
+    return
+  }
+  // El nombre del caso solo va en el contenido de la pagina; <title> sigue
+  // siendo el de la marca (lo ve la vista previa de WhatsApp).
+  openedCase = { id: null, name: result.shared.name }
+  setReadOnly()
+  await loadModel(result.shared.model.url)
+  await applyAnnotations(toStoredConfig(result.shared.config ?? {}))
 }
 
 async function saveCase() {
@@ -1019,11 +1067,14 @@ async function boot() {
   const model = params.get('model')
   const annotations = params.get('annotations')
   const caseId = params.get('case')
+  const shareId = params.get('share')
 
   if (model) {
     await loadModel(model, { annotations })
   } else if (caseId) {
     await openCase(caseId)
+  } else if (shareId) {
+    await openShare(shareId)
   } else {
     viewer.doc = createDocument()
     panelVisibility(false)

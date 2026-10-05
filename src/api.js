@@ -118,5 +118,16 @@ export function createApi({ base, fetch: doFetch = (...args) => globalThis.fetch
       if (status === 400 || status === 401) return { _tag: 'Rejected' }
       return { _tag: 'Failed', status }
     },
+
+    /**
+     * Caso compartido con el doctor: nombre, configuracion y URL firmada del
+     * GLB. Ruta publica, sin token: el enlace es el permiso.
+     */
+    async getShare(shareId) {
+      const { status, result } = await call(`/shares/${encodeURIComponent(shareId)}`)
+      if (status === 200) return { _tag: 'Found', shared: result }
+      if (status === 400 || status === 404) return { _tag: 'NotFound' }
+      return { _tag: 'Failed', status }
+    },
   }
 }

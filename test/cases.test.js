@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { caseEditorUrl, configBytes, formatDate, formatSize, sortCases, statusLabel, validateNewCase } from '../src/cases.js'
+import { caseEditorUrl, configBytes, doctorLinkUrl, formatDate, formatSize, shareActionLabel, sortCases, statusLabel, validateNewCase } from '../src/cases.js'
 
 test('los estados de la API se muestran en espanol', () => {
   assert.equal(statusLabel('draft'), 'Borrador')
@@ -62,4 +62,17 @@ test('el tamano de la configuracion se mide en bytes UTF-8, como en la API', () 
 test('la URL del editor lleva el id del caso codificado', () => {
   assert.equal(caseEditorUrl('2f0c4b9e-1c7a'), 'index.html?case=2f0c4b9e-1c7a')
   assert.equal(caseEditorUrl('a&b'), 'index.html?case=a%26b')
+})
+
+test('el enlace del doctor se resuelve contra la carpeta del frontend', () => {
+  assert.equal(
+    doctorLinkUrl('?share=abc', 'https://flexortholab.github.io/model-viewer-frontend/panel.html'),
+    'https://flexortholab.github.io/model-viewer-frontend/?share=abc',
+  )
+  assert.equal(doctorLinkUrl('?share=abc', 'http://localhost:5173/panel.html'), 'http://localhost:5173/?share=abc')
+})
+
+test('el boton de enlace genera en un borrador y copia si ya lo hay', () => {
+  assert.equal(shareActionLabel('draft'), 'Generar enlace')
+  assert.equal(shareActionLabel('linked'), 'Copiar enlace')
 })

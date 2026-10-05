@@ -60,6 +60,23 @@ export function createApi({ base, fetch: doFetch = (...args) => globalThis.fetch
       return { _tag: 'Failed', status }
     },
 
+    /**
+     * Enlace del doctor. Si el caso ya lo tenia, devuelve el mismo (200); si
+     * no, lo genera (201). Exige que el GLB ya este subido (409 si no).
+     */
+    async shareCase(token, caseId) {
+      const { status, result } = await call(`/cases/${encodeURIComponent(caseId)}/share`, {
+        method: 'POST',
+        token,
+      })
+      if (status === 200 || status === 201)
+        return { _tag: 'Shared', sharePath: result.sharePath, generatedNow: status === 201 }
+      if (status === 409) return { _tag: 'ModelNotUploaded' }
+      if (status === 400 || status === 404) return { _tag: 'NotFound' }
+      if (status === 401) return { _tag: 'Unauthorized' }
+      return { _tag: 'Failed', status }
+    },
+
     /** Sustituye la configuracion entera del caso (marcadores, medidas, corte). */
     async saveConfig(token, caseId, config) {
       const { status, result } = await call(`/cases/${encodeURIComponent(caseId)}/config`, {

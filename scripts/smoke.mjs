@@ -15,7 +15,7 @@ import { join } from 'node:path'
 
 const BASE = process.argv[2] ?? 'http://localhost:4173'
 const EXTRA_QUERY = process.argv[3] ? `&${process.argv[3]}` : ''
-const URL_TEST = `${BASE}/visor.html?model=samples/disyuntor-4-pilares.stl&embed=0${EXTRA_QUERY}`
+const URL_TEST = `${BASE}/viewer.html?model=samples/disyuntor-4-pilares.stl&embed=0${EXTRA_QUERY}`
 
 // HEADED=1 abre el Chromium con ventana para poder ver la prueba con tus ojos.
 // Por defecto es headless (rápido y sin Occupying la pantalla).
@@ -1740,7 +1740,7 @@ check('el canvas vuelve al tamano original tras el shot', Math.abs(shot.back - s
   `${shot.back} vs ${shot.normal}`)
 
 // --- Modelo GLB decimado ----------------------------------------------------
-const GLB_URL = `${BASE}/visor.html?model=samples/Test1.glb&embed=0${EXTRA_QUERY}`
+const GLB_URL = `${BASE}/viewer.html?model=samples/Test1.glb&embed=0${EXTRA_QUERY}`
 console.log(`\nVisor (GLB decimado): ${GLB_URL}\n`)
 const mainConsoleErrors = [...consoleErrors]
 const mainPageErrors = [...pageErrors]

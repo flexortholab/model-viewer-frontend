@@ -1006,7 +1006,7 @@ async function openCase(caseId) {
   const hadSession = session.email() !== null
   const result = await authorizedCall(session, (token) => api.getCase(token, caseId))
   if (result._tag === 'SignedOut') {
-    window.location.replace(loginUrl(`visor.html?case=${encodeURIComponent(caseId)}`, { expired: hadSession }))
+    window.location.replace(loginUrl(`viewer.html?case=${encodeURIComponent(caseId)}`, { expired: hadSession }))
     return
   }
   if (result._tag === 'NotFound') {

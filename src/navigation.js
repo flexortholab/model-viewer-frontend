@@ -5,7 +5,7 @@
 
 export const LOGIN_PAGE = 'login.html'
 export const PANEL_PAGE = './'
-export const VIEWER_PAGE = 'visor.html'
+export const VIEWER_PAGE = 'viewer.html'
 
 /** Parametros que son del visor: si llegan al panel, la URL es del visor. */
 const VIEWER_PARAMS = ['model', 'case', 'share', 'annotations']

@@ -89,3 +89,49 @@ test('listCases con 401 es una sesion no autorizada', async () => {
 
   assert.deepEqual(await createApi({ base: '', fetch }).listCases('viejo'), { _tag: 'Unauthorized' })
 })
+
+test('createCase envia nombre y tamano y devuelve el caso y su subida firmada', async () => {
+  const upload = { method: 'PUT', url: 'https://s3.test/x?X-Amz-Signature=1', headers: { 'Content-Type': 'model/gltf-binary', 'If-None-Match': '*' }, expiresAt: 'z' }
+  const { fetch, calls } = fakeFetch(201, { result: { id: 'c1', upload } })
+  const result = await createApi({ base: '', fetch }).createCase('access-1', { name: 'Caso', sizeBytes: 123 })
+
+  assert.equal(calls[0].url, '/api/v1/cases')
+  assert.equal(calls[0].init.method, 'POST')
+  assert.equal(calls[0].init.headers.Authorization, 'Bearer access-1')
+  assert.deepEqual(JSON.parse(calls[0].init.body), { name: 'Caso', sizeBytes: 123 })
+  assert.deepEqual(result, { _tag: 'Created', caseId: 'c1', upload })
+})
+
+test('createCase con 400 es un caso no valido', async () => {
+  const { fetch } = fakeFetch(400, { message: 'KO' })
+
+  assert.deepEqual(await createApi({ base: '', fetch }).createCase('a', { name: '', sizeBytes: 0 }), { _tag: 'Invalid' })
+})
+
+test('uploadModel hace el PUT a la URL firmada con sus cabeceras exactas y el fichero', async () => {
+  const calls = []
+  const fetch = async (url, init) => {
+    calls.push({ url, init })
+    return { ok: true, status: 200 }
+  }
+  const upload = { method: 'PUT', url: 'https://s3.test/x?X-Amz-Signature=1', headers: { 'Content-Type': 'model/gltf-binary', 'If-None-Match': '*' } }
+  const file = { name: 'modelo.glb', size: 3 }
+
+  const result = await createApi({ base: 'https://api.test', fetch }).uploadModel(upload, file)
+
+  assert.deepEqual(result, { _tag: 'Uploaded' })
+  assert.equal(calls[0].url, upload.url)
+  assert.equal(calls[0].init.method, 'PUT')
+  assert.deepEqual(calls[0].init.headers, upload.headers)
+  assert.equal(calls[0].init.body, file)
+})
+
+test('uploadModel distingue la URL caducada del modelo ya subido', async () => {
+  const upload = { method: 'PUT', url: 'u', headers: {} }
+  for (const [status, tag] of [[403, 'Expired'], [412, 'AlreadyUploaded'], [500, 'Failed']]) {
+    const fetch = async () => ({ ok: false, status })
+    const result = await createApi({ base: '', fetch }).uploadModel(upload, {})
+
+    assert.equal(result._tag, tag)
+  }
+})

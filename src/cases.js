@@ -31,3 +31,28 @@ export function formatDate(iso) {
   const time = Date.parse(iso)
   return Number.isFinite(time) ? dateFormat.format(time) : ''
 }
+
+export const MAX_CASE_NAME_LENGTH = 200
+export const MAX_MODEL_SIZE_BYTES = 500 * 1024 * 1024
+
+/** Tamano legible en MB con coma decimal, p. ej. "14,2 MB". */
+export function formatSize(bytes) {
+  return `${(bytes / (1024 * 1024)).toLocaleString('es-ES', { maximumFractionDigits: 1 })} MB`
+}
+
+/**
+ * Comprueba el formulario de caso nuevo antes de llamar a la API, con los
+ * mismos limites que el backend. `file` solo necesita `name` y `size`.
+ */
+export function validateNewCase({ name, file }) {
+  const trimmed = String(name ?? '').trim()
+  if (!trimmed) return { _tag: 'Invalid', message: 'Escribe el nombre del caso.' }
+  if (trimmed.length > MAX_CASE_NAME_LENGTH)
+    return { _tag: 'Invalid', message: `El nombre no puede pasar de ${MAX_CASE_NAME_LENGTH} caracteres.` }
+  if (!file) return { _tag: 'Invalid', message: 'Elige el modelo GLB.' }
+  if (!/\.glb$/i.test(file.name)) return { _tag: 'Invalid', message: 'El modelo tiene que ser un fichero .glb.' }
+  if (!(file.size > 0)) return { _tag: 'Invalid', message: 'El fichero está vacío.' }
+  if (file.size > MAX_MODEL_SIZE_BYTES)
+    return { _tag: 'Invalid', message: `El modelo pesa ${formatSize(file.size)}; el máximo es ${formatSize(MAX_MODEL_SIZE_BYTES)}.` }
+  return { _tag: 'Valid', name: trimmed, sizeBytes: file.size }
+}

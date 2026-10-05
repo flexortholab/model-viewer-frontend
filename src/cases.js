@@ -3,10 +3,6 @@
  * Presentacion de los casos del panel, sin DOM para poder probarla.
  */
 
-/** Columna "Enlace": cuando se genero el enlace del doctor, o un guion si no lo tiene. */
-export function linkLabel(item) {
-  return item.status === 'linked' && item.linkGeneratedAt ? formatDate(item.linkGeneratedAt) : '—'
-}
 
 /** Lo ultimo tocado, primero. */
 export function sortCases(cases) {

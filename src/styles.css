@@ -1135,37 +1135,34 @@ button[data-marker-kind='screw'] .kind-dot {
   display: none !important;
 }
 
-/* Volver a la lista de casos: bajo el titulo del caso, siempre visible. */
+/* Volver a la lista de casos: enlace discreto bajo el titulo del caso. */
 a.case-back {
   position: absolute;
-  top: 48px;
+  top: 44px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 6;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px 12px 5px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--accent);
-  background: var(--panel);
-  box-shadow: 0 2px 10px rgba(20, 22, 26, 0.12);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--accent-ink);
+  gap: 2px;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--muted);
   text-decoration: none;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9);
 }
 
 a.case-back svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
 }
 
 a.case-back:hover {
-  background: var(--accent-soft);
+  color: var(--accent-ink);
+  text-decoration: underline;
 }
 
 /* En movil la parte de arriba es de la barra movil: abajo a la izquierda. */
@@ -1173,7 +1170,7 @@ a.case-back:hover {
   a.case-back {
     top: auto;
     bottom: calc(16px + env(safe-area-inset-bottom));
-    left: 16px;
+    left: 12px;
     transform: none;
     z-index: 60;
   }

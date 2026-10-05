@@ -52,9 +52,9 @@ pieza y seguir dando la vuelta. El modo anterior (`OrbitControls`), que se queda
 clavado al llegar a superior/inferior, sigue disponible con **`?giro=orbit`**; el
 libre se puede forzar con **`?giro=libre`**. En `demo-giro.html` hay un interruptor
 en pantalla para comparar ambos modos con la escena real.
-> **Demo desplegada (GitHub Pages, rama gh-pages):** https://rms1982.github.io/dental-viewer/
-> **Demo cargada con la pieza de ejemplo (visita recomendada):** https://rms1982.github.io/dental-viewer/?model=samples/B1-draco.glb
-> **Modelo decimado para pruebas móviles:** https://rms1982.github.io/dental-viewer/?model=samples/Test1.glb (~5 MB, ~415 k triángulos)
+> **Demo desplegada (GitHub Pages, rama gh-pages):** https://flexortholab.github.io/model-viewer-frontend/
+> **Demo cargada con la pieza de ejemplo (visita recomendada):** https://flexortholab.github.io/model-viewer-frontend/?model=samples/B1-draco.glb
+> **Modelo decimado para pruebas móviles:** https://flexortholab.github.io/model-viewer-frontend/?model=samples/Test1.glb (~5 MB, ~415 k triángulos)
 > La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.
 
 ---

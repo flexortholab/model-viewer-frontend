@@ -81,7 +81,7 @@ test('listCases pide la lista con el access token', async () => {
   assert.equal(calls[0].url, '/api/v1/cases')
   assert.equal(calls[0].init.method, 'GET')
   assert.equal(calls[0].init.headers.Authorization, 'Bearer access-1')
-  assert.deepEqual(result, { _tag: 'Cases', cases })
+  assert.deepEqual(result, { _tag: 'Cases', cases, nextCursor: null })
 })
 
 test('listCases con 401 es una sesion no autorizada', async () => {
@@ -180,4 +180,20 @@ test('shareCase con 409 es un caso sin modelo subido', async () => {
   const { fetch } = fakeFetch(409, { message: 'KO' })
 
   assert.deepEqual(await createApi({ base: '', fetch }).shareCase('a', 'c1'), { _tag: 'ModelNotUploaded' })
+})
+
+test('listCases sin cursor pide la primera pagina y devuelve el cursor de la siguiente', async () => {
+  const { fetch, calls } = fakeFetch(200, { result: [], nextCursor: 'abc' })
+  const result = await createApi({ base: '', fetch }).listCases('access-1')
+
+  assert.equal(calls[0].url, '/api/v1/cases')
+  assert.equal(result.nextCursor, 'abc')
+})
+
+test('listCases con cursor pide la pagina siguiente', async () => {
+  const { fetch, calls } = fakeFetch(200, { result: [] })
+  const result = await createApi({ base: '', fetch }).listCases('access-1', { cursor: 'a+b/c=' })
+
+  assert.equal(calls[0].url, '/api/v1/cases?cursor=a%2Bb%2Fc%3D')
+  assert.equal(result.nextCursor, null)
 })

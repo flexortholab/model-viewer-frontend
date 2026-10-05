@@ -68,3 +68,17 @@ export function configBytes(config) {
 export function caseEditorUrl(caseId) {
   return `index.html?case=${encodeURIComponent(caseId)}`
 }
+
+/**
+ * URL completa del enlace del doctor. La API devuelve `sharePath` relativo a
+ * la carpeta del frontend (`?share=<id>`); se resuelve contra la pagina
+ * actual para que funcione igual en GitHub Pages que en local.
+ */
+export function doctorLinkUrl(sharePath, pageUrl) {
+  return new URL(sharePath, new URL('./', pageUrl)).href
+}
+
+/** Texto del boton de enlace segun el estado del caso. */
+export function shareActionLabel(status) {
+  return status === 'linked' ? 'Copiar enlace' : 'Generar enlace'
+}

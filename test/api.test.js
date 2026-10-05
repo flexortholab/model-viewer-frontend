@@ -164,3 +164,20 @@ test('saveConfig sustituye la configuracion con PUT', async () => {
   assert.deepEqual(JSON.parse(calls[0].init.body), config)
   assert.deepEqual(result, { _tag: 'Saved', updatedAt: '2026-10-05T10:00:00.000Z' })
 })
+
+test('shareCase pide el enlace con POST y distingue si se acaba de generar', async () => {
+  for (const [status, generatedNow] of [[201, true], [200, false]]) {
+    const { fetch, calls } = fakeFetch(status, { result: { id: 'c1', shareId: 's1', sharePath: '?share=s1', linkGeneratedAt: 'x' } })
+    const result = await createApi({ base: '', fetch }).shareCase('access-1', 'c1')
+
+    assert.equal(calls[0].url, '/api/v1/cases/c1/share')
+    assert.equal(calls[0].init.method, 'POST')
+    assert.deepEqual(result, { _tag: 'Shared', sharePath: '?share=s1', generatedNow })
+  }
+})
+
+test('shareCase con 409 es un caso sin modelo subido', async () => {
+  const { fetch } = fakeFetch(409, { message: 'KO' })
+
+  assert.deepEqual(await createApi({ base: '', fetch }).shareCase('a', 'c1'), { _tag: 'ModelNotUploaded' })
+})

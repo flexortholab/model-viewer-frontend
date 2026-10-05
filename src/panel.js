@@ -1,13 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
- * Panel de administracion (panel.html): lista de casos y alta de un caso
- * nuevo con su GLB. Sin sesion, manda a login.html, que vuelve aqui al
+ * Panel de administracion (panel.html): lista de casos, alta de un caso
+ * nuevo con su GLB y enlace del doctor. Sin sesion, manda a login.html, que vuelve aqui al
  * entrar. El resto de acciones se iran anadiendo aqui.
  */
 import { applyBrand, BRAND } from './brand.js'
 import { api, session } from './app-session.js'
 import { authorizedCall } from './authorized.js'
-import { caseEditorUrl, formatDate, formatSize, sortCases, statusLabel, validateNewCase } from './cases.js'
+import {
+  caseEditorUrl,
+  doctorLinkUrl,
+  formatDate,
+  formatSize,
+  shareActionLabel,
+  sortCases,
+  statusLabel,
+  validateNewCase,
+} from './cases.js'
 import { LOGIN_PAGE, loginUrl, PANEL_PAGE } from './navigation.js'
 
 applyBrand()
@@ -23,6 +32,10 @@ const newCaseStatus = document.getElementById('new-case-status')
 const newCaseError = document.getElementById('new-case-error')
 const newCaseSubmit = newCaseForm.querySelector('button[type="submit"]')
 let uploading = false
+const shareResult = document.getElementById('share-result')
+const shareResultText = document.getElementById('share-result-text')
+const shareResultUrl = document.getElementById('share-result-url')
+const shareError = document.getElementById('share-error')
 
 function goToLogin({ expired = false } = {}) {
   window.location.replace(loginUrl(PANEL_PAGE, { expired }))
@@ -55,7 +68,12 @@ function caseRow(item) {
   const open = document.createElement('a')
   open.href = caseEditorUrl(item.id)
   open.textContent = 'Abrir'
-  actions.appendChild(open)
+  const share = document.createElement('button')
+  share.type = 'button'
+  share.dataset.action = 'share-case'
+  share.dataset.caseId = item.id
+  share.textContent = shareActionLabel(item.status)
+  actions.append(open, share)
   row.appendChild(actions)
   return row
 }
@@ -174,6 +192,58 @@ newCaseForm.addEventListener('submit', async (event) => {
   }
 })
 
+// --- Enlace del doctor ---
+
+function showShareError(message) {
+  shareError.hidden = !message
+  shareError.textContent = message ?? ''
+}
+
+/** Copia al portapapeles; si el navegador no deja, el enlace queda seleccionado para copiarlo a mano. */
+async function copyShareLink() {
+  try {
+    await navigator.clipboard.writeText(shareResultUrl.value)
+    shareResultText.textContent = `${shareResultText.dataset.caseName}: enlace copiado. Pégalo en WhatsApp o donde quieras enviarlo.`
+  } catch {
+    shareResultUrl.select()
+    shareResultText.textContent = `${shareResultText.dataset.caseName}: copia el enlace seleccionado (Ctrl+C o Cmd+C).`
+  }
+}
+
+async function shareCase(button) {
+  const caseId = button.dataset.caseId
+  const caseName = button.closest('tr')?.cells[0]?.textContent ?? ''
+  showShareError(null)
+  shareResult.hidden = true
+  button.disabled = true
+  let result
+  try {
+    result = await authorizedCall(session, (token) => api.shareCase(token, caseId))
+  } catch {
+    showShareError('No se ha podido contactar con el servidor. Vuelve a probar en un momento.')
+    return
+  } finally {
+    button.disabled = false
+  }
+  if (result._tag === 'SignedOut') {
+    goToLogin({ expired: true })
+    return
+  }
+  if (result._tag === 'ModelNotUploaded') {
+    showShareError(`${caseName}: el modelo no llegó a subirse. Crea el caso de nuevo.`)
+    return
+  }
+  if (result._tag !== 'Shared') {
+    showShareError('No se ha podido obtener el enlace. Vuelve a probar en un momento.')
+    return
+  }
+  shareResultUrl.value = doctorLinkUrl(result.sharePath, window.location.href)
+  shareResultText.dataset.caseName = caseName
+  shareResult.hidden = false
+  await copyShareLink()
+  if (result.generatedNow) loadCases()
+}
+
 // Avisa antes de cerrar o recargar la pagina con una subida a medias.
 window.addEventListener('beforeunload', (event) => {
   if (uploading) event.preventDefault()
@@ -187,6 +257,8 @@ document.addEventListener('click', (event) => {
   }
   if (button?.dataset.action === 'new-case') openNewCase()
   if (button?.dataset.action === 'cancel-new-case') closeNewCase()
+  if (button?.dataset.action === 'share-case') shareCase(button)
+  if (button?.dataset.action === 'copy-share') copyShareLink()
 })
 
 async function boot() {

@@ -41,6 +41,14 @@
             <button type="submit" class="primary">Crear y subir</button>
           </div>
         </form>
+        <div id="share-result" class="share-result" role="status" hidden>
+          <p id="share-result-text" class="share-result-text"></p>
+          <div class="share-result-link">
+            <input id="share-result-url" type="text" readonly aria-label="Enlace del doctor" />
+            <button type="button" class="primary" data-action="copy-share">Copiar</button>
+          </div>
+        </div>
+        <p id="share-error" class="modal-error share-error" role="alert" hidden></p>
         <p id="cases-message" class="panel-empty" role="status">Cargando casos…</p>
         <table id="cases" class="cases-table" hidden>
           <thead>

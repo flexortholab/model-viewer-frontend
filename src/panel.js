@@ -143,13 +143,13 @@ function caseRow(item) {
 
   const actions = document.createElement('td')
   actions.className = 'case-actions'
-  const chevron = document.createElement('span')
-  chevron.className = 'case-chevron'
-  chevron.setAttribute('aria-hidden', 'true')
-  chevron.textContent = '›'
+  const openLink = document.createElement('a')
+  openLink.className = 'case-open-link'
+  openLink.href = caseEditorUrl(item.id)
+  openLink.textContent = 'Abrir ›'
   actions.append(
     iconButton({ action: 'delete-case', caseId: item.id, icon: ICON_TRASH, label: 'Borrar caso', className: 'delete' }),
-    chevron,
+    openLink,
   )
 
   row.append(name, updated, link, actions)

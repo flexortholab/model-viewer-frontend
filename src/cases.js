@@ -9,19 +9,21 @@ export function sortCases(cases) {
   return [...cases].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
 }
 
-const dateFormat = new Intl.DateTimeFormat('es-ES', {
+const DATE_OPTIONS = {
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
-  timeZone: 'Europe/Madrid',
-})
+}
 
-/** Fecha ISO de la API en hora de Madrid, p. ej. "05/10/2026, 12:30". */
-export function formatDate(iso) {
+/**
+ * Fecha ISO de la API en la zona horaria del navegador, p. ej. "05/10/2026, 12:30".
+ * `timeZone` solo para fijarla en los tests.
+ */
+export function formatDate(iso, { timeZone } = {}) {
   const time = Date.parse(iso)
-  return Number.isFinite(time) ? dateFormat.format(time) : ''
+  return Number.isFinite(time) ? new Intl.DateTimeFormat('es-ES', { ...DATE_OPTIONS, timeZone }).format(time) : ''
 }
 
 export const MAX_CASE_NAME_LENGTH = 200

@@ -407,16 +407,23 @@
   text-align: right;
 }
 
-.case-chevron {
+/* Papelera a la izquierda y bien separada de "Abrir", que es la accion habitual. */
+.case-actions .delete {
+  margin-right: 20px;
+}
+
+.case-open-link {
   display: inline-block;
-  margin-left: 6px;
-  color: var(--muted);
-  font-size: 18px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  color: var(--accent-ink);
+  font-weight: 600;
+  text-decoration: none;
   vertical-align: middle;
 }
 
-.case-row:hover .case-chevron {
-  color: var(--accent-ink);
+.case-row:hover .case-open-link {
+  background: var(--accent-soft);
 }
 
 .load-more {

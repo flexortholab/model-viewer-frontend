@@ -11,11 +11,12 @@
     <div id="app">
       <div id="viewport">
         <div id="labels" aria-live="polite"></div>
-        <div id="doc-title" class="doc-title" hidden></div>
-        <a id="case-back" class="case-only case-back" href="./" hidden>
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg>
-          Casos
-        </a>
+        <!-- Titulo del caso; con ?case= lleva delante la miga de pan "Casos ›". -->
+        <div class="doc-heading">
+          <a id="case-back" class="case-only case-back" href="./" hidden>Casos</a>
+          <span class="case-only crumb-separator" aria-hidden="true" hidden>›</span>
+          <div id="doc-title" class="doc-title" hidden></div>
+        </div>
         <div id="case-message" class="case-message" role="alert" hidden></div>
         <div id="loader" class="loader" hidden>
           <span class="loader-ring" aria-hidden="true"></span>

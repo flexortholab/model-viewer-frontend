@@ -116,3 +116,18 @@ test('remove quita la copia de un caso y clear las borra todas', async () => {
   await cache.clear()
   assert.equal(storage.size('model-viewer-models'), 0)
 })
+
+test('la descarga informa del progreso hasta completarse', async () => {
+  const chunks = [new Uint8Array(3), new Uint8Array(3), new Uint8Array(4)]
+  const fetch = async () =>
+    new Response(new ReadableStream({ start(c) { chunks.forEach((x) => c.enqueue(x)); c.close() } }), {
+      headers: { 'content-length': '10' },
+    })
+  const seen = []
+  const cache = createModelCache({ cacheStorage: memoryCacheStorage(), fetch, now: () => 0 })
+
+  const result = await cache.getModel('case/c1', 'u1', { onProgress: (f) => seen.push(f) })
+
+  assert.deepEqual(seen, [0.3, 0.6, 1])
+  assert.equal(result.blob.size, 10)
+})

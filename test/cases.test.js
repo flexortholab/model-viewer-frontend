@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { caseEditorUrl, configBytes, doctorLinkUrl, formatDate, formatSize, shareActionLabel, sortCases, statusLabel, validateNewCase } from '../src/cases.js'
+import { caseEditorUrl, configBytes, doctorLinkUrl, formatDate, formatSize, shareActionLabel, linkLabel, sortCases, validateNewCase } from '../src/cases.js'
 
-test('los estados de la API se muestran en espanol', () => {
-  assert.equal(statusLabel('draft'), 'Borrador')
-  assert.equal(statusLabel('linked'), 'Enlace generado')
+test('un caso con enlace muestra cuando se genero, en hora de Madrid', () => {
+  assert.equal(linkLabel({ status: 'linked', linkGeneratedAt: '2026-10-05T10:30:00.000Z' }), '05/10/2026, 12:30')
+})
+
+test('un borrador no tiene fecha de enlace', () => {
+  assert.equal(linkLabel({ status: 'draft' }), '—')
 })
 
 test('los casos se ordenan por ultima actualizacion, sin tocar la lista original', () => {

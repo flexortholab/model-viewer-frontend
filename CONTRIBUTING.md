@@ -51,4 +51,4 @@ npx vite preview --port 4173 &
 CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" node scripts/smoke.mjs http://localhost:4173
 ```
 
-La referencia es el CI (Linux). En macOS, la comprobación "arrastrar un asa de mover desplaza el plano" puede fallar en local por el tamaño de la ventana de Chrome, aunque `main` esté bien.
+La comprobación "arrastrar un asa de mover desplaza el plano" falla a veces, en local y en el CI, sin cambios en el código ([#12](https://github.com/flexortholab/model-viewer-frontend/issues/12)). Si es la única que falla, se relanza el job; si falla otra, es una regresión de verdad.

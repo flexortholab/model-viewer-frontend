@@ -62,7 +62,7 @@ export function configBytes(config) {
 
 /** Pagina del visor que abre un caso del panel para editarlo. */
 export function caseEditorUrl(caseId) {
-  return `visor.html?case=${encodeURIComponent(caseId)}`
+  return `viewer.html?case=${encodeURIComponent(caseId)}`
 }
 
 /**

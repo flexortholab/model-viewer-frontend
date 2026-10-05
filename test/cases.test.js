@@ -63,8 +63,8 @@ test('el tamano de la configuracion se mide en bytes UTF-8, como en la API', () 
 })
 
 test('la URL del editor lleva el id del caso codificado', () => {
-  assert.equal(caseEditorUrl('2f0c4b9e-1c7a'), 'visor.html?case=2f0c4b9e-1c7a')
-  assert.equal(caseEditorUrl('a&b'), 'visor.html?case=a%26b')
+  assert.equal(caseEditorUrl('2f0c4b9e-1c7a'), 'viewer.html?case=2f0c4b9e-1c7a')
+  assert.equal(caseEditorUrl('a&b'), 'viewer.html?case=a%26b')
 })
 
 test('el enlace del doctor se resuelve contra la carpeta del frontend', () => {

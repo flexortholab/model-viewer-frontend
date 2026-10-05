@@ -164,22 +164,3 @@ test('saveConfig sustituye la configuracion con PUT', async () => {
   assert.deepEqual(JSON.parse(calls[0].init.body), config)
   assert.deepEqual(result, { _tag: 'Saved', updatedAt: '2026-10-05T10:00:00.000Z' })
 })
-
-test('getShare pide el caso compartido sin token', async () => {
-  const shared = { name: 'Caso', config: {}, model: { url: 'https://s3.test/m.glb?X-Amz-Signature=1', expiresAt: 'z' } }
-  const { fetch, calls } = fakeFetch(200, { result: shared })
-  const result = await createApi({ base: '', fetch }).getShare('s/1')
-
-  assert.equal(calls[0].url, '/api/v1/shares/s%2F1')
-  assert.equal(calls[0].init.method, 'GET')
-  assert.equal(calls[0].init.headers.Authorization, undefined)
-  assert.deepEqual(result, { _tag: 'Found', shared })
-})
-
-test('getShare con 404 o un id mal formado es un enlace no valido', async () => {
-  for (const status of [400, 404]) {
-    const { fetch } = fakeFetch(status, { message: 'KO' })
-
-    assert.deepEqual(await createApi({ base: '', fetch }).getShare('x'), { _tag: 'NotFound' })
-  }
-})

@@ -37,7 +37,18 @@
             <button type="button" data-action="logout">Cerrar sesión</button>
           </span>
         </header>
-        <p class="panel-empty">Aquí aparecerá la lista de casos.</p>
+        <p id="cases-message" class="panel-empty" role="status">Cargando casos…</p>
+        <table id="cases" class="cases-table" hidden>
+          <thead>
+            <tr>
+              <th scope="col">Caso</th>
+              <th scope="col">Estado</th>
+              <th scope="col">Creado</th>
+              <th scope="col">Actualizado</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </section>
     </main>
     <script type="module" src="./src/panel.js"></script>

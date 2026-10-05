@@ -43,6 +43,14 @@ export function createApi({ base, fetch: doFetch = (...args) => globalThis.fetch
       return { _tag: 'Failed', status }
     },
 
+    /** Todos los casos con su estado y fechas. Exige access token. */
+    async listCases(token) {
+      const { status, result } = await call('/cases', { token })
+      if (status === 200) return { _tag: 'Cases', cases: result }
+      if (status === 401) return { _tag: 'Unauthorized' }
+      return { _tag: 'Failed', status }
+    },
+
     /** Cambia el refresh token por un par nuevo. El refresh token usado deja de valer. */
     async refresh(refreshToken) {
       const { status, result } = await call('/auth/refresh', {

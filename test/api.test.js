@@ -72,3 +72,20 @@ test('una respuesta sin JSON no rompe el cliente', async () => {
 
   assert.deepEqual(await createApi({ base: '', fetch }).refresh('x'), { _tag: 'Failed', status: 502 })
 })
+
+test('listCases pide la lista con el access token', async () => {
+  const cases = [{ id: 'c1', name: 'Caso', status: 'draft', createdAt: 'x', updatedAt: 'y' }]
+  const { fetch, calls } = fakeFetch(200, { result: cases })
+  const result = await createApi({ base: '', fetch }).listCases('access-1')
+
+  assert.equal(calls[0].url, '/api/v1/cases')
+  assert.equal(calls[0].init.method, 'GET')
+  assert.equal(calls[0].init.headers.Authorization, 'Bearer access-1')
+  assert.deepEqual(result, { _tag: 'Cases', cases })
+})
+
+test('listCases con 401 es una sesion no autorizada', async () => {
+  const { fetch } = fakeFetch(401, { message: 'KO' })
+
+  assert.deepEqual(await createApi({ base: '', fetch }).listCases('viejo'), { _tag: 'Unauthorized' })
+})

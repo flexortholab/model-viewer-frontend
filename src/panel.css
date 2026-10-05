@@ -1,0 +1,71 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Panel de administracion: mismas variables y controles que el visor. */
+
+.panel-page {
+  height: auto;
+  min-height: 100%;
+  background: #f4f6f8;
+}
+
+.panel-main {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 32px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.panel-logo {
+  height: 40px;
+}
+
+.panel-card {
+  box-shadow: 0 4px 18px rgba(20, 22, 26, 0.1);
+}
+
+.panel-card input:invalid:focus {
+  border-color: var(--danger);
+}
+
+.panel-section[hidden] {
+  display: none;
+}
+
+.panel-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 15px;
+}
+
+.panel-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.panel-user button {
+  border-color: var(--border);
+}
+
+.panel-empty {
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+}

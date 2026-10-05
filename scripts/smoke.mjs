@@ -67,8 +67,10 @@ const cleanup = () => {
 }
 process.on('exit', cleanup)
 
+// Hasta 60 s: en los runners de GitHub Actions Chrome a veces tarda mas de
+// 15 s en abrir DevTools y el smoke fallaba sin llegar a comprobar nada.
 async function waitForDevTools() {
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 240; i++) {
     try {
       const res = await fetch(`http://127.0.0.1:${port}/json/version`)
       if (res.ok) return (await res.json()).webSocketDebuggerUrl

@@ -220,3 +220,10 @@ test('listCases con name busca por nombre y conserva el cursor', async () => {
 
   assert.equal(calls[0].url, '/api/v1/cases?name=Garc%C3%ADa+J&cursor=c%2B1')
 })
+
+test('listCases envia el tamano de pagina pedido', async () => {
+  const { fetch, calls } = fakeFetch(200, { result: [] })
+  await createApi({ base: '', fetch }).listCases('access-1', { limit: 50 })
+
+  assert.equal(calls[0].url, '/api/v1/cases?limit=50')
+})

@@ -41,6 +41,10 @@ let nextCursor = null
 /** Texto buscado ('' = todos los casos) y numero de la ultima peticion de la lista, para descartar respuestas viejas. */
 let searchName = ''
 let listRequest = 0
+/** Casos por pagina (25 o 50): es el `limit` que se pide a la API, que lo lee tal cual de DynamoDB. */
+const pageSizeSelect = document.getElementById('page-size')
+const casesFooter = document.getElementById('cases-footer')
+const pageSize = () => Number(pageSizeSelect.value) || 25
 const caseSearch = document.getElementById('case-search')
 /** Orden de la tabla (criterio principal y secundario): se aplica a lo cargado y se mantiene al cargar mas. */
 let sortBy = DEFAULT_SORT
@@ -63,6 +67,7 @@ function showSignedIn() {
 
 function showCasesMessage(message) {
   casesTable.hidden = true
+  casesFooter.hidden = true
   casesEmpty.hidden = true
   casesMessage.textContent = message
   casesMessage.hidden = false
@@ -70,6 +75,7 @@ function showCasesMessage(message) {
 
 function showCasesEmpty() {
   casesTable.hidden = true
+  casesFooter.hidden = true
   casesMessage.hidden = true
   casesEmpty.hidden = false
   casesCount.textContent = ''
@@ -174,7 +180,7 @@ casesBody.addEventListener('click', (event) => {
 
 async function fetchCasesPage(cursor) {
   try {
-    return await authorizedCall(session, (token) => api.listCases(token, { cursor, name: searchName || undefined }))
+    return await authorizedCall(session, (token) => api.listCases(token, { cursor, name: searchName || undefined, limit: pageSize() }))
   } catch {
     return { _tag: 'Unavailable' }
   }
@@ -183,7 +189,7 @@ async function fetchCasesPage(cursor) {
 /** Con busqueda se siguen pidiendo paginas hasta tener resultados (pueden venir vacias); sin ella, una. */
 function fetchCases(cursor) {
   return searchName
-    ? collectPages(fetchCasesPage, { cursor, minResults: 10, maxPages: 10 })
+    ? collectPages(fetchCasesPage, { cursor, minResults: pageSize(), maxPages: 10 })
     : fetchCasesPage(cursor)
 }
 
@@ -211,6 +217,7 @@ function renderCases() {
   casesMessage.hidden = true
   casesEmpty.hidden = true
   casesTable.hidden = false
+  casesFooter.hidden = false
   loadMoreButton.hidden = !nextCursor
   casesCount.textContent = `${loadedCases.length}${nextCursor ? '+' : ''}`
 }
@@ -286,6 +293,8 @@ caseSearch.addEventListener('keydown', (event) => {
     caseSearch.dispatchEvent(new Event('input'))
   }
 })
+
+pageSizeSelect.addEventListener('change', () => loadCases())
 
 // --- Caso nuevo ---
 

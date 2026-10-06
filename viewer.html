@@ -86,18 +86,17 @@
             </div>
             <div class="tb-group">
               <!-- Solo al abrir un caso del panel (?case=): guarda en la API. -->
-              <button type="button" data-action="save-case" class="case-only" title="Guardar los marcadores del caso" hidden>
-                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h9l2 2v9h-11z"/><path d="M5 2.5v4h5v-4M5 13.5v-4h6v4"/></svg>
-                Guardar
-              </button>
-              <div class="case-only history-buttons" hidden>
-                <button type="button" data-action="undo-case" title="Deshacer (Ctrl+Z)" disabled>
-                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 4 2.5 7l3 3"/><path d="M2.5 7h7a4 4 0 0 1 0 8H8"/></svg>
-                  Deshacer
+              <!-- Guardar, deshacer y rehacer en una fila: el panel es estrecho. -->
+              <div class="case-only save-row" hidden>
+                <button type="button" data-action="save-case" title="Guardar los marcadores del caso (Ctrl+S)">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h9l2 2v9h-11z"/><path d="M5 2.5v4h5v-4M5 13.5v-4h6v4"/></svg>
+                  Guardar
                 </button>
-                <button type="button" data-action="redo-case" title="Rehacer (Ctrl+Shift+Z)" disabled>
+                <button type="button" class="icon-only" data-action="undo-case" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" disabled>
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 4 2.5 7l3 3"/><path d="M2.5 7h7a4 4 0 0 1 0 8H8"/></svg>
+                </button>
+                <button type="button" class="icon-only" data-action="redo-case" title="Rehacer (Ctrl+Shift+Z)" aria-label="Rehacer" disabled>
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 4l3 3-3 3"/><path d="M13.5 7h-7a4 4 0 0 0 0 8H8"/></svg>
-                  Rehacer
                 </button>
               </div>
               <span id="save-status" class="case-only save-status" role="status" hidden></span>

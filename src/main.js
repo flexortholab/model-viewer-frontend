@@ -810,6 +810,9 @@ document.addEventListener('click', (event) => {
       break
     case 'gizmo-toggle': {
       viewer.section?.setGizmoMode('combined')
+      // El gizmo mueve el plano de corte y, con el corte apagado, no se ve:
+      // encenderlo activa tambien el corte.
+      if (viewer.section?.gizmoOn && !viewer.section.enabled) viewer.setSection({ enabled: true })
       syncSectionUI()
       const on = !!viewer.section?.gizmoOn
       showHint(on ? 'Gizmo: flechas y planos para mover, arcos de X, Y y Z para rotar' : 'Gizmo oculto')

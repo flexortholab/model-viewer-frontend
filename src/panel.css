@@ -366,13 +366,7 @@
   color: var(--accent-ink);
 }
 
-.case-sub {
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.col-updated {
+.col-date {
   color: var(--muted);
   white-space: nowrap;
 }
@@ -474,8 +468,7 @@
 @media (max-width: 640px) {
   .app-brand-text,
   #user-email,
-  .col-updated,
-  .case-sub {
+  .col-date {
     display: none;
   }
 
@@ -513,22 +506,16 @@
   color: var(--accent-ink);
 }
 
-.sort-button::after {
-  content: '↕';
+.sort-indicator {
   font-size: 11px;
   opacity: 0.35;
+  font-variant-numeric: tabular-nums;
 }
 
-th[aria-sort] .sort-button {
+th.is-sorted .sort-button {
   color: var(--accent-ink);
 }
 
-th[aria-sort='ascending'] .sort-button::after {
-  content: '↑';
-  opacity: 1;
-}
-
-th[aria-sort='descending'] .sort-button::after {
-  content: '↓';
+th.is-sorted .sort-indicator {
   opacity: 1;
 }

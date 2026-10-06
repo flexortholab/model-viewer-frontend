@@ -37,7 +37,7 @@ const loadMoreButton = document.getElementById('load-more')
 /** Casos cargados hasta ahora y cursor de la pagina siguiente (null en la ultima). */
 let loadedCases = []
 let nextCursor = null
-/** Orden de la tabla: se aplica a lo cargado y se mantiene al cargar mas. */
+/** Orden de la tabla (criterio principal y secundario): se aplica a lo cargado y se mantiene al cargar mas. */
 let sortBy = DEFAULT_SORT
 const newCaseForm = document.getElementById('new-case')
 const newCaseStatus = document.getElementById('new-case-status')
@@ -116,13 +116,14 @@ function caseRow(item) {
   open.className = 'case-open'
   open.href = caseEditorUrl(item.id)
   open.textContent = item.name
-  const created = document.createElement('div')
-  created.className = 'case-sub'
-  created.textContent = `Creado ${formatDate(item.createdAt)}`
-  name.append(open, created)
+  name.append(open)
+
+  const created = document.createElement('td')
+  created.className = 'col-date'
+  created.textContent = formatDate(item.createdAt)
 
   const updated = document.createElement('td')
-  updated.className = 'col-updated'
+  updated.className = 'col-date'
   updated.textContent = formatDate(item.updatedAt)
 
   const link = document.createElement('td')
@@ -156,7 +157,7 @@ function caseRow(item) {
     openLink,
   )
 
-  row.append(name, updated, link, actions)
+  row.append(name, created, updated, link, actions)
   return row
 }
 
@@ -174,11 +175,21 @@ async function fetchCasesPage(cursor) {
   }
 }
 
+/**
+ * Flecha en las columnas por las que se ordena y, si hay dos, su prioridad
+ * (1 y 2). aria-sort solo admite una columna: la principal.
+ */
 function renderSortHeaders() {
   for (const header of casesTable.querySelectorAll('th[data-sort-key]')) {
-    const active = header.dataset.sortKey === sortBy.key
-    if (active) header.setAttribute('aria-sort', sortBy.direction === 'asc' ? 'ascending' : 'descending')
+    const rank = sortBy.findIndex((criterion) => criterion.key === header.dataset.sortKey)
+    const criterion = sortBy[rank]
+    const indicator = header.querySelector('.sort-indicator')
+    header.classList.toggle('is-sorted', rank >= 0)
+    if (rank === 0) header.setAttribute('aria-sort', criterion.direction === 'asc' ? 'ascending' : 'descending')
     else header.removeAttribute('aria-sort')
+    indicator.textContent = criterion
+      ? `${criterion.direction === 'asc' ? '↑' : '↓'}${sortBy.length > 1 ? rank + 1 : ''}`
+      : '↕'
   }
 }
 

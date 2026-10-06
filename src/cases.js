@@ -4,36 +4,58 @@
  */
 
 
-/** Orden por defecto: lo ultimo tocado, primero. */
-export const DEFAULT_SORT = { key: 'updatedAt', direction: 'desc' }
+/** Orden por defecto: lo ultimo tocado, primero. Lista de criterios: principal y secundario. */
+export const DEFAULT_SORT = [{ key: 'updatedAt', direction: 'desc' }]
 
 const nameCollator = new Intl.Collator('es', { sensitivity: 'base', numeric: true })
 
 const COMPARATORS = {
   name: (a, b) => nameCollator.compare(a.name, b.name),
+  createdAt: (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
   updatedAt: (a, b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt),
   linkGeneratedAt: (a, b) => Date.parse(a.linkGeneratedAt) - Date.parse(b.linkGeneratedAt),
 }
 
-/**
- * Casos ordenados por `key` ('name', 'updatedAt' o 'linkGeneratedAt') en
- * `direction` ('asc' o 'desc'), sin tocar la lista original. Los casos sin
- * enlace van siempre al final al ordenar por enlace.
- */
-export function sortCases(cases, { key, direction } = DEFAULT_SORT) {
+const hasLink = (c) => Number.isFinite(Date.parse(c.linkGeneratedAt))
+
+/** Comparacion por un criterio. Los casos sin enlace van siempre al final al ordenar por enlace. */
+function compareBy({ key, direction }, a, b) {
+  if (key === 'linkGeneratedAt' && hasLink(a) !== hasLink(b)) return hasLink(a) ? -1 : 1
+  if (key === 'linkGeneratedAt' && !hasLink(a)) return 0
   const compare = COMPARATORS[key] ?? COMPARATORS.updatedAt
-  const sign = direction === 'asc' ? 1 : -1
-  const hasLink = (c) => Number.isFinite(Date.parse(c.linkGeneratedAt))
+  return (direction === 'asc' ? 1 : -1) * compare(a, b)
+}
+
+/**
+ * Casos ordenados por uno o varios criterios `{ key, direction }`: el primero
+ * manda y los siguientes desempatan. `key` es 'name', 'createdAt',
+ * 'updatedAt' o 'linkGeneratedAt'; `direction`, 'asc' o 'desc'. No toca la
+ * lista original.
+ */
+export function sortCases(cases, sort = DEFAULT_SORT) {
+  const criteria = Array.isArray(sort) ? sort : [sort]
   return [...cases].sort((a, b) => {
-    if (key === 'linkGeneratedAt' && hasLink(a) !== hasLink(b)) return hasLink(a) ? -1 : 1
-    return sign * compare(a, b)
+    for (const criterion of criteria) {
+      const result = compareBy(criterion, a, b)
+      if (result !== 0) return result
+    }
+    return 0
   })
 }
 
-/** Siguiente orden al pulsar la cabecera `key`: la misma invierte; otra empieza en su sentido natural. */
+/**
+ * Orden tras pulsar la cabecera `key`. Si ya es la principal, invierte su
+ * sentido. Si no, pasa a ser la principal (en su sentido natural: nombre de
+ * la A a la Z, fechas de la mas reciente a la mas antigua) y la principal
+ * anterior queda como secundaria.
+ */
 export function nextSort(current, key) {
-  if (current.key === key) return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
-  return { key, direction: key === 'name' ? 'asc' : 'desc' }
+  const [primary] = current
+  if (primary?.key === key) {
+    return [{ key, direction: primary.direction === 'asc' ? 'desc' : 'asc' }, ...current.slice(1)]
+  }
+  const natural = { key, direction: key === 'name' ? 'asc' : 'desc' }
+  return primary ? [natural, primary] : [natural]
 }
 
 const DATE_OPTIONS = {

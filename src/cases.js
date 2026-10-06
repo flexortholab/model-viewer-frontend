@@ -125,3 +125,22 @@ export function doctorLinkUrl(sharePath, pageUrl) {
 export function shareActionLabel(status) {
   return status === 'linked' ? 'Copiar enlace' : 'Generar enlace'
 }
+
+/**
+ * Pide paginas seguidas hasta reunir al menos `minResults` casos, quedarse
+ * sin paginas o llegar a `maxPages`. Con la busqueda, una pagina puede venir
+ * vacia aunque haya resultados mas adelante. Devuelve el primer resultado que
+ * no sea una pagina de casos (sesion caducada, error) tal cual.
+ */
+export async function collectPages(fetchPage, { cursor = null, minResults = 1, maxPages = 10 } = {}) {
+  let cases = []
+  let next = cursor
+  for (let page = 0; page < maxPages; page++) {
+    const result = await fetchPage(next)
+    if (result._tag !== 'Cases') return result
+    cases = [...cases, ...result.cases]
+    next = result.nextCursor
+    if (!next || cases.length >= minResults) break
+  }
+  return { _tag: 'Cases', cases, nextCursor: next }
+}

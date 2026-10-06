@@ -44,12 +44,17 @@ export function createApi({ base, fetch: doFetch = (...args) => globalThis.fetch
     },
 
     /**
-     * Una pagina de casos, lo modificado mas recientemente primero. Con
-     * `cursor` (el `nextCursor` de la pagina anterior) trae la siguiente;
-     * `nextCursor` falta en la ultima pagina. Exige access token.
+     * Una pagina de casos (orden interno de DynamoDB). Con `cursor` (el
+     * `nextCursor` de la pagina anterior) trae la siguiente; `nextCursor` falta
+     * en la ultima pagina. Con `name`, solo los casos cuyo nombre lo contiene
+     * (sin distinguir tildes ni mayusculas): una pagina puede venir con menos
+     * casos, o ninguno, y aun asi tener `nextCursor`. Exige access token.
      */
-    async listCases(token, { cursor } = {}) {
-      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
+    async listCases(token, { cursor, name } = {}) {
+      const params = new URLSearchParams()
+      if (name) params.set('name', name)
+      if (cursor) params.set('cursor', cursor)
+      const query = params.size > 0 ? `?${params}` : ''
       const { status, result, nextCursor } = await call(`/cases${query}`, { token })
       if (status === 200) return { _tag: 'Cases', cases: result, nextCursor: nextCursor ?? null }
       if (status === 401) return { _tag: 'Unauthorized' }

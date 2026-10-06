@@ -213,3 +213,10 @@ test('deleteCase de un caso que ya no existe es NotFound', async () => {
 
   assert.deepEqual(await createApi({ base: '', fetch }).deleteCase('a', 'c1'), { _tag: 'NotFound' })
 })
+
+test('listCases con name busca por nombre y conserva el cursor', async () => {
+  const { fetch, calls } = fakeFetch(200, { result: [] })
+  await createApi({ base: '', fetch }).listCases('access-1', { name: 'García J', cursor: 'c+1' })
+
+  assert.equal(calls[0].url, '/api/v1/cases?name=Garc%C3%ADa+J&cursor=c%2B1')
+})

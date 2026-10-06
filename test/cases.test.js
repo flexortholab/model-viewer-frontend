@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { caseEditorUrl, configBytes, doctorLinkUrl, formatDate, formatSize, nextSort, shareActionLabel, sortCases, validateNewCase } from '../src/cases.js'
+import { caseEditorUrl, collectPages, configBytes, doctorLinkUrl, formatDate, formatSize, nextSort, shareActionLabel, sortCases, validateNewCase } from '../src/cases.js'
 
 test('los casos se ordenan por ultima actualizacion, sin tocar la lista original', () => {
   const cases = [
@@ -120,4 +120,48 @@ test('el criterio secundario desempata al principal', () => {
 
   assert.deepEqual(ids(sortCases(sameName, [{ key: 'name', direction: 'asc' }, { key: 'createdAt', direction: 'desc' }])), ['otro', 'nuevo', 'viejo'])
   assert.deepEqual(ids(sortCases(sameName, [{ key: 'name', direction: 'asc' }, { key: 'createdAt', direction: 'asc' }])), ['otro', 'viejo', 'nuevo'])
+})
+
+function pages(...list) {
+  const seen = []
+  const fetchPage = async (cursor) => {
+    seen.push(cursor)
+    return list[seen.length - 1]
+  }
+  return { fetchPage, seen }
+}
+
+test('collectPages sigue pidiendo paginas vacias hasta reunir resultados', async () => {
+  const { fetchPage, seen } = pages(
+    { _tag: 'Cases', cases: [], nextCursor: 'p2' },
+    { _tag: 'Cases', cases: [], nextCursor: 'p3' },
+    { _tag: 'Cases', cases: [{ id: 'a' }], nextCursor: 'p4' },
+  )
+
+  const result = await collectPages(fetchPage, { minResults: 1 })
+
+  assert.deepEqual(seen, [null, 'p2', 'p3'])
+  assert.deepEqual(result, { _tag: 'Cases', cases: [{ id: 'a' }], nextCursor: 'p4' })
+})
+
+test('collectPages para al acabarse las paginas', async () => {
+  const { fetchPage } = pages({ _tag: 'Cases', cases: [], nextCursor: null })
+
+  assert.deepEqual(await collectPages(fetchPage, { minResults: 10 }), { _tag: 'Cases', cases: [], nextCursor: null })
+})
+
+test('collectPages no pasa del maximo de paginas por peticion', async () => {
+  const empty = { _tag: 'Cases', cases: [], nextCursor: 'mas' }
+  const { fetchPage, seen } = pages(empty, empty, empty, empty)
+
+  const result = await collectPages(fetchPage, { minResults: 1, maxPages: 3 })
+
+  assert.equal(seen.length, 3)
+  assert.equal(result.nextCursor, 'mas')
+})
+
+test('collectPages devuelve tal cual un fallo a mitad', async () => {
+  const { fetchPage } = pages({ _tag: 'Cases', cases: [], nextCursor: 'p2' }, { _tag: 'SignedOut' })
+
+  assert.deepEqual(await collectPages(fetchPage), { _tag: 'SignedOut' })
 })

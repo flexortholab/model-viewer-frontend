@@ -519,3 +519,48 @@ th.is-sorted .sort-button {
 th.is-sorted .sort-indicator {
   opacity: 1;
 }
+
+/* --- Buscador ------------------------------------------------------------------- */
+
+.case-search {
+  flex: 1;
+  max-width: 360px;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+}
+
+.case-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.case-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0;
+  border: 0;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: transparent;
+}
+
+@media (max-width: 640px) {
+  .cases-card-head {
+    flex-wrap: wrap;
+  }
+
+  .case-search {
+    order: 3;
+    max-width: none;
+    flex-basis: 100%;
+  }
+}

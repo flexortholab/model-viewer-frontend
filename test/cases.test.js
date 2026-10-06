@@ -94,8 +94,30 @@ test('por enlace, los casos sin enlace van al final en los dos sentidos', () => 
   assert.deepEqual(ids(sortCases(sample, { key: 'linkGeneratedAt', direction: 'asc' })), ['b', 'c', 'a', 'd'])
 })
 
-test('pulsar la misma cabecera invierte; otra empieza en su sentido natural', () => {
-  assert.deepEqual(nextSort({ key: 'updatedAt', direction: 'desc' }, 'updatedAt'), { key: 'updatedAt', direction: 'asc' })
-  assert.deepEqual(nextSort({ key: 'updatedAt', direction: 'desc' }, 'name'), { key: 'name', direction: 'asc' })
-  assert.deepEqual(nextSort({ key: 'name', direction: 'asc' }, 'linkGeneratedAt'), { key: 'linkGeneratedAt', direction: 'desc' })
+test('pulsar la cabecera principal invierte su sentido y conserva la secundaria', () => {
+  const current = [{ key: 'name', direction: 'asc' }, { key: 'createdAt', direction: 'desc' }]
+
+  assert.deepEqual(nextSort(current, 'name'), [{ key: 'name', direction: 'desc' }, { key: 'createdAt', direction: 'desc' }])
+})
+
+test('pulsar otra cabecera la hace principal en su sentido natural y la anterior pasa a secundaria', () => {
+  assert.deepEqual(nextSort([{ key: 'createdAt', direction: 'desc' }], 'name'), [
+    { key: 'name', direction: 'asc' },
+    { key: 'createdAt', direction: 'desc' },
+  ])
+  assert.deepEqual(nextSort([{ key: 'name', direction: 'asc' }, { key: 'createdAt', direction: 'desc' }], 'linkGeneratedAt'), [
+    { key: 'linkGeneratedAt', direction: 'desc' },
+    { key: 'name', direction: 'asc' },
+  ])
+})
+
+test('el criterio secundario desempata al principal', () => {
+  const sameName = [
+    { id: 'viejo', name: 'García', createdAt: '2026-10-01T10:00:00.000Z' },
+    { id: 'nuevo', name: 'garcia', createdAt: '2026-10-05T10:00:00.000Z' },
+    { id: 'otro', name: 'Alba', createdAt: '2026-10-03T10:00:00.000Z' },
+  ]
+
+  assert.deepEqual(ids(sortCases(sameName, [{ key: 'name', direction: 'asc' }, { key: 'createdAt', direction: 'desc' }])), ['otro', 'nuevo', 'viejo'])
+  assert.deepEqual(ids(sortCases(sameName, [{ key: 'name', direction: 'asc' }, { key: 'createdAt', direction: 'asc' }])), ['otro', 'viejo', 'nuevo'])
 })

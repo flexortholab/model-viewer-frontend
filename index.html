@@ -27,6 +27,10 @@
       <section id="signed-in" class="cases-card" hidden>
         <header class="cases-card-head">
           <h1 class="cases-title">Casos <span id="cases-count" class="cases-count"></span></h1>
+          <label class="case-search">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3 3" /></svg>
+            <input id="case-search" type="search" maxlength="100" placeholder="Buscar por nombre" aria-label="Buscar casos por nombre" autocomplete="off" />
+          </label>
           <button type="button" class="button-solid" data-action="new-case">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
             Nuevo caso

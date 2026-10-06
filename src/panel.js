@@ -9,6 +9,7 @@ import { api, session } from './app-session.js'
 import { authorizedCall } from './authorized.js'
 import { createModelCache } from './model-cache.js'
 import {
+  collectPages,
   DEFAULT_SORT,
   nextSort,
   caseEditorUrl,
@@ -37,6 +38,10 @@ const loadMoreButton = document.getElementById('load-more')
 /** Casos cargados hasta ahora y cursor de la pagina siguiente (null en la ultima). */
 let loadedCases = []
 let nextCursor = null
+/** Texto buscado ('' = todos los casos) y numero de la ultima peticion de la lista, para descartar respuestas viejas. */
+let searchName = ''
+let listRequest = 0
+const caseSearch = document.getElementById('case-search')
 /** Orden de la tabla (criterio principal y secundario): se aplica a lo cargado y se mantiene al cargar mas. */
 let sortBy = DEFAULT_SORT
 const newCaseForm = document.getElementById('new-case')
@@ -169,10 +174,17 @@ casesBody.addEventListener('click', (event) => {
 
 async function fetchCasesPage(cursor) {
   try {
-    return await authorizedCall(session, (token) => api.listCases(token, { cursor }))
+    return await authorizedCall(session, (token) => api.listCases(token, { cursor, name: searchName || undefined }))
   } catch {
     return { _tag: 'Unavailable' }
   }
+}
+
+/** Con busqueda se siguen pidiendo paginas hasta tener resultados (pueden venir vacias); sin ella, una. */
+function fetchCases(cursor) {
+  return searchName
+    ? collectPages(fetchCasesPage, { cursor, minResults: 10, maxPages: 10 })
+    : fetchCasesPage(cursor)
 }
 
 /**
@@ -205,9 +217,11 @@ function renderCases() {
 
 /** Primera pagina: al entrar y tras crear, compartir o borrar un caso. */
 async function loadCases() {
-  showCasesMessage('Cargando casos…')
+  const request = ++listRequest
+  showCasesMessage(searchName ? 'Buscando…' : 'Cargando casos…')
   loadMoreButton.hidden = true
-  const result = await fetchCasesPage(null)
+  const result = await fetchCases(null)
+  if (request !== listRequest) return
   if (result._tag === 'SignedOut') {
     goToLogin({ expired: true })
     return
@@ -223,7 +237,12 @@ async function loadCases() {
   loadedCases = result.cases
   nextCursor = result.nextCursor
   if (loadedCases.length === 0 && !nextCursor) {
-    showCasesEmpty()
+    if (searchName) {
+      showCasesMessage(`Ningún caso coincide con «${searchName}».`)
+      casesCount.textContent = '0'
+    } else {
+      showCasesEmpty()
+    }
     return
   }
   renderCases()
@@ -231,9 +250,11 @@ async function loadCases() {
 
 async function loadMoreCases() {
   if (!nextCursor) return
+  const request = listRequest
   loadMoreButton.disabled = true
-  const result = await fetchCasesPage(nextCursor)
+  const result = await fetchCases(nextCursor)
   loadMoreButton.disabled = false
+  if (request !== listRequest) return
   if (result._tag === 'SignedOut') {
     goToLogin({ expired: true })
     return
@@ -246,6 +267,25 @@ async function loadMoreCases() {
   nextCursor = result.nextCursor
   renderCases()
 }
+
+// --- Buscar ---
+
+caseSearch.addEventListener('input', () => {
+  clearTimeout(caseSearch.timer)
+  caseSearch.timer = setTimeout(() => {
+    const name = caseSearch.value.trim()
+    if (name === searchName) return
+    searchName = name
+    loadCases()
+  }, 300)
+})
+
+caseSearch.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && caseSearch.value) {
+    caseSearch.value = ''
+    caseSearch.dispatchEvent(new Event('input'))
+  }
+})
 
 // --- Caso nuevo ---
 

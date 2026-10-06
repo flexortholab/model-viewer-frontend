@@ -66,9 +66,9 @@
         <table id="cases" class="cases-table" hidden>
           <thead>
             <tr>
-              <th scope="col">Caso</th>
-              <th scope="col" class="col-updated">Actualizado</th>
-              <th scope="col">Enlace del doctor</th>
+              <th scope="col" data-sort-key="name"><button type="button" class="sort-button" data-sort="name">Caso</button></th>
+              <th scope="col" class="col-updated" data-sort-key="updatedAt" aria-sort="descending"><button type="button" class="sort-button" data-sort="updatedAt">Actualizado</button></th>
+              <th scope="col" data-sort-key="linkGeneratedAt"><button type="button" class="sort-button" data-sort="linkGeneratedAt">Enlace del doctor</button></th>
               <th scope="col"><span class="visually-hidden">Acciones</span></th>
             </tr>
           </thead>

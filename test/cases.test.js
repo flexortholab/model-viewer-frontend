@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { caseEditorUrl, configBytes, doctorLinkUrl, formatDate, formatSize, shareActionLabel, sortCases, validateNewCase } from '../src/cases.js'
+import { caseEditorUrl, configBytes, doctorLinkUrl, formatDate, formatSize, nextSort, shareActionLabel, sortCases, validateNewCase } from '../src/cases.js'
 
 test('los casos se ordenan por ultima actualizacion, sin tocar la lista original', () => {
   const cases = [
@@ -71,4 +71,31 @@ test('el enlace del doctor se resuelve contra la carpeta del frontend', () => {
 test('el boton de enlace genera en un borrador y copia si ya lo hay', () => {
   assert.equal(shareActionLabel('draft'), 'Generar enlace')
   assert.equal(shareActionLabel('linked'), 'Copiar enlace')
+})
+
+const sample = [
+  { id: 'b', name: 'Óscar', updatedAt: '2026-10-02T10:00:00.000Z', linkGeneratedAt: '2026-10-02T09:00:00.000Z' },
+  { id: 'a', name: 'alba', updatedAt: '2026-10-03T10:00:00.000Z' },
+  { id: 'c', name: 'Caso 10', updatedAt: '2026-10-01T10:00:00.000Z', linkGeneratedAt: '2026-10-04T09:00:00.000Z' },
+  { id: 'd', name: 'Caso 9', updatedAt: '2026-10-04T10:00:00.000Z' },
+]
+const ids = (cases) => cases.map((c) => c.id)
+
+test('por nombre ignora tildes y mayusculas y ordena los numeros como numeros', () => {
+  assert.deepEqual(ids(sortCases(sample, { key: 'name', direction: 'asc' })), ['a', 'd', 'c', 'b'])
+})
+
+test('por nombre descendente invierte el orden', () => {
+  assert.deepEqual(ids(sortCases(sample, { key: 'name', direction: 'desc' })), ['b', 'c', 'd', 'a'])
+})
+
+test('por enlace, los casos sin enlace van al final en los dos sentidos', () => {
+  assert.deepEqual(ids(sortCases(sample, { key: 'linkGeneratedAt', direction: 'desc' })), ['c', 'b', 'a', 'd'])
+  assert.deepEqual(ids(sortCases(sample, { key: 'linkGeneratedAt', direction: 'asc' })), ['b', 'c', 'a', 'd'])
+})
+
+test('pulsar la misma cabecera invierte; otra empieza en su sentido natural', () => {
+  assert.deepEqual(nextSort({ key: 'updatedAt', direction: 'desc' }, 'updatedAt'), { key: 'updatedAt', direction: 'asc' })
+  assert.deepEqual(nextSort({ key: 'updatedAt', direction: 'desc' }, 'name'), { key: 'name', direction: 'asc' })
+  assert.deepEqual(nextSort({ key: 'name', direction: 'asc' }, 'linkGeneratedAt'), { key: 'linkGeneratedAt', direction: 'desc' })
 })

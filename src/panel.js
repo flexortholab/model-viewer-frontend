@@ -9,6 +9,8 @@ import { api, session } from './app-session.js'
 import { authorizedCall } from './authorized.js'
 import { createModelCache } from './model-cache.js'
 import {
+  DEFAULT_SORT,
+  nextSort,
   caseEditorUrl,
   doctorLinkUrl,
   formatDate,
@@ -35,6 +37,8 @@ const loadMoreButton = document.getElementById('load-more')
 /** Casos cargados hasta ahora y cursor de la pagina siguiente (null en la ultima). */
 let loadedCases = []
 let nextCursor = null
+/** Orden de la tabla: se aplica a lo cargado y se mantiene al cargar mas. */
+let sortBy = DEFAULT_SORT
 const newCaseForm = document.getElementById('new-case')
 const newCaseStatus = document.getElementById('new-case-status')
 const newCaseError = document.getElementById('new-case-error')
@@ -170,8 +174,17 @@ async function fetchCasesPage(cursor) {
   }
 }
 
+function renderSortHeaders() {
+  for (const header of casesTable.querySelectorAll('th[data-sort-key]')) {
+    const active = header.dataset.sortKey === sortBy.key
+    if (active) header.setAttribute('aria-sort', sortBy.direction === 'asc' ? 'ascending' : 'descending')
+    else header.removeAttribute('aria-sort')
+  }
+}
+
 function renderCases() {
-  casesBody.replaceChildren(...sortCases(loadedCases).map(caseRow))
+  renderSortHeaders()
+  casesBody.replaceChildren(...sortCases(loadedCases, sortBy).map(caseRow))
   casesMessage.hidden = true
   casesEmpty.hidden = true
   casesTable.hidden = false
@@ -450,6 +463,11 @@ document.addEventListener('click', (event) => {
   if (button?.dataset.action === 'cancel-new-case') closeNewCase()
   if (button?.dataset.action === 'share-case') shareCase(button)
   if (button?.dataset.action === 'load-more') loadMoreCases()
+  const sortButton = event.target.closest('button[data-sort]')
+  if (sortButton) {
+    sortBy = nextSort(sortBy, sortButton.dataset.sort)
+    renderCases()
+  }
   if (button?.dataset.action === 'delete-case') openDeleteDialog(button.dataset.caseId)
   if (button?.dataset.action === 'cancel-delete') closeDeleteDialog()
   if (button?.dataset.action === 'confirm-delete') confirmDelete()

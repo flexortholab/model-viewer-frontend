@@ -492,3 +492,43 @@
     padding: 10px 12px;
   }
 }
+
+/* --- Ordenar por columna ------------------------------------------------------ */
+
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  background: none;
+}
+
+.sort-button:hover {
+  background: none;
+  color: var(--accent-ink);
+}
+
+.sort-button::after {
+  content: '↕';
+  font-size: 11px;
+  opacity: 0.35;
+}
+
+th[aria-sort] .sort-button {
+  color: var(--accent-ink);
+}
+
+th[aria-sort='ascending'] .sort-button::after {
+  content: '↑';
+  opacity: 1;
+}
+
+th[aria-sort='descending'] .sort-button::after {
+  content: '↓';
+  opacity: 1;
+}

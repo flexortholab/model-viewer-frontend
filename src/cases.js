@@ -4,9 +4,36 @@
  */
 
 
-/** Lo ultimo tocado, primero. */
-export function sortCases(cases) {
-  return [...cases].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+/** Orden por defecto: lo ultimo tocado, primero. */
+export const DEFAULT_SORT = { key: 'updatedAt', direction: 'desc' }
+
+const nameCollator = new Intl.Collator('es', { sensitivity: 'base', numeric: true })
+
+const COMPARATORS = {
+  name: (a, b) => nameCollator.compare(a.name, b.name),
+  updatedAt: (a, b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt),
+  linkGeneratedAt: (a, b) => Date.parse(a.linkGeneratedAt) - Date.parse(b.linkGeneratedAt),
+}
+
+/**
+ * Casos ordenados por `key` ('name', 'updatedAt' o 'linkGeneratedAt') en
+ * `direction` ('asc' o 'desc'), sin tocar la lista original. Los casos sin
+ * enlace van siempre al final al ordenar por enlace.
+ */
+export function sortCases(cases, { key, direction } = DEFAULT_SORT) {
+  const compare = COMPARATORS[key] ?? COMPARATORS.updatedAt
+  const sign = direction === 'asc' ? 1 : -1
+  const hasLink = (c) => Number.isFinite(Date.parse(c.linkGeneratedAt))
+  return [...cases].sort((a, b) => {
+    if (key === 'linkGeneratedAt' && hasLink(a) !== hasLink(b)) return hasLink(a) ? -1 : 1
+    return sign * compare(a, b)
+  })
+}
+
+/** Siguiente orden al pulsar la cabecera `key`: la misma invierte; otra empieza en su sentido natural. */
+export function nextSort(current, key) {
+  if (current.key === key) return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+  return { key, direction: key === 'name' ? 'asc' : 'desc' }
 }
 
 const DATE_OPTIONS = {

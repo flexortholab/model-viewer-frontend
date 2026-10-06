@@ -50,8 +50,9 @@ export function createApi({ base, fetch: doFetch = (...args) => globalThis.fetch
      * (sin distinguir tildes ni mayusculas): una pagina puede venir con menos
      * casos, o ninguno, y aun asi tener `nextCursor`. Exige access token.
      */
-    async listCases(token, { cursor, name } = {}) {
+    async listCases(token, { cursor, name, limit } = {}) {
       const params = new URLSearchParams()
+      if (limit) params.set('limit', String(limit))
       if (name) params.set('name', name)
       if (cursor) params.set('cursor', cursor)
       const query = params.size > 0 ? `?${params}` : ''

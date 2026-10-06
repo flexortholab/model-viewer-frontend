@@ -79,7 +79,16 @@
           </thead>
           <tbody></tbody>
         </table>
-        <button type="button" id="load-more" class="load-more" data-action="load-more" hidden>Cargar más</button>
+        <footer id="cases-footer" class="cases-footer" hidden>
+          <label class="page-size">
+            Casos por página
+            <select id="page-size">
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+            </select>
+          </label>
+          <button type="button" id="load-more" class="load-more" data-action="load-more" hidden>Cargar más</button>
+        </footer>
       </section>
     </main>
 

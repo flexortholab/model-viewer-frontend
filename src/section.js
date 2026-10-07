@@ -79,7 +79,10 @@ export class SectionPlaneTool {
     this.enabled = false
     this.mode = 'pivot'
     this.capColor = 'auto'
-    this._seedColor = 0x8a7f72
+    // Gris muy claro para el anillo y el visual del plano (peticion de
+    // revision): el rojizo (#c0554a) que guardaban los casos antiguos
+    // distraia del contenido del corte.
+    this._seedColor = 0xd8dbdd
 
     // Tamano del visual: envuelve la pieza con margen.
     const box = new THREE.Box3()
@@ -337,17 +340,19 @@ export class SectionPlaneTool {
     return !settled
   }
 
-  setCapColor(hex) {
-    if (hex === 'auto' || hex == null) {
+  /**
+   * El anillo y el visual del plano se pintan SIEMPRE en gris claro: tampoco
+   * los casos antiguos que guardaron otro capColor deben mostrar colores que
+   * distraen del corte. La clave se conserva solo como dato del documento.
+   */
+  setCapColor(_hex) {
+    if (_hex === 'auto' || _hex == null) {
       this.capColor = null
-      this.planeMesh.material.color.setHex(this._seedColor)
-      this.ringMesh.material.color.setHex(this._seedColor)
-      if (this.enabled) this.apply()
-      return
+    } else {
+      this.capColor = Number.isFinite(_hex) ? _hex : Number.parseInt(String(_hex).replace('#', ''), 16)
     }
-    this.capColor = Number.isFinite(hex) ? hex : Number.parseInt(String(hex).replace('#', ''), 16)
-    this.planeMesh.material.color.setHex(this.capColor)
-    this.ringMesh.material.color.setHex(this.capColor)
+    this.planeMesh.material.color.setHex(this._seedColor)
+    this.ringMesh.material.color.setHex(this._seedColor)
   }
 
   setEnabled(enabled) {

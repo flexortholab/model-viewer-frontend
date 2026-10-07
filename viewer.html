@@ -100,10 +100,6 @@
                 </button>
               </div>
               <span id="save-status" class="case-only save-status" role="status" hidden></span>
-              <button type="button" data-action="export" title="Descargar anotaciones (E)">
-                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v8m0 0L5.2 6.7M8 9.5l2.8-2.8"/><path d="M2.5 11.5v3h11v-3"/></svg>
-                Exportar
-              </button>
             </div>
           </div>
         </div>
@@ -225,6 +221,28 @@
             <p class="panel-note">Pulsa un marcador: restaura vista, corte, medidas y objetos visibles guardados.</p>
             <ul id="mobile-markers-list" class="marker-list"></ul>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leyenda para el doctor que abre un caso compartido por el laboratorio -->
+    <div id="share-welcome" class="modal" hidden>
+      <div class="modal-card share-welcome-card" role="dialog" aria-modal="true" aria-labelledby="share-welcome-title">
+        <div class="modal-head">
+          <strong id="share-welcome-title">Caso preparado por el laboratorio</strong>
+          <button type="button" class="modal-close" data-action="close-share-welcome" aria-label="Cerrar">×</button>
+        </div>
+        <p class="share-welcome-text">
+          Para revisar este caso clínico, usa los <strong>pasos de la presentación</strong>:
+          pulsa cada punto numerado del panel «Presentación» (o el botón Presentación en el móvil)
+          y la vista, el corte y las medidas saltarán solas a ese momento del caso.
+        </p>
+        <p class="share-welcome-text">
+          Puedes girar, medir y ocultar piezas libremente; en la vista compartida nada se guarda.
+          El botón «Vista libre» te devuelve a la vista general en cualquier momento.
+        </p>
+        <div class="modal-actions">
+          <button type="button" class="primary" data-action="close-share-welcome">Entendido, empiezo el repaso</button>
         </div>
       </div>
     </div>

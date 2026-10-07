@@ -633,6 +633,20 @@ this.camera.position.set(40, 30, 60)
     return true
   }
 
+  /**
+   * Vista de inicio del caso (isometrica), contado lo que traiga guardado.
+   *
+   * Al abrir un caso o un enlace compartido se aplica la configuracion
+   * guardada (corte, marcadores, medidas) y despues se recoloca la camara
+   * aqui: el doctor SIEMPRE empieza en la isometrica aunque el caso este
+   * editado, y cada paso de la presentacion coloca su propia vista.
+   */
+  resetView() {
+    this.camera.zoom = 1
+    this.camera.updateProjectionMatrix()
+    this.frameModel()
+  }
+
   // --- Anotaciones ---------------------------------------------------------
 
   getAnnotations() {

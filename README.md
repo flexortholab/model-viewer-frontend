@@ -90,7 +90,7 @@ npm run preview    # sirve dist/ en http://localhost:4173
 | `npm run preview` | Sirve `dist/` en el puerto 4173 |
 | `npm run sample` | Genera las STL de muestra en `public/samples/` |
 | `npm test` | Tests unitarios (runner nativo de Node, 28 tests) |
-| `node scripts/smoke.mjs` | Smoke test headless con Chromium (ver más abajo) |
+| `npm run test:e2e` | Pruebas en navegador con Playwright, en varios navegadores y dispositivos (ver más abajo) |
 
 ## Personalizar la marca
 
@@ -108,7 +108,16 @@ Toda la marca vive en **`src/brand.js`** (objeto `BRAND`): no hay que perseguir 
 ## Tests
 
 - **Unitarios** (`test/`): detección de unidades, formato `formatMm`, validación del formato de anotaciones, geometría de corte y configuración del gizmo. `npm test` (28 tests).
-- **Smoke test** (`scripts/smoke.mjs`): prueba end-to-end headless. Requiere `npm run preview` corriendo en el 4173 y Chromium instalado (`CHROME_PATH` para una ruta no estándar). Carga la muestra STL y el GLB decimado `Test1.glb` en un Chromium headless (SwiftShader, sin GPU) y valida carga, unidades, corte con stencil, mediciones, round-trip de anotaciones, estabilidad de la escena y que el modelo decimado tiene menos de 500 k triángulos. En entornos donde el headless no compone pixeles al canvas, los checks visuales del capping se omiten con aviso. Ultimo resultado: **115/115**.
+- **En navegador** (`test/e2e/*.spec.js`, Playwright): cargan el visor en Chromium, Firefox, WebKit (Safari) y Edge, con perfiles de escritorio, portátil táctil, tablet (iPad) y móvil (iPhone y Pixel). Validan WebGL, carga y unidades, corte con stencil y capping en píxeles, gizmo, giro de cámara con el ratón, mediciones, cubo de vistas, presentación, interfaz móvil, el GLB decimado `Test1.glb`, y el editor (`?case=`) y el enlace del doctor (`?share=`) con la API simulada. Sustituyen al antiguo `scripts/smoke.mjs` y conservan sus comprobaciones con los mismos nombres.
+
+  ```sh
+  npx playwright install                    # una vez: descarga los navegadores
+  npm run test:e2e                          # todos los navegadores y perfiles
+  npm run test:e2e -- --project=escritorio-chromium
+  npm run test:e2e -- --headed --project=escritorio-firefox
+  ```
+
+  Arrancan solas `npm run build` y `vite preview` en el 4173 (o reutilizan uno que ya esté corriendo). Edge se prueba con el Edge instalado en el equipo (`npx playwright install msedge` en Linux).
 
 ---
 
@@ -449,7 +458,7 @@ Detectadas y corregidas en la sesion del 29/09/2026 (smoke **34/34** con Chromiu
 1. Decodificadores Draco/Basis duplicados entre el bundle de Vite y `public/` — optimizacion, no bloqueante.
 2. Sin backend ni despliegue productivo: la demo es estatica (Pages).
 
-Nota sobre el smoke: en un Chromium headless con SwiftShader los triángulos se emiten (sin errores GL) pero los pixeles no llegan al canvas compuesto; por eso los checks visuales del capping se basan en conteo de pixeles y se omiten si el entorno no rasteriza.
+Nota sobre las pruebas de píxeles: el antiguo smoke saltaba los checks visuales del capping porque su conteo suponía un fondo oscuro; las pruebas de Playwright los miden sobre el fondo blanco actual (`test/e2e/corte.spec.js`).
 
 ## Licencia
 

@@ -6,7 +6,7 @@ Prácticas comunes de los repos de `flexortholab`, las mismas que en `model-view
 ## Compatibilidad del visor
 
 - Los cambios para integrarse con el backend **añaden, no sustituyen**. El visor tiene que seguir funcionando como hasta ahora, incluido `?model=samples/…` con los modelos del bundle, hasta que se decida retirar algo en una PR aparte.
-- El smoke test del CI (`scripts/smoke.mjs`) es la red de seguridad: tiene que seguir en verde sin tocarlo para que un cambio pase.
+- Las pruebas en navegador del CI (`test/e2e/`, Playwright) son la red de seguridad: tienen que seguir en verde en todos los navegadores y perfiles sin tocarlas para que un cambio pase.
 
 ## Commits y pull requests
 
@@ -40,15 +40,22 @@ Prácticas comunes de los repos de `flexortholab`, las mismas que en `model-view
 - ES modules, sin punto y coma, comillas simples, 2 espacios y la cabecera `// SPDX-License-Identifier: GPL-3.0-or-later` en cada fichero.
 - Clases solo para las piezas con estado del visor (`DentalViewer`, herramientas de corte y medida); el resto, funciones exportadas.
 - Los textos de la interfaz, en español con tildes. Los comentarios, en español, explicando el porqué.
-- La lógica sin DOM (unidades, anotaciones, cliente de la API) va en módulos propios para poder probarla con `node --test` (`npm test`). Lo que depende del navegador lo cubre el smoke test.
+- La lógica sin DOM (unidades, anotaciones, cliente de la API) va en módulos propios para poder probarla con `node --test` (`npm test`). Lo que depende del navegador lo cubren las pruebas de Playwright (`test/e2e/*.spec.js`).
 
 ## Comprobar un cambio antes de abrir la PR
 
 ```sh
 npm test
-npm run build
-npx vite preview --port 4173 &
-CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" node scripts/smoke.mjs http://localhost:4173
+npx playwright install        # la primera vez: descarga Chromium, Firefox y WebKit
+npm run test:e2e              # build, vite preview en el 4173 y todas las pruebas
 ```
 
-La comprobación "arrastrar un asa de mover desplaza el plano" falla a veces, en local y en el CI, sin cambios en el código ([#12](https://github.com/flexortholab/model-viewer-frontend/issues/12)). Si es la única que falla, se relanza el job; si falla otra, es una regresión de verdad.
+- Un solo navegador o perfil: `npm run test:e2e -- --project=escritorio-chromium` (los nombres están en `playwright.config.js`: `escritorio-*`, `portatil-tactil-*`, `tablet-webkit`, `movil-webkit` y `movil-chromium`). `E2E_NAVEGADOR=webkit npm run test:e2e` deja todos los perfiles de un navegador, como hace el CI.
+- Para ver la prueba en pantalla: `--headed`. Para depurar paso a paso: `--debug` o `--ui`.
+- Los proyectos `*-msedge` usan el Edge instalado en el equipo; si no lo tienes, sáltalos con `--project`.
+- Si ya hay un `vite preview` en el 4173, se reutiliza: recuerda hacer `npm run build` tras cambiar el código.
+- Tras un fallo, `npx playwright show-report` abre el informe con la traza de cada prueba.
+
+El CI corre un job por navegador, sin reintentos y repitiendo cada prueba dos veces (`--repeat-each=2`), así que una prueba inestable lo deja en rojo. Cada noche, `e2e-nocturno.yml` repite cada prueba diez veces en Linux, Windows y macOS; no bloquea, pero si falla hay que mirarlo.
+
+Las pruebas marcadas con `test.fail` documentan un defecto conocido de la app (por ejemplo, el gizmo en equipos táctiles, [#49](https://github.com/flexortholab/model-viewer-frontend/issues/49)). Cuando se arregla, la prueba empieza a pasar y `test.fail` la pone en rojo: hay que quitar la marca en la misma PR del arreglo.

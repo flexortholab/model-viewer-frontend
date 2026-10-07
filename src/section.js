@@ -66,8 +66,11 @@ export class SectionPlaneTool {
    *   onChange: () => void,
    * }} ctx
    */
-  constructor(renderer, { scene, modelRoot, meshes, camera, controls, onChange }) {
+  constructor(renderer, { scene, modelRoot, meshes, camera, controls, onChange, _frameTick }) {
     this.renderer = renderer
+    // El visor pinta bajo demanda: lo que cambie la escena sin pasar por
+    // onChange (encender el gizmo, el atenuado) pide frame con esto.
+    this._frameTick = _frameTick
     this.scene = scene
     this.modelRoot = modelRoot
     this.meshes = meshes
@@ -274,10 +277,13 @@ export class SectionPlaneTool {
    * Sincroniza el helper PivotControls con el plano antes de pintar. Hay que
    * llamarlo en cada frame: la libreria pide `update()` antes del render y,
    * justo despues, se reaplica la calibracion de viewport que `update()`
-   * reescribe.
+   * reescribe. La calibracion se recalcula aqui y no solo al activar el
+   * corte: tras un zoom el gizmo quedaba enorme y fuera de pantalla, o
+   * diminuto.
    */
   updatePivotGizmo() {
     if (!this.pivot) return
+    this._fitPivotGizmoToView()
     this.pivot.update()
     this.pivot.getHelper().scale.multiplyScalar(this._pivotViewportScale ?? 1)
   }
@@ -295,6 +301,9 @@ export class SectionPlaneTool {
     // asas conviven por construccion.
     if (visible) this.pivot.attach(this.gizmo)
     else this.pivot.detach()
+    // Sin este frame, el gizmo no aparecia hasta mover el raton sobre el
+    // lienzo (o tocarlo, en tactil).
+    this._frameTick?.()
   }
 
   /** Muestra u oculta los gizmos sin perder la posicion del plano. */

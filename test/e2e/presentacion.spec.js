@@ -70,10 +70,12 @@ test('dialogo de marcador con las clases como botones', async ({ page }) => {
       selected = dialog.querySelector('[data-marker-kind="screw"]').getAttribute('aria-pressed')
       // El estilo se resuelve en el siguiente pintado y el borde lleva una
       // transicion de 120 ms: se ceden frames y se espera a que asiente, igual
-      // que lo veria el doctor.
+      // que lo veria el doctor. En el runner de macOS 250 ms no bastaban (el
+      // borde salia a medio camino): se espera ademas a que acabe la transicion.
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
       await new Promise((r) => setTimeout(r, 250))
       const screwButton = dialog.querySelector('[data-marker-kind="screw"]')
+      await Promise.all(screwButton.getAnimations().map((a) => a.finished))
       const selectedStyle = getComputedStyle(screwButton)
       selectedOutline = {
         border: selectedStyle.borderColor,

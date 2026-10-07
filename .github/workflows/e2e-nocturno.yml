@@ -25,7 +25,8 @@ jobs:
           # Edge ya viene instalado en los runners de Windows.
           - { os: windows-latest, navegador: msedge, instalar: 'echo Edge ya instalado', pruebas: 'npx playwright test' }
           - { os: windows-latest, navegador: firefox, instalar: 'npx playwright install firefox', pruebas: 'npx playwright test' }
-          - { os: macos-latest, navegador: webkit, instalar: 'npx playwright install webkit', pruebas: 'npx playwright test' }
+          # Con dos workers el runner de macOS perdia a veces el contexto WebGL al cargar.
+          - { os: macos-latest, navegador: webkit, instalar: 'npx playwright install webkit', pruebas: 'npx playwright test --workers=1' }
     env:
       E2E_NAVEGADOR: ${{ matrix.navegador }}
     steps:

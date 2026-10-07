@@ -11,3 +11,6 @@ public/samples/Mario*.fbx
 playwright-report/
 test-results/
 blob-report/
+
+# Worktrees y ajustes locales de Claude Code
+.claude/

@@ -2,12 +2,13 @@
 // Editor de un caso (?case=) con la API simulada: el modelo carga, un cambio
 // se autoguarda con PUT de la configuracion y deshacer lo revierte.
 import { test, expect, esperarModelo, esMovil } from './visor.js'
-import { iniciarSesion, simularApi, modeloFirmado } from './api-simulada.js'
+import { iniciarSesion, simularApi, simularS3, MODELO_FIRMADO } from './api-simulada.js'
 
 const CASO = 'caso-de-prueba'
 
-async function abrirCaso(page, baseURL) {
+async function abrirCaso(page) {
   await iniciarSesion(page)
+  await simularS3(page)
   const api = await simularApi(page, [
     {
       metodo: 'GET',
@@ -18,7 +19,7 @@ async function abrirCaso(page, baseURL) {
           name: 'Caso de prueba',
           status: 'draft',
           config: {},
-          model: { url: modeloFirmado(baseURL) },
+          model: { url: MODELO_FIRMADO },
         },
       }),
     },
@@ -35,17 +36,17 @@ async function abrirCaso(page, baseURL) {
 
 const guardados = (api) => api.peticiones.filter((p) => p.metodo === 'PUT')
 
-test('el editor abre el caso con su modelo y lo marca como guardado', async ({ page, baseURL }) => {
-  const api = await abrirCaso(page, baseURL)
+test('el editor abre el caso con su modelo y lo marca como guardado', async ({ page }) => {
+  const api = await abrirCaso(page)
   const triangulos = await page.evaluate(() => window.dentalViewer.model.stats.triangles)
-  expect(triangulos, 'el GLB de la URL firmada se carga').toBeGreaterThan(0)
+  expect(triangulos, 'el GLB de la URL firmada se carga').toBe(3416)
   expect(api.peticiones.map((p) => `${p.metodo} ${p.ruta}`)).toEqual([`GET /cases/${CASO}`])
   await expect(page.locator('#save-status')).toHaveText('Guardado')
   expect(api.noSimuladas).toEqual([])
 })
 
-test('un marcador nuevo se autoguarda con PUT de la configuracion', async ({ page, baseURL }) => {
-  const api = await abrirCaso(page, baseURL)
+test('un marcador nuevo se autoguarda con PUT de la configuracion', async ({ page }) => {
+  const api = await abrirCaso(page)
   await page.evaluate(() => {
     window.dentalViewer.addMarker({ position: [0, 0, 0], text: 'nota de prueba', kind: 'note', snapshot: false })
   })
@@ -57,9 +58,9 @@ test('un marcador nuevo se autoguarda con PUT de la configuracion', async ({ pag
   expect(api.noSimuladas).toEqual([])
 })
 
-test('deshacer quita el marcador y guarda la configuracion anterior', async ({ page, baseURL }, testInfo) => {
+test('deshacer quita el marcador y guarda la configuracion anterior', async ({ page }, testInfo) => {
   test.skip(esMovil(testInfo), 'en movil los botones de deshacer van en el panel lateral, que no se muestra')
-  const api = await abrirCaso(page, baseURL)
+  const api = await abrirCaso(page)
   await page.evaluate(() => {
     window.dentalViewer.addMarker({ position: [0, 0, 0], text: 'nota de prueba', kind: 'note', snapshot: false })
   })

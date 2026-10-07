@@ -25,14 +25,6 @@ jobs:
       - name: Build de produccion
         run: npm run build
 
-      - name: Smoke test headless
-        run: |
-          npx vite preview --port 4173 --strictPort &
-          sleep 3
-          node scripts/smoke.mjs http://localhost:4173
-        env:
-          CHROME_PATH: /usr/bin/google-chrome
-
       - name: Guardar la web para publicarla
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3

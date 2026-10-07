@@ -2,12 +2,13 @@
 // Enlace del doctor (?share=) con la API simulada: el caso se ve en solo
 // lectura, sin controles de edicion y sin guardar nada.
 import { test, expect, esperarModelo } from './visor.js'
-import { simularApi, modeloFirmado } from './api-simulada.js'
+import { simularApi, simularS3, MODELO_FIRMADO } from './api-simulada.js'
 
 const ENLACE = 'enlace-de-prueba'
 const NOMBRE = 'Caso de prueba'
 
-async function abrirEnlace(page, baseURL) {
+async function abrirEnlace(page) {
+  await simularS3(page)
   const api = await simularApi(page, [
     {
       metodo: 'GET',
@@ -18,7 +19,7 @@ async function abrirEnlace(page, baseURL) {
           config: {
             markers: [{ id: 'k1', position: [0, 0, 0], text: 'paso del laboratorio', kind: 'note' }],
           },
-          model: { url: modeloFirmado(baseURL) },
+          model: { url: MODELO_FIRMADO },
         },
       }),
     },
@@ -28,15 +29,15 @@ async function abrirEnlace(page, baseURL) {
   return api
 }
 
-test('el doctor ve el caso con sus marcadores y la leyenda de bienvenida', async ({ page, baseURL }) => {
-  const api = await abrirEnlace(page, baseURL)
+test('el doctor ve el caso con sus marcadores y la leyenda de bienvenida', async ({ page }) => {
+  const api = await abrirEnlace(page)
   expect(await page.evaluate(() => window.dentalViewer.doc.markers.map((m) => m.text))).toEqual(['paso del laboratorio'])
   await expect(page.locator('#share-welcome')).toBeVisible()
   expect(api.noSimuladas).toEqual([])
 })
 
-test('el enlace del doctor es de solo lectura, sin controles de edicion', async ({ page, baseURL }) => {
-  const api = await abrirEnlace(page, baseURL)
+test('el enlace del doctor es de solo lectura, sin controles de edicion', async ({ page }) => {
+  const api = await abrirEnlace(page)
   await page.locator('#share-welcome [data-action="close-share-welcome"]').first().click()
   await expect(page.locator('#share-welcome')).toBeHidden()
 
@@ -59,8 +60,8 @@ test('el enlace del doctor es de solo lectura, sin controles de edicion', async 
   expect(api.noSimuladas).toEqual([])
 })
 
-test('el nombre del caso no va en el titulo de la pagina', async ({ page, baseURL }) => {
-  await abrirEnlace(page, baseURL)
+test('el nombre del caso no va en el titulo de la pagina', async ({ page }) => {
+  await abrirEnlace(page)
   expect(await page.title()).not.toContain(NOMBRE)
   expect(page.url()).not.toContain(encodeURIComponent(NOMBRE))
 })

@@ -125,11 +125,16 @@ test('giro libre de la camara con el raton', async ({ page }, testInfo) => {
   })
   const STEPS_POLO = 40
   const TOTAL_POLO = 600
-  await page.mouse.move(polarSerie.cx, polarSerie.cy)
+  // El smoke antiguo arrastraba desde el centro y los ultimos pasos caian
+  // fuera de la ventana. Chromium entrega esos eventos al lienzo; Firefox, con
+  // los eventos sinteticos de Playwright, no, y el giro parecia atascado. Se
+  // arrastra el mismo recorrido, pero centrado, sin salir de la ventana.
+  const inicioPolo = polarSerie.cy + TOTAL_POLO / 2
+  await page.mouse.move(polarSerie.cx, inicioPolo)
   await page.mouse.down()
   const recorrido = []
   for (let i = 1; i <= STEPS_POLO; i++) {
-    await page.mouse.move(polarSerie.cx, Math.round(polarSerie.cy - (TOTAL_POLO * i) / STEPS_POLO))
+    await page.mouse.move(polarSerie.cx, Math.round(inicioPolo - (TOTAL_POLO * i) / STEPS_POLO))
     await siguienteFrame(page)
     recorrido.push(await page.evaluate(() => window.dentalViewer.controls.getPolarAngle()))
   }

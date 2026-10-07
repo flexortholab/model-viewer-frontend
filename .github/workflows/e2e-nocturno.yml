@@ -7,13 +7,10 @@ on:
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
-  # TEMPORAL: para probar el workflow desde la rama antes de mergear (GitHub
-  # solo deja lanzarlo a mano cuando ya esta en main). Se quita antes del merge.
-  push:
-    branches: [test/playwright-multinavegador]
 
 jobs:
   e2e:
+    name: ${{ matrix.navegador }} en ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     strategy:

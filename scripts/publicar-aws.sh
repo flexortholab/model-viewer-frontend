@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Publica la web compilada en https://viewer.flexortholab.com (S3 +
-# CloudFront; la infraestructura esta en model-viewer-backend). Lo ejecuta el
-# CI en el push a main, con el rol model-viewer-prod-web-deploy.
+# Publica una web estatica compilada en un bucket S3 servido por CloudFront:
+# sube los ficheros e invalida la cache de la distribucion que tiene el
+# dominio como alias. Se niega a seguir si la sesion de AWS no es de la cuenta
+# indicada.
 #
-# Uso: scripts/publicar-aws.sh [carpeta]   (por defecto, dist)
+# Uso:
+#   scripts/publicar-aws.sh --cuenta <id> --bucket <nombre> --dominio <host> [--dist <carpeta>]
 set -euo pipefail
 
-readonly DIST="${1:-dist}"
-readonly AWS_ACCOUNT_ID='576951332538'
-readonly WEB_BUCKET="model-viewer-prod-web-${AWS_ACCOUNT_ID}"
-readonly WEB_DOMAIN='viewer.flexortholab.com'
+readonly USO='Uso: scripts/publicar-aws.sh --cuenta <id> --bucket <nombre> --dominio <host> [--dist <carpeta>]'
+
+DIST='dist'
+AWS_ACCOUNT_ID=''
+WEB_BUCKET=''
+WEB_DOMAIN=''
 
 fail() {
   echo "publicar-aws: $1" >&2
@@ -23,7 +27,7 @@ comprobar_cuenta() {
   cuenta="$(aws sts get-caller-identity --query Account --output text)" ||
     fail 'no hay una sesion de AWS valida'
   [[ "$cuenta" == "$AWS_ACCOUNT_ID" ]] ||
-    fail "la sesion de AWS es de la cuenta $cuenta, no de la del visor ($AWS_ACCOUNT_ID)"
+    fail "la sesion de AWS es de la cuenta $cuenta, no de la $AWS_ACCOUNT_ID"
 }
 
 # assets/ lleva hash en el nombre: se cachea un ano y no se borra lo anterior,
@@ -51,7 +55,20 @@ invalidar_cache() {
   aws cloudfront create-invalidation --distribution-id "$distribucion" --paths '/*'
 }
 
-[[ -f "$DIST/index.html" ]] || fail "no existe $DIST/index.html: falta npm run build"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dist) DIST="${2:?$USO}"; shift 2 ;;
+    --cuenta) AWS_ACCOUNT_ID="${2:?$USO}"; shift 2 ;;
+    --bucket) WEB_BUCKET="${2:?$USO}"; shift 2 ;;
+    --dominio) WEB_DOMAIN="${2:?$USO}"; shift 2 ;;
+    -h | --help) echo "$USO"; exit 0 ;;
+    *) fail "argumento desconocido: $1. $USO" ;;
+  esac
+done
+[[ -n "$AWS_ACCOUNT_ID" && -n "$WEB_BUCKET" && -n "$WEB_DOMAIN" ]] || fail "$USO"
+readonly DIST AWS_ACCOUNT_ID WEB_BUCKET WEB_DOMAIN
+
+[[ -f "$DIST/index.html" ]] || fail "no existe $DIST/index.html: falta el build"
 comprobar_cuenta
 subir_web
 invalidar_cache

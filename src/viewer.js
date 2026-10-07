@@ -6,11 +6,9 @@ import { FreeOrbitControls } from './free-controls.js'
 import { loadModel, normalizeModel, applyDentalMaterial, prepareMaterialsForReview, isSupported, isSupportedFormat, extensionOf } from './loaders.js'
 import { SectionPlaneTool } from './section.js'
 import { MeasureTool } from './measure.js'
-import { Line2 } from 'three/addons/lines/Line2.js'
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
-import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
 import { createDocument, validateDocument } from './annotations.js'
 import { formatMm, round } from './units.js'
+import { boundsOf, placeLabel } from './label-layout.js'
 
 // Altura del frustum de la camara ortografica, en unidades de escena. Marca
 // cuanto se ve en vertical; el ancho sale del aspecto del contenedor.
@@ -838,19 +836,8 @@ this.camera.position.set(40, 30, 60)
       dot.renderOrder = 1000
       group.add(dot)
 
-      const stemMat = new LineMaterial({
-        color,
-        linewidth: 3.2,
-        transparent: true,
-        opacity: 0.85,
-        depthTest: false,
-      })
-      stemMat.resolution.set(this.renderer.domElement.clientWidth, this.renderer.domElement.clientHeight)
-      const stemGeo = new LineGeometry().setPositions([0, 0, 0, 0, 5, 0])
-      const stem = new Line2(stemGeo, stemMat)
-      stem.renderOrder = 999
-      group.add(stem)
-
+      // Sin palo vertical: la etiqueta va fuera del modelo y la une con su
+      // punto una linea guia (_layoutMarkerLabels).
       group.position.copy(anchor)
       this.markerGroup.add(group)
 
@@ -858,9 +845,103 @@ this.camera.position.set(40, 30, 60)
         const el = document.createElement('div')
         el.className = `marker-label marker-${marker.kind}`
         el.textContent = marker.text
-        this.measure.addOverlay(`marker:${marker.id}`, el, anchor.clone().add(new THREE.Vector3(0, 5.5, 0)))
+        el.dataset.kind = marker.kind
+        this.measure.addOverlay(`marker:${marker.id}`, el, anchor.clone(), { manual: true })
       }
     }
+    this.requestRender()
+  }
+
+  /**
+   * Silueta del modelo en pantalla: el rectangulo que envuelve una muestra de
+   * vertices de las piezas visibles. Con unos miles de puntos basta; el hueco
+   * de SILHOUETTE_GAP cubre lo que la muestra no alcance.
+   */
+  _modelScreenBounds(width, height) {
+    if (!this.model) return null
+    if (this._silhouetteModel !== this.model) {
+      const perMesh = Math.max(50, Math.floor(4000 / Math.max(1, this.model.meshes.length)))
+      this._silhouetteSamples = this.model.meshes.map((mesh) => {
+        const positions = mesh.geometry.getAttribute('position')
+        const step = Math.max(1, Math.floor(positions.count / perMesh))
+        const points = []
+        for (let i = 0; i < positions.count; i += step) {
+          points.push(new THREE.Vector3(positions.getX(i), positions.getY(i), positions.getZ(i)))
+        }
+        return { mesh, points }
+      })
+      this._silhouetteModel = this.model
+    }
+    const projected = new THREE.Vector3()
+    const screen = []
+    for (const { mesh, points } of this._silhouetteSamples) {
+      if (!mesh.visible) continue
+      for (const point of points) {
+        projected.copy(point).applyMatrix4(mesh.matrixWorld).project(this.camera)
+        screen.push({ x: (projected.x * 0.5 + 0.5) * width, y: (-projected.y * 0.5 + 0.5) * height })
+      }
+    }
+    return boundsOf(screen)
+  }
+
+  /**
+   * Coloca las etiquetas de los marcadores fuera de la silueta del modelo y
+   * sin pisar otras etiquetas (src/label-layout.js), y dibuja la linea guia
+   * de cada una hasta su punto. Va despues de measure.update(), que ya ha
+   * colocado las etiquetas de las medidas.
+   */
+  _layoutMarkerLabels() {
+    if (!this.labelLayer) return
+    const entries = this.measure?.labels.filter((entry) => entry.manual) ?? []
+    const leaders = this._markerLeaders ?? this._createMarkerLeaders()
+    if (!entries.length) {
+      leaders.replaceChildren()
+      return
+    }
+    const width = this.container.clientWidth
+    const height = this.container.clientHeight
+    const layer = this.labelLayer.getBoundingClientRect()
+    const obstacles = this.measure.labels
+      .filter((entry) => !entry.manual && entry.el.style.display !== 'none')
+      .map(({ el }) => {
+        const r = el.getBoundingClientRect()
+        return { x: r.left - layer.left, y: r.top - layer.top, w: r.width, h: r.height }
+      })
+    const silhouette = this._modelScreenBounds(width, height) ?? { x: width / 2, y: height / 2, w: 0, h: 0 }
+    const viewport = { w: width, h: height }
+    const projected = new THREE.Vector3()
+    const lines = []
+    for (const entry of entries) {
+      projected.copy(entry.position).project(this.camera)
+      if (projected.z > 1) {
+        entry.el.style.display = 'none'
+        continue
+      }
+      entry.el.style.display = ''
+      const anchor = { x: (projected.x * 0.5 + 0.5) * width, y: (-projected.y * 0.5 + 0.5) * height }
+      const size = { w: entry.el.offsetWidth, h: entry.el.offsetHeight }
+      const { rect, leader } = placeLabel({ anchor, size, silhouette, viewport, obstacles })
+      entry.el.style.transform = `translate(${rect.x.toFixed(1)}px, ${rect.y.toFixed(1)}px)`
+      obstacles.push(rect)
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
+      line.setAttribute('x1', leader.from.x.toFixed(1))
+      line.setAttribute('y1', leader.from.y.toFixed(1))
+      line.setAttribute('x2', leader.to.x.toFixed(1))
+      line.setAttribute('y2', leader.to.y.toFixed(1))
+      line.setAttribute('class', `marker-leader marker-${entry.el.dataset.kind ?? 'note'}`)
+      lines.push(line)
+    }
+    leaders.replaceChildren(...lines)
+  }
+
+  /** Capa SVG de las lineas guia, debajo de las etiquetas. */
+  _createMarkerLeaders() {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.setAttribute('class', 'marker-leaders')
+    svg.setAttribute('aria-hidden', 'true')
+    this.labelLayer.prepend(svg)
+    this._markerLeaders = svg
+    return svg
   }
 
   setMarkersVisible(visible, focusedId = null) {
@@ -1128,6 +1209,7 @@ this.camera.position.set(40, 30, 60)
     this._tail = moved || wasDirty ? 30 : this._tail - 1
     this.renderer.render(this.scene, this.camera)
     this.measure?.update()
+    this._layoutMarkerLabels()
     this.emit('frame')
   }
 

@@ -1,8 +1,8 @@
-# Mantiene al dia las acciones de GitHub: una PR al mes con todas las
-# versiones nuevas juntas. El titulo lleva el prefijo `ci:` para pasar la
-# comprobacion de Conventional Commits.
+# Una vez al mes y en PRs separadas por ecosistema. Los titulos llevan un
+# prefijo de Conventional Commits para pasar la comprobacion del titulo.
 version: 2
 updates:
+  # Acciones de GitHub: todas las versiones nuevas juntas en una PR.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -12,3 +12,16 @@ updates:
     groups:
       acciones:
         patterns: ['*']
+
+  # Dependencias de npm: las versiones menores y los parches de todo, juntos en
+  # una PR; cada version mayor, en su propia PR, porque puede romper algo.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      npm-menores:
+        update-types: [minor, patch]

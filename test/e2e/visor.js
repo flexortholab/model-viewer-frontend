@@ -24,7 +24,8 @@ export const test = base.extend({
       }
       const consola = { errores: [], excepciones: [] }
       page.on('console', (message) => {
-        if (message.type() === 'error') consola.errores.push(`${message.text()} [${message.location().url}]`)
+        if (message.type() !== 'error' || esFavicon(message)) return
+        consola.errores.push(`${message.text()} [${message.location().url}]`)
       })
       page.on('pageerror', (error) => consola.excepciones.push(error.message))
       await use(consola)
@@ -34,6 +35,15 @@ export const test = base.extend({
     { auto: true },
   ],
 })
+
+/**
+ * Edge pide /favicon.ico por su cuenta (Chromium headless no) y el 404 sale
+ * como error de consola. No es un console.error de la app, que es lo que
+ * vigilaba el smoke antiguo (Runtime.consoleAPICalled).
+ */
+function esFavicon(message) {
+  return message.location().url.endsWith('/favicon.ico')
+}
 
 /** Perfil del proyecto: escritorio, portatil-tactil, tablet o movil. */
 export function perfil(testInfo) {

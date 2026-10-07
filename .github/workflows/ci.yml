@@ -85,8 +85,10 @@ jobs:
         if: steps.cache-navegadores.outputs.cache-hit == 'true'
         run: npx playwright install-deps ${{ matrix.navegador }}
 
+      # Firefox headless en Linux no encuentra driver de GL y no crea el
+      # contexto WebGL: se lanza con ventana sobre un X virtual (Mesa).
       - name: Pruebas en ${{ matrix.navegador }}
-        run: npx playwright test --repeat-each=2
+        run: ${{ matrix.navegador == 'firefox' && 'xvfb-run --auto-servernum npx playwright test --headed' || 'npx playwright test' }} --repeat-each=2
 
       - name: Guardar el informe y las trazas
         if: failure()

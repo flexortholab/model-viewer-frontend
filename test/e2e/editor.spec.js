@@ -74,3 +74,17 @@ test('deshacer quita el marcador y guarda la configuracion anterior', async ({ p
   await expect(page.locator('[data-action="redo-case"]')).toBeEnabled()
   expect(api.noSimuladas).toEqual([])
 })
+
+test('un marcador recien creado se ve, solo el', async ({ page }) => {
+  await abrirCaso(page)
+  await page.evaluate(() => {
+    const v = window.dentalViewer
+    v.addMarker({ position: [0, 0, 0], text: 'primero', kind: 'note', snapshot: false })
+    v.addMarker({ position: [5, 0, 0], text: 'segundo', kind: 'note', snapshot: false })
+  })
+  const visibles = await page.evaluate(() =>
+    window.dentalViewer.markerGroup.children.filter((c) => c.userData?.isMarker).map((c) => c.userData.markerId),
+  )
+  expect(visibles).toHaveLength(1)
+  expect(visibles[0]).toBe(await page.evaluate(() => window.dentalViewer.doc.markers[1].id))
+})

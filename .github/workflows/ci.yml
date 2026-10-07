@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# En una PR, un push nuevo cancela el run anterior, que ya no sirve. En main el
+# grupo es por commit: nunca se cancela el despliegue de otro merge.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -25,23 +31,76 @@ jobs:
       - name: Build de produccion
         run: npm run build
 
-      - name: Smoke test headless
-        run: |
-          npx vite preview --port 4173 --strictPort &
-          sleep 3
-          node scripts/smoke.mjs http://localhost:4173
-        env:
-          CHROME_PATH: /usr/bin/google-chrome
-
       - name: Guardar la web para publicarla
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
+  # Pruebas en navegador (Playwright): un job por navegador, en paralelo. Cada
+  # job corre todos los perfiles de ese navegador (escritorio, portatil
+  # tactil, tablet, movil). Sin reintentos y con cada test repetido dos veces
+  # en las PR: un test inestable deja el CI en rojo.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        navegador: [chromium, firefox, webkit, msedge]
+    env:
+      E2E_NAVEGADOR: ${{ matrix.navegador }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dependencias
+        run: npm ci
+
+      - name: Version de Playwright
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # Edge se instala como paquete del sistema (fuera de la cache); el resto
+      # de navegadores se guardan en la cache por version de Playwright.
+      - name: Cache de navegadores
+        if: matrix.navegador != 'msedge'
+        id: cache-navegadores
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ matrix.navegador }}
+
+      - name: Instalar el navegador
+        if: steps.cache-navegadores.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps ${{ matrix.navegador }}
+
+      - name: Dependencias del sistema del navegador
+        if: steps.cache-navegadores.outputs.cache-hit == 'true'
+        run: npx playwright install-deps ${{ matrix.navegador }}
+
+      # Firefox headless en Linux no encuentra driver de GL y no crea el
+      # contexto WebGL: se lanza con ventana sobre un X virtual (Mesa).
+      - name: Pruebas en ${{ matrix.navegador }}
+        run: ${{ matrix.navegador == 'firefox' && 'xvfb-run --auto-servernum npx playwright test --headed' || 'npx playwright test' }} --repeat-each=2
+
+      - name: Guardar el informe y las trazas
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ matrix.navegador }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: test
+    needs: [test, e2e]
     runs-on: ubuntu-latest
     permissions:
       pages: write

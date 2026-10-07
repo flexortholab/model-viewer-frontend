@@ -7,7 +7,9 @@ import { simularApi, simularS3, MODELO_FIRMADO } from './api-simulada.js'
 const ENLACE = 'enlace-de-prueba'
 const NOMBRE = 'Caso de prueba'
 
-async function abrirEnlace(page) {
+const UN_MARCADOR = [{ id: 'k1', position: [0, 0, 0], text: 'paso del laboratorio', kind: 'note' }]
+
+async function abrirEnlace(page, markers = UN_MARCADOR) {
   await simularS3(page)
   const api = await simularApi(page, [
     {
@@ -16,9 +18,7 @@ async function abrirEnlace(page) {
       responder: () => ({
         result: {
           name: NOMBRE,
-          config: {
-            markers: [{ id: 'k1', position: [0, 0, 0], text: 'paso del laboratorio', kind: 'note' }],
-          },
+          config: { markers },
           model: { url: MODELO_FIRMADO },
         },
       }),
@@ -64,4 +64,21 @@ test('el nombre del caso no va en el titulo de la pagina', async ({ page }) => {
   await abrirEnlace(page)
   expect(await page.title()).not.toContain(NOMBRE)
   expect(page.url()).not.toContain(encodeURIComponent(NOMBRE))
+})
+
+// Marcadores dibujados en la escena y etiquetas en pantalla.
+const marcadoresVisibles = (page) =>
+  page.evaluate(() => ({
+    escena: window.dentalViewer.markerGroup.children.filter((c) => c.userData?.isMarker).length,
+    etiquetas: [...document.querySelectorAll('.marker-label')].filter((el) => el.offsetParent !== null).length,
+  }))
+
+test('al abrir el enlace no se ve ningun marcador hasta pulsar su paso', async ({ page }) => {
+  await abrirEnlace(page, [
+    { id: 'k1', position: [0, 0, 0], text: 'primer paso', kind: 'note' },
+    { id: 'k2', position: [5, 0, 0], text: 'segundo paso', kind: 'warning' },
+  ])
+  expect(await marcadoresVisibles(page)).toEqual({ escena: 0, etiquetas: 0 })
+  await page.evaluate(() => window.dentalViewer.focusMarker('k2'))
+  expect(await marcadoresVisibles(page), 'solo el marcador del paso pulsado').toEqual({ escena: 1, etiquetas: 1 })
 })

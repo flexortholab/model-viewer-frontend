@@ -772,9 +772,6 @@ document.addEventListener('click', (event) => {
       showHint(removed ? 'Medición borrada' : 'No hay medición que borrar')
       break
     }
-    case 'export':
-      exportAnnotations()
-      break
     case 'save-case':
       saveCase()
       break
@@ -953,9 +950,6 @@ window.addEventListener('keydown', (event) => {
     case 'f':
       viewer.frameModel()
       break
-    case 'e':
-      if (!readOnly) exportAnnotations()
-      break
     case 'escape':
       if (viewer.measure?.enabled) toggleMeasure()
       if (markerMode) toggleMarkerTool()
@@ -992,7 +986,7 @@ let readOnly = false
 function setReadOnly() {
   readOnly = true
   if (markerMode) toggleMarkerTool()
-  for (const button of document.querySelectorAll('[data-action="add-marker"], [data-action="export"]')) {
+  for (const button of document.querySelectorAll('[data-action="add-marker"]')) {
     button.classList.add('is-read-only')
   }
   renderMarkers()

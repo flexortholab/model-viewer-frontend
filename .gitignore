@@ -8,3 +8,6 @@ dist/
 
 public/samples/Final1.glb
 public/samples/Mario*.fbx
+playwright-report/
+test-results/
+blob-report/

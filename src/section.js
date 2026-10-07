@@ -301,8 +301,8 @@ export class SectionPlaneTool {
     // asas conviven por construccion.
     if (visible) this.pivot.attach(this.gizmo)
     else this.pivot.detach()
-    // Sin este frame, el gizmo no aparecia hasta mover el raton sobre el
-    // lienzo (o tocarlo, en tactil).
+    // Frame propio: hoy lo pinta tambien el atenuado, pero que aparezca no
+    // debe depender de ese efecto secundario.
     this._frameTick?.()
   }
 

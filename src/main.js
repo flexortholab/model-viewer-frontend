@@ -1044,6 +1044,14 @@ async function loadCaseModel(key, signedUrl) {
   }
 }
 
+/**
+ * Vista libre al abrir: ningun marcador hasta pulsar su paso. Cada marcador es
+ * una vista preparada con algo senalado; verlos todos a la vez no se entiende.
+ */
+function showFreeView() {
+  viewer.setMarkersVisible(false)
+}
+
 async function openCase(caseId) {
   if (loader) {
     loader.hidden = false
@@ -1070,6 +1078,7 @@ async function openCase(caseId) {
   await applyAnnotations(toStoredConfig(result.case.config ?? {}))
   // La vista de origen es siempre la de inicio (isometrica), este o no editado.
   viewer.resetView()
+  showFreeView()
   startCaseHistory()
 }
 
@@ -1101,6 +1110,7 @@ async function openShare(shareId) {
   await applyAnnotations(toStoredConfig(result.shared.config ?? {}))
   // La vista de origen es siempre la de inicio (isometrica), este o no editado.
   viewer.resetView()
+  showFreeView()
   showShareWelcome()
 }
 

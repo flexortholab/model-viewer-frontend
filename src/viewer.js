@@ -696,7 +696,8 @@ this.camera.position.set(40, 30, 60)
       marker.objects = this.listObjects().map(({ index, visible }) => ({ index, visible }))
     }
     this.doc.markers.push(marker)
-    this._renderMarkers()
+    // Se ve el marcador recien creado, solo: los marcadores se ven de uno en uno.
+    this.setMarkersVisible(true, marker.id)
     this._syncDoc()
     this.emit('markers', this.doc.markers)
     return marker

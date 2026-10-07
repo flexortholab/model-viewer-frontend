@@ -1053,6 +1053,8 @@ async function openCase(caseId) {
   await loadCaseModel(`case/${caseId}`, result.case.model.url)
   // Sin `model`: una configuracion guardada nunca debe recargar otra URL.
   await applyAnnotations(toStoredConfig(result.case.config ?? {}))
+  // La vista de origen es siempre la de inicio (isometrica), este o no editado.
+  viewer.resetView()
   startCaseHistory()
 }
 
@@ -1082,6 +1084,8 @@ async function openShare(shareId) {
   setReadOnly()
   await loadCaseModel(`share/${shareId}`, result.shared.model.url)
   await applyAnnotations(toStoredConfig(result.shared.config ?? {}))
+  // La vista de origen es siempre la de inicio (isometrica), este o no editado.
+  viewer.resetView()
 }
 
 // --- Autoguardado y deshacer (solo con ?case=) ---

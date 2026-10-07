@@ -4,13 +4,6 @@
 // pero gizmo oculto y desadjuntado.
 import { test, check, abrirVisor, perfil } from './visor.js'
 
-// En los equipos que el visor toma por moviles (maxTouchPoints > 2 o user
-// agent de iPad, iPhone o Android) el gizmo se oculta a la fuerza aunque el
-// boton quede encendido. Es el defecto de #49: estas pruebas fallan ahi
-// hasta que se arregle, y entonces test.fail avisara de que ya pasan.
-const OCULTO_EN_TACTIL = '#49: el visor oculta el gizmo en equipos tactiles'
-const esTactil = (testInfo) => perfil(testInfo) !== 'escritorio'
-
 test.beforeEach(async ({ page }) => {
   check('el visor se instancia y carga el modelo', await abrirVisor(page))
   await page.evaluate(() => {
@@ -20,8 +13,7 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-test('un solo boton enciende y apaga el gizmo', async ({ page }, testInfo) => {
-  test.fail(esTactil(testInfo), OCULTO_EN_TACTIL)
+test('un solo boton enciende y apaga el gizmo', async ({ page }) => {
   const gizmo = await page.evaluate(() => {
     const v = window.dentalViewer
     const s = v.section
@@ -197,7 +189,6 @@ test('configuracion PivotControls y geometria de las asas', async ({ page }) => 
 // orbita se desactiva durante el gesto y se reactiva al soltar.
 test('arrastrar un asa de mover con el raton', async ({ page }, testInfo) => {
   test.skip(['movil', 'tablet'].includes(perfil(testInfo)), 'sin raton en movil y tablet')
-  test.fail(esTactil(testInfo), OCULTO_EN_TACTIL)
   const arrastre = await page.evaluate(() => {
     const v = window.dentalViewer
     const s = v.section

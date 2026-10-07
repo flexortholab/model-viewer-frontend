@@ -1,0 +1,55 @@
+name: E2E nocturno
+
+# Pasada larga de las pruebas en navegador para cazar tests inestables: cada
+# test se repite 10 veces, en Linux y tambien en Windows y macOS reales. No
+# bloquea nada (no corre en las PR); si falla, se mira el informe.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, navegador: chromium, instalar: 'npx playwright install --with-deps chromium', pruebas: 'npx playwright test' }
+          # Firefox headless en Linux no crea el contexto WebGL: con ventana sobre un X virtual.
+          - { os: ubuntu-latest, navegador: firefox, instalar: 'npx playwright install --with-deps firefox', pruebas: 'xvfb-run --auto-servernum npx playwright test --headed' }
+          - { os: ubuntu-latest, navegador: webkit, instalar: 'npx playwright install --with-deps webkit', pruebas: 'npx playwright test' }
+          - { os: ubuntu-latest, navegador: msedge, instalar: 'npx playwright install --with-deps msedge', pruebas: 'npx playwright test' }
+          # Edge ya viene instalado en los runners de Windows.
+          - { os: windows-latest, navegador: msedge, instalar: 'echo Edge ya instalado', pruebas: 'npx playwright test' }
+          - { os: windows-latest, navegador: firefox, instalar: 'npx playwright install firefox', pruebas: 'npx playwright test' }
+          - { os: macos-latest, navegador: webkit, instalar: 'npx playwright install webkit', pruebas: 'npx playwright test' }
+    env:
+      E2E_NAVEGADOR: ${{ matrix.navegador }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dependencias
+        run: npm ci
+
+      - name: Instalar el navegador
+        run: ${{ matrix.instalar }}
+
+      - name: Pruebas en ${{ matrix.navegador }} (${{ matrix.os }})
+        run: ${{ matrix.pruebas }} --repeat-each=10
+
+      - name: Guardar el informe y las trazas
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-nocturno-${{ matrix.os }}-${{ matrix.navegador }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

@@ -4,6 +4,12 @@
 // incluidas vueltas completas y vistas desde debajo.
 import { test, check, abrirVisor, perfil } from './visor.js'
 
+// Los controles giran en el frame siguiente al movimiento del raton. Por CDP
+// cada paso del smoke antiguo era una ida y vuelta lenta; con Playwright los
+// pasos llegan tan seguidos que WebKit los juntaba en un frame y el giro
+// salia corto. Se espera un frame tras cada paso, como un raton real.
+const siguienteFrame = (page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())))
+
 /** Arrastre con el boton izquierdo en `steps` pasos y una pausa al soltar. */
 async function drag(page, x0, y0, x1, y1, steps = 12) {
   await page.mouse.move(x0, y0)
@@ -11,6 +17,7 @@ async function drag(page, x0, y0, x1, y1, steps = 12) {
   for (let i = 1; i <= steps; i++) {
     const t = i / steps
     await page.mouse.move(Math.round(x0 + (x1 - x0) * t), Math.round(y0 + (y1 - y0) * t))
+    await siguienteFrame(page)
   }
   await page.mouse.up()
   await page.waitForTimeout(400)
@@ -123,6 +130,7 @@ test('giro libre de la camara con el raton', async ({ page }, testInfo) => {
   const recorrido = []
   for (let i = 1; i <= STEPS_POLO; i++) {
     await page.mouse.move(polarSerie.cx, Math.round(polarSerie.cy - (TOTAL_POLO * i) / STEPS_POLO))
+    await siguienteFrame(page)
     recorrido.push(await page.evaluate(() => window.dentalViewer.controls.getPolarAngle()))
   }
   await page.mouse.up()

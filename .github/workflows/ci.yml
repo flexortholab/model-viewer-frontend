@@ -40,6 +40,15 @@ jobs:
         with:
           path: dist
 
+      - name: Guardar la web para publicarla en AWS
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v7
+        with:
+          name: web
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
+
   # Pruebas en navegador (Playwright): un job por navegador, en paralelo. Cada
   # job corre todos los perfiles de ese navegador (escritorio, portatil
   # tactil, tablet, movil). Sin reintentos y con cada test repetido dos veces
@@ -133,3 +142,54 @@ jobs:
       - name: Publicar en GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+  # La misma web, tambien en https://viewer.flexortholab.com (S3 + CloudFront,
+  # infraestructura en model-viewer-backend). Convive con Pages hasta nueva
+  # orden. Sin environment: con uno, el subject OIDC cambia y AWS solo acepta
+  # el de refs/heads/main.
+  deploy-aws:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: aws-web
+      cancel-in-progress: false
+    env:
+      AWS_ACCOUNT_ID: '576951332538'
+      AWS_REGION: eu-south-2
+      WEB_BUCKET: model-viewer-prod-web-576951332538
+      WEB_DOMAIN: viewer.flexortholab.com
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: web
+          path: dist
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/model-viewer-prod-web-deploy
+          role-session-name: model-viewer-frontend-${{ github.run_id }}
+
+      - name: Comprobar la cuenta de AWS
+        run: test "$(aws sts get-caller-identity --query Account --output text)" = "$AWS_ACCOUNT_ID"
+
+      # assets/ lleva hash en el nombre: se cachea un ano y no se borra lo
+      # anterior, para que una pestana abierta con el HTML viejo siga cargando.
+      # El resto (HTML, samples, draco, basis) se revalida siempre.
+      - name: Subir la web
+        run: |
+          aws s3 sync dist/assets "s3://$WEB_BUCKET/assets" --cache-control 'public, max-age=31536000, immutable'
+          aws s3 sync dist "s3://$WEB_BUCKET" --exclude 'assets/*' --delete --cache-control 'no-cache'
+          aws s3 cp dist "s3://$WEB_BUCKET" --recursive --exclude '*' --include '*.wasm' \
+            --content-type application/wasm --cache-control 'no-cache'
+
+      - name: Invalidar la cache de CloudFront
+        run: |
+          distribution_id="$(aws cloudfront list-distributions --output text \
+            --query "DistributionList.Items[?Aliases.Items && contains(Aliases.Items, '$WEB_DOMAIN')].Id | [0]")"
+          test -n "$distribution_id" && test "$distribution_id" != None
+          aws cloudfront create-invalidation --distribution-id "$distribution_id" --paths '/*'

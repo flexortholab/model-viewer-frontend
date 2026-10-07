@@ -4,6 +4,7 @@
 import { test, expect, abrirVisor, pixelesPintados } from './visor.js'
 
 test('el lienzo WebGL pinta la pieza (pixeles distintos del fondo)', async ({ page }) => {
+  expect(1, 'fallo a proposito para probar la cola de merge').toBe(2)
   expect(await abrirVisor(page)).toBe(true)
   // La rejilla tambien pinta: lo que cuenta es la diferencia con la pieza oculta.
   const conPieza = await pixelesPintados(page)

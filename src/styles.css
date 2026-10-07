@@ -1272,3 +1272,49 @@ a.case-back:hover {
   color: #b3261e;
 }
 
+/* --- Zoom alto del navegador o pantallas cortas ---------------------------
+   Los paneles miden en px, asi que con mucho zoom crecen respecto al
+   viewport y pueden tapar el cubo de vistas (a la izquierda, abajo). Se
+   compactan ancho, paddings y alturas para que quede hueco para el cubo
+   (del que el navegador deja ~150px) y el logo; ademas el cuerpo de cada
+   panel se vuelve scrollable y el cubo queda por encima de todo. */
+@media (max-height: 720px) {
+  #viewcube {
+    z-index: 30;
+  }
+
+  #leftbar,
+  #rightbar {
+    gap: 4px;
+  }
+
+  #views-bar,
+  #tools-bar,
+  #panel,
+  .panel {
+    width: 176px;
+    padding: 6px;
+    gap: 4px;
+  }
+
+  button {
+    padding: 4px 8px;
+  }
+
+  .panel-body,
+  #tools-bar .panel-body {
+    max-height: 26vh;
+    overflow-y: auto;
+  }
+
+  .tb-title,
+  .panel-head {
+    font-size: 10px;
+  }
+
+  #brand-logo {
+    width: 150px;
+    right: 16px;
+    bottom: 16px;
+  }
+}

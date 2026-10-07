@@ -20,8 +20,8 @@ Prácticas comunes de los repos de `flexortholab`, las mismas que en `model-view
 
 - Se escriben en español.
 - Cada ticket de negocio describe valor para Roberto o para el doctor (por ejemplo, "Roberto crea un caso subiendo un GLB"). El trabajo técnico va en sub-issues.
-- Los tickets de negocio viven en `model-viewer-backend` y sus sub-issues del frontend, en este repo.
-- GitHub no deja trasladar issues de un repo privado a uno público: un ticket del backend que pase aquí se recrea.
+- Los tickets de negocio viven en el repo privado [flexortholab/docs](https://github.com/flexortholab/docs/issues), y sus sub-issues del frontend, en este repo.
+- GitHub no deja trasladar issues de un repo privado a uno público: un ticket de `docs` o del backend que pase aquí se recrea.
 - Seguimiento: [Project "Visor de modelos 3D"](https://github.com/orgs/flexortholab/projects/1).
 
 ## Operaciones manuales

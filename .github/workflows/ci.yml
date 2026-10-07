@@ -157,12 +157,9 @@ jobs:
     concurrency:
       group: aws-web
       cancel-in-progress: false
-    env:
-      AWS_ACCOUNT_ID: '576951332538'
-      AWS_REGION: eu-south-2
-      WEB_BUCKET: model-viewer-prod-web-576951332538
-      WEB_DOMAIN: viewer.flexortholab.com
     steps:
+      - uses: actions/checkout@v7
+
       - uses: actions/download-artifact@v8
         with:
           name: web
@@ -170,26 +167,9 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
-          aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/model-viewer-prod-web-deploy
+          aws-region: eu-south-2
+          role-to-assume: arn:aws:iam::576951332538:role/model-viewer-prod-web-deploy
           role-session-name: model-viewer-frontend-${{ github.run_id }}
 
-      - name: Comprobar la cuenta de AWS
-        run: test "$(aws sts get-caller-identity --query Account --output text)" = "$AWS_ACCOUNT_ID"
-
-      # assets/ lleva hash en el nombre: se cachea un ano y no se borra lo
-      # anterior, para que una pestana abierta con el HTML viejo siga cargando.
-      # El resto (HTML, samples, draco, basis) se revalida siempre.
-      - name: Subir la web
-        run: |
-          aws s3 sync dist/assets "s3://$WEB_BUCKET/assets" --cache-control 'public, max-age=31536000, immutable'
-          aws s3 sync dist "s3://$WEB_BUCKET" --exclude 'assets/*' --delete --cache-control 'no-cache'
-          aws s3 cp dist "s3://$WEB_BUCKET" --recursive --exclude '*' --include '*.wasm' \
-            --content-type application/wasm --cache-control 'no-cache'
-
-      - name: Invalidar la cache de CloudFront
-        run: |
-          distribution_id="$(aws cloudfront list-distributions --output text \
-            --query "DistributionList.Items[?Aliases.Items && contains(Aliases.Items, '$WEB_DOMAIN')].Id | [0]")"
-          test -n "$distribution_id" && test "$distribution_id" != None
-          aws cloudfront create-invalidation --distribution-id "$distribution_id" --paths '/*'
+      - name: Publicar en viewer.flexortholab.com
+        run: scripts/publicar-aws.sh dist

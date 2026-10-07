@@ -43,7 +43,7 @@ jobs:
   # Pruebas en navegador (Playwright): un job por navegador, en paralelo. Cada
   # job corre todos los perfiles de ese navegador (escritorio, portatil
   # tactil, tablet, movil). Sin reintentos y con cada test repetido dos veces
-  # en las PR: un test inestable deja el CI en rojo. No corre en cada push a
+  # en el CI: un test inestable lo deja en rojo. No corre en cada push a
   # una PR, sino al integrar: en la cola de merge y en el push a main (por si
   # un merge se salta la cola, que nunca se publique sin probar).
   e2e:

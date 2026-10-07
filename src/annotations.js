@@ -22,7 +22,7 @@ export function createDocument({ model = '', meta = {} } = {}) {
     },
     // Plano unico de corte: punto y normal en mm, coordenadas del modelo
     // normalizado (centro en el origen).
-    section: { enabled: false, capColor: '#c0554a', point: [0, 0, 0], normal: [0, 0, 1] },
+    section: { enabled: false, capColor: 'auto', point: [0, 0, 0], normal: [0, 0, 1] },
     measurements: [],
     markers: [],
   }

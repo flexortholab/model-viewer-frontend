@@ -16,6 +16,19 @@ import { defineConfig, devices } from '@playwright/test'
 // se aplica la media query de pantallas cortas y los paneles se compactan.
 const ESCRITORIO = { viewport: { width: 1280, height: 860 } }
 
+// Firefox headless en Linux bloquea WebGL 2 sin GPU (AllowWebgl2:false): se
+// fuerza, como haria un usuario con la lista negra de drivers desactivada.
+const FIREFOX = {
+  launchOptions: {
+    firefoxUserPrefs: {
+      'webgl.force-enabled': true,
+      'webgl.disabled': false,
+      'webgl.enable-webgl2': true,
+      'gfx.blocklist.all': -1,
+    },
+  },
+}
+
 // Portatil con pantalla tactil (tipico Windows con Edge): raton y dedo a la
 // vez. navigator.maxTouchPoints = 10, que es lo que mira el visor, lo pone
 // test/e2e/visor.js con addInitScript: Playwright no tiene opcion para ello.
@@ -23,12 +36,12 @@ const TACTIL = { ...ESCRITORIO, hasTouch: true }
 
 const proyectos = [
   { name: 'escritorio-chromium', navegador: 'chromium', perfil: 'escritorio', use: { ...devices['Desktop Chrome'], ...ESCRITORIO } },
-  { name: 'escritorio-firefox', navegador: 'firefox', perfil: 'escritorio', use: { ...devices['Desktop Firefox'], ...ESCRITORIO } },
+  { name: 'escritorio-firefox', navegador: 'firefox', perfil: 'escritorio', use: { ...devices['Desktop Firefox'], ...ESCRITORIO, ...FIREFOX } },
   { name: 'escritorio-webkit', navegador: 'webkit', perfil: 'escritorio', use: { ...devices['Desktop Safari'], ...ESCRITORIO } },
   { name: 'escritorio-msedge', navegador: 'msedge', perfil: 'escritorio', use: { ...devices['Desktop Edge'], ...ESCRITORIO, channel: 'msedge' } },
   { name: 'portatil-tactil-chromium', navegador: 'chromium', perfil: 'portatil-tactil', use: { ...devices['Desktop Chrome'], ...TACTIL } },
   { name: 'portatil-tactil-msedge', navegador: 'msedge', perfil: 'portatil-tactil', use: { ...devices['Desktop Edge'], ...TACTIL, channel: 'msedge' } },
-  { name: 'portatil-tactil-firefox', navegador: 'firefox', perfil: 'portatil-tactil', use: { ...devices['Desktop Firefox'], ...TACTIL } },
+  { name: 'portatil-tactil-firefox', navegador: 'firefox', perfil: 'portatil-tactil', use: { ...devices['Desktop Firefox'], ...TACTIL, ...FIREFOX } },
   { name: 'tablet-webkit', navegador: 'webkit', perfil: 'tablet', use: { ...devices['iPad (gen 7)'] } },
   { name: 'movil-webkit', navegador: 'webkit', perfil: 'movil', use: { ...devices['iPhone 13'] } },
   { name: 'movil-chromium', navegador: 'chromium', perfil: 'movil', use: { ...devices['Pixel 7'] } },

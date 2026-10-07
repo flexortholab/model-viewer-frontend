@@ -24,7 +24,7 @@ export const test = base.extend({
       }
       const consola = { errores: [], excepciones: [] }
       page.on('console', (message) => {
-        if (message.type() === 'error') consola.errores.push(message.text())
+        if (message.type() === 'error') consola.errores.push(`${message.text()} [${message.location().url}]`)
       })
       page.on('pageerror', (error) => consola.excepciones.push(error.message))
       await use(consola)

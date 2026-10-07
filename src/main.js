@@ -42,6 +42,7 @@ const mobileUi = document.getElementById('mobile-ui')
 const mobileToolbar = document.getElementById('mobile-toolbar')
 const mobileTitle = document.getElementById('mobile-title')
 const caseMessage = document.getElementById('case-message')
+const shareWelcome = document.getElementById('share-welcome')
 const saveCaseButton = document.querySelector('[data-action="save-case"]')
 const undoButton = document.querySelector('[data-action="undo-case"]')
 const redoButton = document.querySelector('[data-action="redo-case"]')
@@ -832,6 +833,9 @@ document.addEventListener('click', (event) => {
       renderMarkers()
       showHint('Vista libre: se ocultan mediciones, corte y marcadores')
       break
+    case 'close-share-welcome':
+      closeShareWelcome()
+      break
   }
 })
 
@@ -930,6 +934,10 @@ window.addEventListener('pointerup', releaseDrag)
 
 window.addEventListener('keydown', (event) => {
   if (event.target?.matches?.('input, textarea')) return
+  if (event.key === 'Escape' && shareWelcome && !shareWelcome.hidden) {
+    closeShareWelcome()
+    return
+  }
   // Atajos del caso abierto: deshacer, rehacer y guardar.
   if (caseHistory && (event.metaKey || event.ctrlKey)) {
     const key = event.key.toLowerCase()
@@ -996,6 +1004,19 @@ function showCaseMessage(text) {
   if (loader) loader.hidden = true
   caseMessage.textContent = text
   caseMessage.hidden = false
+}
+
+/**
+ * Leyenda para el doctor que abre un enlace compartido (?share=): le dice que
+ * use la presentacion (pasos numerados) para revisar el caso preparado.
+ * Sale al terminar de cargar y se cierra con su boton o con Escape.
+ */
+function showShareWelcome() {
+  if (shareWelcome) shareWelcome.hidden = false
+}
+
+function closeShareWelcome() {
+  if (shareWelcome) shareWelcome.hidden = true
 }
 
 /**
@@ -1080,6 +1101,7 @@ async function openShare(shareId) {
   await applyAnnotations(toStoredConfig(result.shared.config ?? {}))
   // La vista de origen es siempre la de inicio (isometrica), este o no editado.
   viewer.resetView()
+  showShareWelcome()
 }
 
 // --- Autoguardado y deshacer (solo con ?case=) ---

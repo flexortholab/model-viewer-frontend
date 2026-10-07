@@ -696,6 +696,20 @@ button[data-marker-kind='screw'] .kind-dot {
   background: #a855f7;
 }
 
+/* Leyenda del caso compartido (?share=): que el doctor use la presentacion */
+.share-welcome-card {
+  max-width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+.share-welcome-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -1257,3 +1271,4 @@ a.case-back:hover {
 .save-status[data-status='gone'] {
   color: #b3261e;
 }
+

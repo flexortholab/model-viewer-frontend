@@ -1776,6 +1776,131 @@ check('Test1.glb sin excepciones sin capturar', pageErrors.length === 0, pageErr
 check('sin errores en consola', mainConsoleErrors.length === 0, mainConsoleErrors.join(' | ') || 'ninguno')
 check('sin excepciones sin capturar', mainPageErrors.length === 0, mainPageErrors.join(' | ') || 'ninguna')
 
+// --- Portatil tactil: el gizmo se ve al pulsar el boton ----------------------
+// Un portatil Windows con pantalla tactil da maxTouchPoints 10. Se pulsa el
+// boton de verdad (sin pasar el raton por el lienzo, que pediria frame) y se
+// cuentan en lo ultimo pintado los pixeles con los colores de los ejes del
+// gizmo: asi se ve lo mismo que veria Roberto, no el estado interno.
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 10 }, sessionId)
+await send('Page.navigate', { url: URL_TEST }, sessionId)
+await sleep(1000)
+await evaluate(`
+  new Promise((resolve, reject) => {
+    const t0 = Date.now()
+    const tick = () => {
+      if (window.dentalViewer?.model) return resolve(true)
+      if (Date.now() - t0 > 30000) return reject(new Error('timeout cargando el modelo en tactil'))
+      setTimeout(tick, 200)
+    }
+    tick()
+  })
+`)
+check('perfil tactil: el navegador anuncia 10 puntos tactiles',
+  (await evaluate('navigator.maxTouchPoints')) === 10)
+
+await evaluate(`
+  window.__pixelesGizmo = () => {
+    const v = window.dentalViewer
+    const lienzo = v.renderer.domElement
+    const copia = document.createElement('canvas')
+    copia.width = lienzo.width
+    copia.height = lienzo.height
+    const ctx = copia.getContext('2d')
+    ctx.drawImage(lienzo, 0, 0)
+    const datos = ctx.getImageData(0, 0, copia.width, copia.height).data
+    const colores = Object.values(v.section.pivotOptions.axisColors)
+      .map((c) => [(c >> 16) & 255, (c >> 8) & 255, c & 255])
+    let n = 0
+    for (let i = 0; i < datos.length; i += 4) {
+      for (const [r, g, b] of colores) {
+        if (Math.hypot(datos[i] - r, datos[i + 1] - g, datos[i + 2] - b) < 40) { n++; break }
+      }
+    }
+    return n
+  }
+`)
+
+// Clic real sobre el boton por CDP, en el centro de su caja.
+async function pulsar(selector) {
+  const caja = await evaluate(`
+    (() => {
+      const r = document.querySelector(${JSON.stringify(selector)})?.getBoundingClientRect()
+      return r && r.width > 0 ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null
+    })()
+  `)
+  if (!caja) throw new Error(`${selector} no esta en pantalla`)
+  for (const type of ['mousePressed', 'mouseReleased']) {
+    await send('Input.dispatchMouseEvent',
+      { type, x: caja.x, y: caja.y, button: 'left', clickCount: 1 }, sessionId)
+  }
+}
+
+// Mas que la cola de 30 frames del render bajo demanda: lo que no se haya
+// pedido explicitamente ya no se pinta.
+const reposo = () => sleep(1500)
+
+await reposo()
+const tactilBase = await evaluate('window.__pixelesGizmo()')
+await pulsar('#gizmo-toggle')
+await reposo()
+const tactilCorteApagado = await evaluate(`({
+  pixeles: window.__pixelesGizmo(),
+  corte: window.dentalViewer.section.enabled,
+})`)
+check('perfil tactil: con el corte apagado, pulsar Gizmo activa el corte y el gizmo se ve',
+  tactilCorteApagado.corte && tactilCorteApagado.pixeles - tactilBase > 300,
+  `${tactilBase} -> ${tactilCorteApagado.pixeles} px de color de eje`)
+
+await pulsar('#gizmo-toggle')
+await reposo()
+const tactilApagado = await evaluate('window.__pixelesGizmo()')
+check('perfil tactil: volver a pulsar Gizmo lo quita de la pantalla',
+  tactilApagado - tactilBase < 50,
+  `${tactilBase} -> ${tactilApagado} px de color de eje`)
+
+await pulsar('#gizmo-toggle')
+await reposo()
+const tactilCorteActivo = await evaluate('window.__pixelesGizmo()')
+check('perfil tactil: con el corte ya activo, pulsar Gizmo lo pinta sin tocar el lienzo',
+  tactilCorteActivo - tactilApagado > 300,
+  `${tactilApagado} -> ${tactilCorteActivo} px de color de eje`)
+
+// Tamano en pantalla tras acercar y alejar: la punta de la flecha sigue al 16.5%
+// del alto visible, sin volver a activar el corte.
+const tactilTamanos = await evaluate(`
+  (async () => {
+    const v = window.dentalViewer
+    const s = v.section
+    const espera = () => new Promise((r) => setTimeout(r, 300))
+    const fraccion = () => {
+      const altoMundo = (v.camera.top - v.camera.bottom) / v.camera.zoom
+      return s._pivotHelper.scale.x * 0.62 / altoMundo
+    }
+    const zoom0 = v.camera.zoom
+    const fracciones = {}
+    v.camera.zoom = zoom0 * 4
+    v.camera.updateProjectionMatrix()
+    v.requestRender()
+    await espera()
+    fracciones.acercado = fraccion()
+    v.camera.zoom = zoom0 / 4
+    v.camera.updateProjectionMatrix()
+    v.requestRender()
+    await espera()
+    fracciones.alejado = fraccion()
+    v.camera.zoom = zoom0
+    v.camera.updateProjectionMatrix()
+    v.requestRender()
+    await espera()
+    return fracciones
+  })()
+`)
+check('perfil tactil: el gizmo conserva su tamano en pantalla al acercar y alejar',
+  Math.abs(tactilTamanos.acercado - 0.165) < 0.005 && Math.abs(tactilTamanos.alejado - 0.165) < 0.005,
+  `acercado ${(tactilTamanos.acercado * 100).toFixed(1)}%, alejado ${(tactilTamanos.alejado * 100).toFixed(1)}%`)
+
+await send('Emulation.setTouchEmulationEnabled', { enabled: false }, sessionId)
+
 // --- Capturas del gizmo (SHOTS=1) --------------------------------------------
 // Sirven para revisar la estetica a ojo: flechas, planos, arcos y apagado.
 // Las deja en el directorio temporal del perfil.

@@ -308,7 +308,6 @@ this.camera.position.set(40, 30, 60)
       onChange: () => this._syncDoc(),
       _frameTick: () => this.requestRender(),
     })
-    if (this._isMobile) this.section.setGizmoVisible(false)
 
     this.measure = new MeasureTool({
       container: this.container,
@@ -472,7 +471,6 @@ this.camera.position.set(40, 30, 60)
           this.section.reset(this.camera)
           this.section.orientToCamera(this.camera)
         }
-        if (this._isMobile) this.section.setGizmoVisible(false)
       }
     } else {
       this.section.apply()
@@ -748,7 +746,6 @@ this.camera.position.set(40, 30, 60)
       // del documento (el conjunto completo vive en doc.measurements).
       this._preservingMeasures = true
       this.section?.restore({ ...marker.section, enabled: !!marker.section.enabled })
-      if (this._isMobile) this.section?.setGizmoVisible(false)
     } else {
       this.section?.setEnabled(false)
     }

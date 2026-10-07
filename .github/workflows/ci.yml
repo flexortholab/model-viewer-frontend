@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Cola de merge: al pulsar "Merge when ready" la PR se prueba sobre main con
+  # el cambio encima y solo se mergea si pasa.
+  merge_group:
 
 # En una PR, un push nuevo cancela el run anterior, que ya no sirve. En main el
 # grupo es por commit: nunca se cancela el despliegue de otro merge.
@@ -40,8 +43,11 @@ jobs:
   # Pruebas en navegador (Playwright): un job por navegador, en paralelo. Cada
   # job corre todos los perfiles de ese navegador (escritorio, portatil
   # tactil, tablet, movil). Sin reintentos y con cada test repetido dos veces
-  # en las PR: un test inestable deja el CI en rojo.
+  # en el CI: un test inestable lo deja en rojo. No corre en cada push a
+  # una PR, sino al integrar: en la cola de merge y en el push a main (por si
+  # un merge se salta la cola, que nunca se publique sin probar).
   e2e:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -97,6 +103,18 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 14
+
+  # Check que exige la regla de main: un nombre estable para toda la matriz.
+  # En una PR e2e se salta y esto sale en verde; en la cola refleja la matriz.
+  e2e-resultado:
+    if: always()
+    needs: e2e
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resultado de las pruebas en navegador
+        run: |
+          echo "e2e: ${{ needs.e2e.result }}"
+          test "${{ needs.e2e.result }}" != failure && test "${{ needs.e2e.result }}" != cancelled
 
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

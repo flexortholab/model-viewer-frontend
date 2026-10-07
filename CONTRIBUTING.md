@@ -56,6 +56,6 @@ npm run test:e2e              # build, vite preview en el 4173 y todas las prueb
 - Si ya hay un `vite preview` en el 4173, se reutiliza: recuerda hacer `npm run build` tras cambiar el código.
 - Tras un fallo, `npx playwright show-report` abre el informe con la traza de cada prueba.
 
-El CI corre al integrar código: en cada PR contra `main` y al mergearla. Lanza un job por navegador, sin reintentos y repitiendo cada prueba dos veces (`--repeat-each=2`), así que una prueba inestable lo deja en rojo.
+En cada push a una PR, el CI solo corre los tests unitarios y el build. Las pruebas en navegador corren al integrar: la PR se mergea con *Merge when ready*, entra en la cola de merge y se prueba sobre `main` con el cambio encima; si pasan, se mergea sola, y si fallan, sale de la cola sin tocar `main`. Vuelven a correr en el push a `main`, antes de publicar. Lanzan un job por navegador, sin reintentos y repitiendo cada prueba dos veces (`--repeat-each=2`), así que una prueba inestable lo deja en rojo.
 
 Una prueba que falla por un defecto conocido de la app se marca con `test.fail` y un comentario con el issue. Cuando se arregla, la prueba empieza a pasar y `test.fail` la pone en rojo: hay que quitar la marca en la misma PR del arreglo.

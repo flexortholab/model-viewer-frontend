@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# En una PR, un push nuevo cancela el run anterior, que ya no sirve. En main el
+# grupo es por commit: nunca se cancela el despliegue de otro merge.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest

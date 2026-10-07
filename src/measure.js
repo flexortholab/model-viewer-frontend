@@ -481,6 +481,8 @@ export class MeasureTool {
     this.syncSpriteSizes()
     if (!this.labels.length) return
     for (const entry of this.labels) {
+      // Las etiquetas de los marcadores las coloca el visor (fuera del modelo).
+      if (entry.manual) continue
       const mid = entry.position
       this._tmp.copy(mid).project(this.camera)
       const offscreen = this._tmp.z > 1
@@ -499,11 +501,14 @@ export class MeasureTool {
     }
   }
 
-  /** Etiqueta libre, no ligada a una medicion (marcadores, notas). */
-  addOverlay(id, el, position) {
+  /**
+   * Etiqueta libre, no ligada a una medicion (marcadores, notas). Con
+   * `manual`, update() no la coloca: lo hace quien la anadio.
+   */
+  addOverlay(id, el, position, { manual = false } = {}) {
     this.removeOverlay(id)
     this.labelLayer.appendChild(el)
-    this.labels.push({ el, id, position: position.clone() })
+    this.labels.push({ el, id, position: position.clone(), manual })
   }
 
   removeOverlay(id) {

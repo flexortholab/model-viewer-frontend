@@ -1318,3 +1318,29 @@ a.case-back:hover {
     bottom: 16px;
   }
 }
+
+/* --- Lineas guia de los marcadores ----------------------------------------- */
+/* La etiqueta de un marcador va fuera del modelo; la linea la une con su punto. */
+
+.marker-leaders {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.marker-leader {
+  stroke: #22c55e;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.marker-leader.marker-screw {
+  stroke: #a855f7;
+}
+
+.marker-leader.marker-warning {
+  stroke: #ef4444;
+}

@@ -52,10 +52,11 @@ pieza y seguir dando la vuelta. El modo anterior (`OrbitControls`), que se queda
 clavado al llegar a superior/inferior, sigue disponible con **`?giro=orbit`**; el
 libre se puede forzar con **`?giro=libre`**. En `demo-giro.html` hay un interruptor
 en pantalla para comparar ambos modos con la escena real.
+> **Web publicada:** https://viewer.flexortholab.com (S3 + CloudFront) y, en paralelo, https://flexortholab.github.io/model-viewer-frontend/ (GitHub Pages). Cada merge a `main` publica en las dos.
 > **Demo desplegada (GitHub Pages):** https://flexortholab.github.io/model-viewer-frontend/viewer.html
 > **Demo cargada con la pieza de ejemplo (visita recomendada):** https://flexortholab.github.io/model-viewer-frontend/viewer.html?model=samples/B1-draco.glb
 > **Modelo decimado para pruebas móviles:** https://flexortholab.github.io/model-viewer-frontend/viewer.html?model=samples/Test1.glb (~5 MB, ~415 k triángulos)
-> La demo sirve el build de la rama `main`; para actualizarla basta rehacer `npm run build` y actualizar `gh-pages`.
+> La demo sirve el build de la rama `main`; la publica el CI al mergear (`.github/workflows/ci.yml`, jobs `deploy` y `deploy-aws`).
 
 ---
 
@@ -126,7 +127,7 @@ Toda la marca vive en **`src/brand.js`** (objeto `BRAND`): no hay que perseguir 
 La raíz (`index.html`) es el panel del laboratorio, conectado a la API del visor ([model-viewer-backend](https://github.com/flexortholab/model-viewer-backend)), con la lista de casos. Sin sesión, manda a `login.html` (email y contraseña), que vuelve al panel al entrar. Los usuarios los da de alta Sergio con un script del backend; no hay registro abierto.
 
 - La sesión dura mientras se use: el access token (15 min) se renueva solo con el refresh token (30 días) y se guarda en `localStorage`. La contraseña nunca se guarda.
-- En producción el panel llama a la API directamente. En `npm run dev`, las llamadas pasan por un proxy de Vite (`/dev-api`, ver `vite.config.js`), porque la API solo acepta en CORS el origen de GitHub Pages.
+- En producción el panel llama a la API directamente. En `npm run dev`, las llamadas pasan por un proxy de Vite (`/dev-api`, ver `vite.config.js`), porque la API solo acepta en CORS los orígenes publicados (GitHub Pages y `https://viewer.flexortholab.com`).
 - El visor está en `viewer.html` y sigue funcionando igual, con `?model=`. Los enlaces antiguos a la raíz con `?model=`, `?case=`, `?share=` o `?annotations=` redirigen al visor y `panel.html` redirige a la raíz.
 
 ## Uso por URL

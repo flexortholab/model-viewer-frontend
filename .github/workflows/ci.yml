@@ -40,6 +40,15 @@ jobs:
         with:
           path: dist
 
+      - name: Guardar la web para publicarla en AWS
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v7
+        with:
+          name: web
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
+
   # Pruebas en navegador (Playwright): un job por navegador, en paralelo. Cada
   # job corre todos los perfiles de ese navegador (escritorio, portatil
   # tactil, tablet, movil). Sin reintentos y con cada test repetido dos veces
@@ -133,3 +142,36 @@ jobs:
       - name: Publicar en GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+  # La misma web, tambien en https://viewer.flexortholab.com (S3 + CloudFront,
+  # infraestructura en model-viewer-backend). Convive con Pages hasta nueva
+  # orden. Sin environment: con uno, el subject OIDC cambia y AWS solo acepta
+  # el de refs/heads/main.
+  deploy-aws:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: aws-web
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: web
+          path: dist
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: eu-south-2
+          role-to-assume: arn:aws:iam::576951332538:role/model-viewer-prod-frontend-deploy
+          role-session-name: model-viewer-frontend-${{ github.run_id }}
+
+      - name: Publicar en viewer.flexortholab.com
+        run: >-
+          scripts/publicar-aws.sh --dist dist --cuenta 576951332538
+          --bucket model-viewer-prod-frontend-576951332538 --dominio viewer.flexortholab.com

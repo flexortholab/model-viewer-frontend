@@ -168,10 +168,10 @@ jobs:
       - uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: eu-south-2
-          role-to-assume: arn:aws:iam::576951332538:role/model-viewer-prod-web-deploy
+          role-to-assume: arn:aws:iam::576951332538:role/model-viewer-prod-frontend-deploy
           role-session-name: model-viewer-frontend-${{ github.run_id }}
 
       - name: Publicar en viewer.flexortholab.com
         run: >-
           scripts/publicar-aws.sh --dist dist --cuenta 576951332538
-          --bucket model-viewer-prod-web-576951332538 --dominio viewer.flexortholab.com
+          --bucket model-viewer-prod-frontend-576951332538 --dominio viewer.flexortholab.com

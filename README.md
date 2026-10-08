@@ -16,7 +16,6 @@ Revisa, mide y presenta diseños 3D directamente en el navegador, sin instalar n
   <img src="./docs/visor-captura.png" alt="Visor 3D de Flex Ortho Lab mostrando un caso con corte seccional, lista de objetos y presentación de marcadores" width="90%">
 </p>
 
-> **Nota:** para que la imagen anterior se vea en GitHub, guarda la captura que quieras mostrar como `docs/visor-captura.png` en este mismo repositorio.
 
 ## Pruébalo ahora
 

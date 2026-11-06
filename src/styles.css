@@ -368,6 +368,18 @@ button.wide {
   accent-color: var(--accent-strong);
 }
 
+/* Activar corte / Gizmo: el estado pulsado pasa a un azul claro con contorno
+   del mismo color que el texto, para que el doctor vea claramente que estan
+   encendidos. */
+#section-toggle[aria-pressed='true'],
+#gizmo-toggle[aria-pressed='true'] {
+  background: #e6f7fa;
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+  box-shadow: inset 0 0 0 1px var(--accent-ink);
+  font-weight: 600;
+}
+
 .switch,
 .field {
   display: flex;

@@ -115,7 +115,8 @@ export function caseEditorUrl(caseId) {
 /**
  * URL completa del enlace del doctor. La API devuelve `sharePath` relativo a
  * la carpeta del frontend (`?share=<id>`); se resuelve contra la pagina
- * actual para que funcione igual en GitHub Pages que en local.
+ * actual para que funcione igual en GitHub Pages, en viewer.flexortholab.com
+ * y en local.
  */
 export function doctorLinkUrl(sharePath, pageUrl) {
   return new URL(sharePath, new URL('./', pageUrl)).href

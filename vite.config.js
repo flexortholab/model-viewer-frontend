@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     port: 5173,
     fs: { strict: false },
-    // La API solo acepta el origen de GitHub Pages: en desarrollo se le
+    // La API solo acepta los origenes publicados: en desarrollo se le
     // reenvian las peticiones sin la cabecera Origin (ver src/config.js).
     proxy: {
       [DEV_API_PREFIX]: {

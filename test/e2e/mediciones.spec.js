@@ -266,3 +266,102 @@ test('seleccionar una medida, anotarla y borrarla con Supr', async ({ page }) =>
   check('la nota aparece en la cifra', edit.shown.includes('ancho'), edit.shown)
   check('Supr borra la medida seleccionada', edit.remaining === 0)
 })
+
+// Iman de borde: al salir de la pieza por un borde con aire detras, el punto
+// se queda en la superficie visible mas cercana; lejos del modelo no inventa
+// puntos. Las piezas ocultas tampoco atraen el cursor, aunque Raycaster las
+// seguiria intersectando si no se filtraran.
+test('iman de borde y piezas ocultas al medir', async ({ page }) => {
+  await page.evaluate(() => {
+    const v = window.dentalViewer
+    v.setTool('measure')
+    v.setSection({ enabled: false })
+    v.setView('superior')
+  })
+  // Un frame para que la camara y el modelo esten pintados: el raycast se
+  // hace contra la matriz de mundo de la camara, no contra la que se acaba de
+  // escribir en setView.
+  await page.waitForTimeout(250)
+  const snap = await page.evaluate(() => {
+    const v = window.dentalViewer
+    const canvas = v.renderer.domElement
+    const rect = canvas.getBoundingClientRect()
+    const width = rect.width
+    const height = rect.height
+    const at = (fx, fy) => [rect.left + fx * width, rect.top + fy * height]
+    const point = (x, y) => {
+      v.setPointer({ clientX: x, clientY: y })
+      return v.pick()
+    }
+
+    // Primer punto con pieza bajo el cursor (el centro cae en el paladar).
+    let start = null
+    for (const fy of [0.5, 0.4, 0.6, 0.3, 0.7]) {
+      for (const fx of [0.5, 0.4, 0.6, 0.3, 0.7]) {
+        const [x, y] = at(fx, fy)
+        if (point(x, y)) {
+          start = [x, y]
+          break
+        }
+      }
+      if (start) break
+    }
+
+    // Caminar en una direccion hasta cruzar la silueta: ultimo pixel con
+    // pieza y primero con aire.
+    let edge = null
+    if (start) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        let last = null
+        for (let i = 0; i < Math.max(width, height); i++) {
+          const x = start[0] + dx * i
+          const y = start[1] + dy * i
+          if (x < rect.left + 2 || x > rect.right - 2 || y < rect.top + 2 || y > rect.bottom - 2) break
+          if (point(x, y)) last = [x, y]
+          else if (last) {
+            edge = { last, air: [x, y] }
+            break
+          }
+        }
+        if (edge) break
+      }
+    }
+
+    const sticky = edge ? v.pickSticky(edge.air[0], edge.air[1], 24) : null
+    const far = v.pickSticky(rect.left + 3, rect.top + 3, 24)
+
+    // Pieza bajo el cursor y, despues, todas ocultas en el mismo pixel.
+    const testigo = edge?.last ?? start
+    let beforeHide = null
+    let afterHide = null
+    if (testigo) {
+      v.setPointer({ clientX: testigo[0], clientY: testigo[1] })
+      beforeHide = v.pick()?.object?.name ?? null
+      const visibles = v.model.meshes.map((mesh) => mesh.visible)
+      v.model.meshes.forEach((_, index) => v.setMeshVisible(index, false))
+      v.setPointer({ clientX: testigo[0], clientY: testigo[1] })
+      afterHide = v.pick()
+      v.model.meshes.forEach((_, index) => v.setMeshVisible(index, visibles[index]))
+    }
+
+    v.setTool('orbit')
+    v.resetView()
+    return {
+      tienePieza: start !== null,
+      bordeEncontrado: edge !== null,
+      sticky: sticky ? { point: sticky.point.toArray(), flag: sticky.sticky === true } : null,
+      far: far ? far.toArray() : null,
+      beforeHide,
+      afterHide: afterHide === null ? null : 'algo',
+    }
+  })
+  check('hay pieza bajo el cursor para probar el borde', snap.tienePieza && snap.bordeEncontrado,
+    `pieza=${snap.tienePieza} borde=${snap.bordeEncontrado}`)
+  check('al salir por un borde el punto se queda en la pieza',
+    Array.isArray(snap.sticky?.point) && snap.sticky.flag === true,
+    JSON.stringify(snap.sticky))
+  check('lejos del modelo no se inventa un punto', snap.far === null, JSON.stringify(snap.far))
+  check('una pieza oculta no atrae el cursor de medicion',
+    snap.beforeHide !== null && snap.afterHide === null,
+    `${snap.beforeHide} -> ${snap.afterHide}`)
+})

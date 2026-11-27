@@ -374,12 +374,30 @@ export class SectionPlaneTool {
   }
 
   /** Posiciona el gizmo desde una especificacion {point, normal}. */
-  setPlane({ point, normal } = {}) {
+  /**
+   * @param {{point?:number[], normal?:number[], xAxis?:number[]}} options
+   *   `xAxis` fija el giro del gizmo alrededor de la normal (por defecto, el
+   *   arco mas corto desde Z, que deja un balanceo arbitrario). Se usa para
+   *   colocar el plano de perfil siempre en los ejes de la pantalla.
+   */
+  setPlane({ point, normal, xAxis } = {}) {
     if (Array.isArray(point)) this.gizmo.position.fromArray(point)
     if (Array.isArray(normal)) {
       const n = new THREE.Vector3(...normal)
       if (n.lengthSq() > 1e-12 && Number.isFinite(n.x)) {
-        this.gizmo.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n.normalize())
+        n.normalize()
+        const ref = Array.isArray(xAxis) ? new THREE.Vector3(...xAxis) : null
+        // Se quita la componente en la normal para que X sea perpendicular.
+        if (ref) ref.addScaledVector(n, -ref.dot(n))
+        if (ref && ref.lengthSq() > 1e-12) {
+          ref.normalize()
+          const y = new THREE.Vector3().crossVectors(n, ref).normalize()
+          this.gizmo.quaternion.setFromRotationMatrix(
+            new THREE.Matrix4().makeBasis(ref, y, n),
+          )
+        } else {
+          this.gizmo.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n)
+        }
       }
     }
     if (this.enabled) this.apply()
@@ -725,6 +743,19 @@ export class SectionPlaneTool {
     // ~0 por error de coma flotante) y son validos; sin ella su etiqueta se
     // esconderia y no se podria cotar sobre el corte.
     return this.plane.distanceToPoint(point) >= -Math.max(this.radius * 1e-5, 1e-6)
+  }
+
+  /**
+   * Filtro de visibilidad para muchos puntos (iman de borde de las medidas):
+   * sincroniza el plano una sola vez en lugar de en cada vertice.
+   * @returns {(point: import('three').Vector3) => boolean}
+   */
+  visibilityTest() {
+    if (!this.enabled) return () => true
+    this._syncPlane()
+    const plane = this.plane
+    const tolerance = Math.max(this.radius * 1e-5, 1e-6)
+    return (point) => plane.distanceToPoint(point) >= -tolerance
   }
 
   /** ¿El plano en su posicion actual roza la caja de la pieza? */

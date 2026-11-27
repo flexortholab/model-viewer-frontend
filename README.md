@@ -8,7 +8,7 @@ Revisa, mide y presenta diseños 3D directamente en el navegador, sin instalar n
 [![Licencia: GPL-3.0-or-later](https://img.shields.io/badge/licencia-GPL--3.0--or--later-blue.svg)](LICENSE)
 [![Vite](https://img.shields.io/badge/built%20with-Vite-646CFF?logo=vite)](https://vitejs.dev/)
 [![three.js](https://img.shields.io/badge/3D-three.js-black?logo=three.js)](https://threejs.org/)
-[![Tests](https://img.shields.io/badge/tests-130%2F130-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-143%2F143-brightgreen)]()
 
 </div>
 
@@ -41,11 +41,14 @@ Diseñado originalmente para **disyuntores sinterizados con anclaje esquelético
 - **Corte seccional** con plano único y gizmo visual (mover + rotar) para inspeccionar el interior del modelo.
 - **Capping sólido** por pieza: el corte se ve macizo, no como una malla hueca, con curva de contorno exacta.
 - **Mediciones de precisión** en milímetros, editables directamente sobre la pieza, con anotaciones y notas.
-- **Marcadores de presentación** que guardan y restauran vista, corte, medidas y visibilidad de objetos. El doctor solo tiene que pulsar cada paso.
+- **Iman de borde** en las mediciones: al salir por un borde con aire detrás, el punto se queda en la superficie visible en vez de escaparse de la pieza.
+- **Reutilizar trabajo entre casos**: un solo **Copiar/Pegar** lleva medidas, corte y marcadores con sus nombres, vistas, medidas, cortes y piezas visibles (sin duplicar trabajo ya hecho).
+- **Marcadores de presentación** que guardan y restauran vista, corte, medidas y visibilidad de objetos. El doctor solo tiene que pulsar cada paso. El laboratorio puede reordenarlos y borrarlos de uno en uno.
 - **Lista de objetos** para mostrar u ocultar piezas individualmente.
 - **Modo móvil** simplificado con barra inferior: Inicio, Objetos y Presentación.
 - **Embebible** en cualquier plataforma mediante iframe y protocolo `postMessage`.
 - **Marca personalizable** desde un único fichero (`src/brand.js`): nombre, logo y color corporativo.
+- **Solo lectura para el doctor**: el enlace compartido no permite editar marcadores, medidas ni cortes del caso; solo revisar, medir y cortar.
 - **Software libre** bajo licencia GPL-3.0-or-later.
 
 ## Formatos soportados
@@ -66,6 +69,15 @@ Abre el enlace que aparece (normalmente `http://localhost:5173`) o ejecuta direc
 ```bash
 Iniciar-Visor-dev.bat
 ```
+
+### Reutilizar un caso en otro
+
+En **Herramientas** hay un único **Copiar / Pegar**: Copiar guarda en este
+navegador medidas, corte y todos los marcadores (su texto, clase, vista y zoom,
+corte, medidas y piezas visibles guardados en cada paso) más la visibilidad
+actual de los objetos. Abre el otro caso y pulsa Pegar: sustituye todo ese
+trabajo y conserva el modelo y la ficha del caso de destino. De momento el
+portapapeles es solo local (`localStorage`), no pasa por la API.
 
 ### Comandos útiles
 

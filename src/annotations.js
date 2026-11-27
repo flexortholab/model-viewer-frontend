@@ -109,6 +109,12 @@ export function validateDocument(raw) {
           // Zoom del paso (opcional: los JSON anteriores no lo traian).
           const zoom = Number(m.view.zoom)
           if (Number.isFinite(zoom) && zoom > 0) marker.view.zoom = zoom
+          // Balanceo exacto de la camara (opcional: los pasos anteriores no lo
+          // guardaban y se restauraban con el arriba del mundo).
+          const q = m.view.quaternion
+          if (Array.isArray(q) && q.length === 4 && q.every((n) => Number.isFinite(n))) {
+            marker.view.quaternion = q.map(Number)
+          }
         }
         if (m.section && typeof m.section === 'object') {
           const s = m.section

@@ -724,20 +724,27 @@ export class MeasureTool {
 
   /**
    * Ajusta a superficie/borde: con el hit del raycast, devuelve el vertice
-   * mas cercano de la cara impactada si esta a tiro (adherencia exacta).
+   * mas cercano de la cara impactada si esta a tiro. La tolerancia se mide en
+   * pixeles de pantalla (no en mm) para que el iman se sienta igual con la
+   * pieza muy ampliada o alejada; si no hay vertice cerca, el punto exacto de
+   * la superficie es mas fiable que saltar a una esquina lejana.
    */
-  snapToSurface(hit, toleranceRatio = 0.004) {
-    if (!hit?.face || !hit.point) return hit.point
+  snapToSurface(hit, maxPx = 8) {
+    if (!hit?.face || !hit.point || !hit.object) return hit?.point ?? null
     const mesh = hit.object
-    const pos = mesh.geometry.getAttribute('position')
+    const pos = mesh.geometry?.getAttribute('position')
     if (!pos) return hit.point
-    const tolerance = this.section?.radius ? this.section.radius * toleranceRatio : 0.8
+    const target = this._projectPx(hit.point)
+    if (!target) return hit.point
     let best = null
-    let bestDist = tolerance
+    let bestDist = maxPx
     const candidate = new THREE.Vector3()
     for (const index of [hit.face.a, hit.face.b, hit.face.c]) {
       candidate.set(pos.getX(index), pos.getY(index), pos.getZ(index))
-      const distance = candidate.distanceTo(hit.point)
+      candidate.applyMatrix4(mesh.matrixWorld)
+      const px = this._projectPx(candidate)
+      if (!px) continue
+      const distance = Math.hypot(px[0] - target[0], px[1] - target[1])
       if (distance <= bestDist) {
         bestDist = distance
         best = candidate.clone()

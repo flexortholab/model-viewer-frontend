@@ -121,6 +121,48 @@ Pendiente de sesiones anteriores (no bloqueante):
 
 ---
 
+## Sesión del 26/11/2026 — precisión y trabajo entre casos
+
+- **Iman de borde en las medidas:** si el cursor sale de la pieza por un borde
+  con aire detrás, el punto se queda en el vértice visible más cercano (radio
+  en píxeles); lejos del modelo no se inventa ningún punto. El snap a vértice
+  de la cara también se mide en píxeles, así se siente igual con la pieza muy
+  ampliada o alejada.
+- **Piezas ocultas:** `Raycaster` no mira `mesh.visible`; ahora `pick()` solo
+  prueba piezas visibles. Antes una pieza ocultada con el ojo seguía atrayendo
+  el cursor de medición.
+- **Vistas superior/inferior sin salto:** ArcballControls usa `camera.up` como
+  arriba **local** y lo rota con el cuaternión completo de la cámara. Hay que
+  dejarlo siempre en la vertical del mundo `(0,1,0)`: cambiarlo a Z para las
+  vistas cenitales hacía que el primer arrastre aplicase un giro de ~180° y que
+  el arriba acabara apuntando hacia delante (el modelo «se volvía loco»). La
+  prueba de navegador arrastra 8 px y exige un giro pequeño y el arriba
+  perpendicular a la mirada.
+- **Vistas de marcador con balanceo exacto:** cada paso guarda también el
+  cuaternión de la cámara. Al pulsarlo vuelve la misma orientación, incluido el
+  giro (roll), en vez de recolocarse con el arriba del mundo y pegar un giro
+  raro. Los pasos antiguos sin cuaternión conservan el balanceo actual
+  proyectado sobre su dirección de vista.
+- **Tijeras sin perder el balanceo y con perfil determinista:** reencuadrar la
+  escena al pulsar las tijeras conserva la orientación de la cámara. El corte
+  se gira 90° a perfil tomando los ejes de la pantalla (normal = arriba de la
+  vista, eje X del gizmo = derecha), así la inclinación es siempre la misma.
+  Antes rotaba sobre el X local del gizmo y arrastraba el balanceo de la
+  cámara, con una angulación distinta en cada vista.
+  `FreeOrbitControls.syncPose()` actualiza la matriz que Arcball usa como
+  referencia sin llamar a `lookAt()`.
+- **Copiar/pegar de todo el caso:** un solo par de botones copia medidas, corte y marcadores **tal cual** (texto, clase, vista y zoom, corte, medidas y visibilidad de piezas guardados en cada paso), más la visibilidad actual de los objetos. El destino conserva su modelo y su meta (caso, doctor, fecha). Portapapeles local en `localStorage`, de momento.
+- **Presentación editable:** cada paso se puede subir, bajar o borrar por
+  separado, en la lista de escritorio y en la del móvil.
+- **Paneles derechos adaptables:** la columna derecha mide según el texto que
+  lleva (mínimo 248 px, máximo `min(420px, 38vw)`) y los nombres de marcadores
+  y objetos se reparten en varias líneas en vez de quedar recortados con
+  puntos suspensivos. La nota de ayuda no fuerza el ancho máximo.
+- **Solo el laboratorio edita:** el enlace del doctor (`?share=`) oculta
+  copiar/pegar y las acciones de los marcadores; medir y cortar sigue disponible.
+
+---
+
 ## Sesión del 29/09/2026 (noche) — registro
 
 - Corto plazo completado al 100%: `setSectionAxis` activa por defecto, reattach de

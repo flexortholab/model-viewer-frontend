@@ -163,6 +163,88 @@ test('las tijeras activan el corte sin hacer zoom', async ({ page }) => {
     `dot ${encuadre.conservedAngulo.toFixed(4)}`)
 })
 
+// Al rotar con el raton, la camara puede quedar con balanceo (roll). Pulsar
+// las tijeras reencuadra la escena, pero NO debe devolver la vista a la
+// vertical del mundo: antes pegaba un giro de hasta casi 180 grados.
+test('las tijeras conservan el balanceo despues de rotar', async ({ page }) => {
+  const balanceo = await page.evaluate(() => {
+    const v = window.dentalViewer
+    v.setSection({ enabled: false })
+    v.setView('frontal')
+    // Rodar 75 grados sobre el eje de la mirada, como deja un arrastre de
+    // Arcball; el arriba de pantalla pasa a ser el de la camara.
+    const axis = new (v.camera.position.constructor)()
+    v.camera.getWorldDirection(axis)
+    const giro = new (v.camera.quaternion.constructor)().setFromAxisAngle(axis, (75 * Math.PI) / 180)
+    v.camera.quaternion.premultiply(giro)
+    v.camera.updateMatrixWorld()
+    const m = v.camera.matrixWorld.elements
+    v.camera.up.set(m[4], m[5], m[6])
+    v.controls.syncPose?.()
+    const antes = v.camera.quaternion.toArray()
+
+    v.focusObject(0, { withPlane: true })
+    const despues = v.camera.quaternion.toArray()
+    const dot = antes.reduce((sum, value, index) => sum + value * despues[index], 0)
+    return {
+      giro: 2 * Math.acos(Math.min(1, Math.abs(dot))) * 180 / Math.PI,
+      corte: v.section.enabled,
+      arriba: v.camera.up.toArray(),
+    }
+  })
+  check('las tijeras conservan el balanceo de la camara', balanceo.giro < 1,
+    `giro ${balanceo.giro.toFixed(2)} grados`)
+  check('las tijeras siguen activando el corte', balanceo.corte === true)
+})
+
+// El plano debe quedar de perfil (girado 90 grados respecto al de frente),
+// siempre con los ejes de la pantalla: normal = arriba de la vista y eje X del
+// gizmo = derecha de la vista. Antes se giraba sobre el X local del gizmo y su
+// inclinacion dependia del balanceo de la camara: salia una angulacion distinta
+// en cada vista.
+test('las tijeras dejan el corte de perfil con los ejes de la pantalla', async ({ page }) => {
+  const resultados = await page.evaluate(() => {
+    const v = window.dentalViewer
+    const V3 = v.camera.position.constructor
+    const centro = v.model.bounds.getCenter(new V3())
+    const distancia = Math.max(v.camera.position.distanceTo(v.controls.target), 120)
+    const salida = []
+    for (const direccion of [[0.4, 0.3, 0.8], [0, 1, 0.001], [1, 0.05, 0.02], [-0.6, 0.4, 0.2]]) {
+      const d = new V3(...direccion).normalize()
+      v.camera.position.copy(centro).addScaledVector(d, distancia)
+      v.controls.target.copy(centro)
+      v.camera.up.set(0, 1, 0)
+      v.camera.lookAt(centro)
+      v.controls.sync?.()
+
+      v.focusObject(0, { withPlane: true })
+      const m = v.camera.matrixWorld.elements
+      const mirada = new V3()
+      v.camera.getWorldDirection(mirada)
+      const arriba = new V3(m[4], m[5], m[6]).normalize()
+      const derecha = new V3(m[0], m[1], m[2]).normalize()
+      const normal = new V3(...v.section.serialize().normal).normalize()
+      const ejeX = new V3(1, 0, 0).applyQuaternion(v.section.gizmo.quaternion).normalize()
+      salida.push({
+        perfil: Math.abs(normal.dot(mirada)),
+        arriba: Math.abs(normal.dot(arriba)),
+        eje: Math.abs(ejeX.dot(derecha)),
+      })
+    }
+    v.setSection({ enabled: false })
+    return salida
+  })
+  check('el corte queda de perfil (normal perpendicular a la mirada)',
+    resultados.every((r) => r.perfil < 1e-3),
+    resultados.map((r) => r.perfil.toFixed(4)).join(', '))
+  check('la normal del corte es el arriba de la pantalla',
+    resultados.every((r) => r.arriba > 0.999),
+    resultados.map((r) => r.arriba.toFixed(4)).join(', '))
+  check('el eje X del gizmo es la derecha de la pantalla',
+    resultados.every((r) => r.eje > 0.999),
+    resultados.map((r) => r.eje.toFixed(4)).join(', '))
+})
+
 // Cotas sobre la cara cortada: esa cara es el capping por stencil, no hay malla
 // que raycastear, asi que pick() cae al plano y acepta el punto solo si esta
 // sobre material. Desde la vista trasera el primer impacto es la cara recortada.

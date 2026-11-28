@@ -99,9 +99,18 @@ test('vistas superior e inferior: el primer arrastre no da un salto', async ({ p
       Math.abs(dot(trasArrastre.up, trasArrastre.forward)) < 0.05,
       `up=${trasArrastre.up.map((n) => n.toFixed(2))} mirada=${trasArrastre.forward.map((n) => n.toFixed(2))}`)
 
-    // El zoom no debe cambiar la orientacion.
-    await page.mouse.move(trasArrastre.center.x, trasArrastre.center.y)
-    await page.mouse.wheel(0, -240)
+    // El zoom no debe cambiar la orientacion. `page.mouse.wheel` no existe en
+    // WebKit movil (un dispositivo tactil no tiene rueda), asi que el evento
+    // se lanza sobre el lienzo, que es lo que escucha ArcballControls.
+    await page.evaluate(({ x, y }) => {
+      window.dentalViewer.renderer.domElement.dispatchEvent(new WheelEvent('wheel', {
+        deltaY: -240,
+        clientX: x,
+        clientY: y,
+        bubbles: true,
+        cancelable: true,
+      }))
+    }, trasArrastre.center)
     await page.waitForTimeout(500)
     const trasZoom = await estado()
     check(`${vista}: el zoom acerca sin cambiar la orientacion`,

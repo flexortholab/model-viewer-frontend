@@ -141,6 +141,33 @@ export class FreeOrbitControls extends THREE.EventDispatcher {
     this.arc.setCamera(this.camera)
   }
 
+  /**
+   * Refresca la pose de referencia de Arcball sin reorientar la camara.
+   *
+   * `setCamera()` hace `lookAt()` y borraria el balanceo actual: al pulsar
+   * las tijeras despues de rotar, la vista volvia de golpe a la vertical del
+   * mundo (giro de hasta ~180 grados). Aqui solo se actualiza la matriz que
+   * Arcball usa para calcular el siguiente gesto; el cuaternion no se toca.
+   */
+  syncPose() {
+    const arc = this.arc
+    // Si una version futura de three cambia los campos internos, mejor perder
+    // el balanceo que romper la navegacion.
+    if (!arc?._cameraMatrixState || !arc?._cameraMatrixState0) {
+      this.sync()
+      return
+    }
+    this.camera.updateMatrix()
+    this.camera.updateMatrixWorld()
+    arc._cameraMatrixState.copy(this.camera.matrix)
+    arc._cameraMatrixState0.copy(this.camera.matrix)
+    arc._zoom0 = this.camera.zoom
+    arc._zoomState = this.camera.zoom
+    arc._currentTarget.copy(arc.target)
+    arc._tbRadius = arc.calculateTbRadius(this.camera)
+    arc.makeGizmos(arc.target, arc._tbRadius)
+  }
+
   /** Angulo polar equivalente, derivado de la orientacion real de la camara. */
   getPolarAngle() {
     const offset = this.camera.position.clone().sub(this.arc.target)

@@ -11,6 +11,7 @@ import { createModelCache } from './model-cache.js'
 import { createAutosave } from './autosave.js'
 import { createCaseHistory } from './case-history.js'
 import { formatMm } from './units.js'
+import { loadBundle, saveBundle } from './clipboard.js'
 import { BRAND, applyBrand } from './brand.js'
 
 applyBrand()
@@ -224,24 +225,41 @@ function renderMobileObjects() {
 // --- Presentacion (marcadores) --------------------------------------------
 let activeMarkerId = null
 
-function renderMarkers() {
-  const markers = viewer.doc.markers ?? []
-  markersCount.textContent = markers.length ? `${markers.length}` : ''
-  markersList.innerHTML = ''
-  markers.forEach((marker, index) => {
-    const li = document.createElement('li')
-    li.className = 'marker-item'
-    li.dataset.kind = marker.kind
-    li.title = 'Pulsa para mostrar el caso en el estado guardado'
+/** Boton pequeno de una fila de marcador (subir, bajar o borrar). */
+function markerActionButton(label, title, onClick) {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'marker-action'
+  button.textContent = label
+  button.title = title
+  button.setAttribute('aria-label', title)
+  button.addEventListener('click', (event) => {
+    event.stopPropagation()
+    onClick()
+  })
+  return button
+}
 
-    const idx = document.createElement('span')
-    idx.className = 'marker-idx'
-    idx.textContent = String(index + 1)
+/**
+ * Una fila de la presentacion. La comparten la lista de escritorio y la del
+ * movil para que borrar y reordenar funcionen igual en las dos.
+ */
+function markerItem(marker, index, { mobile = false, total = 1 } = {}) {
+  const li = document.createElement('li')
+  li.className = 'marker-item'
+  li.dataset.kind = marker.kind
+  li.dataset.id = marker.id
+  li.title = 'Pulsa para mostrar el caso en el estado guardado'
 
-    const text = document.createElement('span')
-    text.className = 'marker-text' + (marker.text ? '' : ' is-empty')
-    text.textContent = marker.text || `Marcador ${index + 1}`
-    text.title = readOnly ? marker.text || '' : 'Doble clic para editar el texto'
+  const idx = document.createElement('span')
+  idx.className = 'marker-idx'
+  idx.textContent = String(index + 1)
+
+  const text = document.createElement('span')
+  text.className = 'marker-text' + (marker.text ? '' : ' is-empty')
+  text.textContent = marker.text || `Marcador ${index + 1}`
+  text.title = readOnly ? marker.text || '' : 'Doble clic para editar el texto'
+  if (!mobile) {
     text.addEventListener('dblclick', (event) => {
       event.stopPropagation()
       if (readOnly) return
@@ -250,73 +268,75 @@ function renderMarkers() {
       viewer.updateMarker(marker.id, { text: next.trim() })
       renderMarkers()
     })
+  }
 
-    li.append(idx, text)
+  li.append(idx, text)
 
-    if (marker.id === activeMarkerId) li.classList.add('is-active')
+  if (!readOnly) {
+    const actions = document.createElement('span')
+    actions.className = 'marker-actions'
 
-    const del = document.createElement('button')
-    del.type = 'button'
-    del.className = 'marker-delete'
-    del.textContent = '\u00d7'
-    del.title = 'Eliminar marcador'
-    del.addEventListener('click', () => {
+    const up = markerActionButton('\u2191', 'Subir este marcador', () => {
+      if (!viewer.moveMarker(marker.id, -1)) return
+      renderMarkers()
+      showHint(`Marcador ${index + 1} movido arriba`)
+    })
+    up.disabled = index === 0
+
+    const down = markerActionButton('\u2193', 'Bajar este marcador', () => {
+      if (!viewer.moveMarker(marker.id, 1)) return
+      renderMarkers()
+      showHint(`Marcador ${index + 1} movido abajo`)
+    })
+    down.disabled = index === total - 1
+
+    const del = markerActionButton('\u00d7', 'Eliminar este marcador', () => {
       if (marker.id === activeMarkerId) {
         viewer.exitMarkerFocus()
         activeMarkerId = null
-      } else if (viewer._preservingMeasures) viewer.exitMarkerFocus()
+      }
       viewer.removeMarker(marker.id)
       renderMarkers()
+      showHint('Marcador eliminado')
     })
-    if (!readOnly) li.append(del)
 
-    li.addEventListener('click', (event) => {
-      if (event.target.closest('.marker-delete')) return
-      const result = viewer.focusMarker(marker.id)
-      if (result) {
-        activeMarkerId = marker.id
-        renderMarkers()
-        showHint(`Marcador ${index + 1}${result.text ? `: ${result.text}` : ''}`, 3200)
-      }
-    })
-    markersList.append(li)
+    actions.append(up, down, del)
+    li.append(actions)
+  }
+
+  if (marker.id === activeMarkerId) li.classList.add('is-active')
+
+  li.addEventListener('click', (event) => {
+    if (event.target.closest('.marker-actions')) return
+    const result = viewer.focusMarker(marker.id)
+    if (result) {
+      activeMarkerId = marker.id
+      renderMarkers()
+      if (mobile) closeMobileModals()
+      showHint(`Marcador ${index + 1}${result.text ? `: ${result.text}` : ''}`, 3200)
+    }
   })
+  return li
+}
+
+function renderMarkers() {
+  const markers = viewer.doc.markers ?? []
+  markersCount.textContent = markers.length ? `${markers.length}` : ''
+  markersList.replaceChildren(
+    ...markers.map((marker, index) => markerItem(marker, index, { total: markers.length })),
+  )
   renderMobileMarkers()
 }
 
 function renderMobileMarkers() {
   if (!mobileMarkersList) return
   const markers = viewer.doc.markers ?? []
-  mobileMarkersList.innerHTML = ''
-  markers.forEach((marker, index) => {
-    const li = document.createElement('li')
-    li.className = 'marker-item'
-    li.dataset.kind = marker.kind
-    li.title = 'Pulsa para mostrar el caso en el estado guardado'
-
-    const idx = document.createElement('span')
-    idx.className = 'marker-idx'
-    idx.textContent = String(index + 1)
-
-    const text = document.createElement('span')
-    text.className = 'marker-text' + (marker.text ? '' : ' is-empty')
-    text.textContent = marker.text || `Marcador ${index + 1}`
-
-    li.append(idx, text)
-
-    if (marker.id === activeMarkerId) li.classList.add('is-active')
-
-    li.addEventListener('click', () => {
-      const result = viewer.focusMarker(marker.id)
-      if (result) {
-        activeMarkerId = marker.id
-        renderMarkers()
-        closeMobileModals()
-        showHint(`Marcador ${index + 1}${result.text ? `: ${result.text}` : ''}`, 3200)
-      }
-    })
-    mobileMarkersList.append(li)
-  })
+  mobileMarkersList.replaceChildren(
+    ...markers.map((marker, index) => markerItem(marker, index, {
+      mobile: true,
+      total: markers.length,
+    })),
+  )
 }
 
 // --- Cubo de vistas --------------------------------------------------------
@@ -773,6 +793,38 @@ document.addEventListener('click', (event) => {
       showHint(removed ? 'Medición borrada' : 'No hay medición que borrar')
       break
     }
+    case 'copy-case': {
+      const bundle = viewer.copyBundle?.()
+      const copied = bundle ? saveBundle(bundle, window.localStorage) : false
+      const medidas = bundle?.measurements?.length ?? 0
+      const marcadores = bundle?.markers?.length ?? 0
+      showHint(
+        copied
+          ? `Caso copiado: ${medidas} ${medidas === 1 ? 'medida' : 'medidas'}, ${marcadores} ${marcadores === 1 ? 'marcador' : 'marcadores'} y el corte. Abre otro caso y pulsa «Pegar».`
+          : 'No se ha podido copiar: el navegador no permite guardar datos locales.',
+        copied ? 4600 : 3600,
+      )
+      break
+    }
+    case 'paste-case': {
+      if (readOnly) break
+      const bundle = loadBundle(window.localStorage)
+      if (!bundle) {
+        showHint('No hay ningún caso copiado. Copia primero desde otro caso.')
+        break
+      }
+      const ok = viewer.pasteBundle?.(bundle) === true
+      renderMarkers()
+      renderObjects()
+      syncSectionUI()
+      showHint(
+        ok
+          ? `Caso pegado: ${bundle.measurements.length} medidas y ${bundle.markers.length} marcadores, con sus nombres, vistas, cortes y piezas visibles.`
+          : 'No se ha podido pegar en este caso.',
+        4600,
+      )
+      break
+    }
     case 'save-case':
       saveCase()
       break
@@ -994,7 +1046,11 @@ let readOnly = false
 function setReadOnly() {
   readOnly = true
   if (markerMode) toggleMarkerTool()
-  for (const button of document.querySelectorAll('[data-action="add-marker"]')) {
+  // El doctor puede medir y cortar para revisar, pero el trabajo del caso
+  // (marcadores, medidas y cortes guardados) solo lo edita el laboratorio.
+  for (const button of document.querySelectorAll(
+    '[data-action="add-marker"], [data-action="copy-case"], [data-action="paste-case"]',
+  )) {
     button.classList.add('is-read-only')
   }
   renderMarkers()

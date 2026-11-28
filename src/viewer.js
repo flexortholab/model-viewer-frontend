@@ -9,6 +9,7 @@ import { MeasureTool } from './measure.js'
 import { createDocument, validateDocument } from './annotations.js'
 import { formatMm, round } from './units.js'
 import { boundsOf, placeLabel } from './label-layout.js'
+import { mergeMeasurements } from './clipboard.js'
 
 // Altura del frustum de la camara ortografica, en unidades de escena. Marca
 // cuanto se ve en vertical; el ancho sale del aspecto del contenedor.
@@ -73,6 +74,10 @@ this.camera.position.set(40, 30, 60)
     this.raycaster.firstHitOnly = true
     this.pointer = new THREE.Vector2()
     this._tmp = new THREE.Vector3()
+    // Muestras de vertices para el iman de borde (solo se calculan al cambiar
+    // de modelo): ver nearestSurfacePoint().
+    this._surfaceSamples = null
+    this._surfaceSamplesModel = null
 
     this.modelRoot = new THREE.Group()
     this.modelRoot.name = 'model'
@@ -85,6 +90,9 @@ this.camera.position.set(40, 30, 60)
 
     this._markersVisible = true
     this._focusedMarkerId = null
+    // Contador propio para los ids: Date.now() solo (con 4 caracteres) repetia
+    // id si se anadieron varios marcadores en el mismo milisegundo.
+    this._nextMarkerId = 1
 
     this.doc = createDocument()
     this.model = null
@@ -118,6 +126,12 @@ this.camera.position.set(40, 30, 60)
    * Todo movimiento de camara hecho desde fuera (setView, cubo, marcadores,
    * reencuadres) debe pasar por aqui: ArcballControls cachea la pose en
    * setCamera() y, sin resincronizar, vuelve a imponer la orientacion previa.
+   *
+   * `camera.up` se queda SIEMPRE en la vertical del mundo: ArcballControls
+   * guarda ese vector como arriba local y lo rota con el cuaternion completo
+   * de la camara. Ponerlo en Z para las vistas cenitales hacia que el primer
+   * arrastre aplicase un giro de ~180 grados y el arriba acabara apuntando
+   * hacia delante (el modelo "se volvia loco").
    */
   _placeCamera(position, target) {
     if (position) this.camera.position.copy(position)
@@ -127,6 +141,88 @@ this.camera.position.set(40, 30, 60)
     this.controls.update()
     this.controls.sync?.()
     this.requestRender()
+  }
+
+  /**
+   * Coloca la camara y el objetivo sin cambiar su orientacion.
+   *
+   * Se usa en reencuadres que no deben girar la vista (las tijeras de un
+   * objeto): conserva el balanceo que el usuario tenia tras rotar.
+   */
+  _placeCameraKeepingOrientation(position, target) {
+    const quaternion = this.camera.quaternion.clone()
+    if (position) this.camera.position.copy(position)
+    if (target) this.controls.target.copy(target)
+    this.camera.quaternion.copy(quaternion)
+    this.camera.updateMatrixWorld()
+    if (this.controls.syncPose) {
+      this.controls.syncPose()
+    } else {
+      // Modo OrbitControls antiguo: su estado interno manda; se resincroniza
+      // como siempre (puede perder el balanceo, pero no rompe la navegacion).
+      this.camera.up.set(0, 1, 0)
+      this.controls.update()
+    }
+    this.requestRender()
+  }
+
+  /**
+   * Cuaternion de una vista guardada que no trae balanceo (pasos antiguos).
+   *
+   * Conserva el arriba de pantalla actual proyectado sobre la direccion de la
+   * vista guardada, en vez de volver al arriba del mundo: asi un paso antiguo
+   * no pega el giro raro al pulsarlo.
+   */
+  _viewQuaternion(view) {
+    const position = new THREE.Vector3().fromArray(view.position)
+    const target = new THREE.Vector3().fromArray(view.target)
+    const direction = target.clone().sub(position)
+    if (direction.lengthSq() < 1e-12) return null
+    direction.normalize()
+    const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1)
+    up.addScaledVector(direction, -up.dot(direction))
+    if (up.lengthSq() < 1e-8) {
+      up.set(0, 1, 0).addScaledVector(direction, -direction.y)
+    }
+    if (up.lengthSq() < 1e-8) return null
+    up.normalize()
+    return new THREE.Quaternion().setFromRotationMatrix(
+      new THREE.Matrix4().lookAt(position, target, up),
+    )
+  }
+
+  /**
+   * Restaura una vista guardada en un marcador.
+   *
+   * Si el paso trae cuaternion (pasos nuevos), se aplica exactamente y se
+   * refresca el estado de Arcball sin tocarlo: asi vuelve tambien el balanceo
+   * con el que se guardo. Los pasos antiguos, sin cuaternion, conservan el
+   * balanceo actual proyectado sobre su direccion de vista.
+   */
+  _restoreView(view) {
+    if (!view?.position || !view?.target) return false
+    const target = new THREE.Vector3().fromArray(view.target)
+    if (Number.isFinite(view.zoom)) {
+      this.camera.zoom = view.zoom
+      this.camera.updateProjectionMatrix()
+    }
+    const stored = Array.isArray(view.quaternion) && view.quaternion.length === 4
+      ? new THREE.Quaternion().fromArray(view.quaternion)
+      : null
+    const quaternion = stored ?? this._viewQuaternion(view)
+    if (quaternion && this.controls.syncPose) {
+      this.camera.position.fromArray(view.position)
+      this.controls.target.copy(target)
+      this.camera.quaternion.copy(quaternion)
+      this.camera.updateMatrixWorld()
+      const m = this.camera.matrixWorld.elements
+      this.camera.up.set(m[4], m[5], m[6])
+      this.controls.syncPose()
+      this.requestRender()
+      return true
+    }
+    this._placeCamera(new THREE.Vector3().fromArray(view.position), target)
+    return true
   }
 
   /**
@@ -268,6 +364,8 @@ this.camera.position.set(40, 30, 60)
 
     this.model = { url, keepMaterials: options.keepMaterials ?? false, ...result }
     this.doc.model = url
+    this._surfaceSamples = null
+    this._surfaceSamplesModel = null
 
     this._setupTools()
     this.frameModel()
@@ -603,13 +701,23 @@ this.camera.position.set(40, 30, 60)
       const viewDir = new THREE.Vector3()
       this.camera.getWorldDirection(viewDir)
       const sceneCenter = this.model.bounds.getCenter(new THREE.Vector3())
-      this._placeCamera(
+      // Conserva la orientacion (y el balanceo) que el usuario tenia: con
+      // _placeCamera se perdia y la vista pegaba un giro de hasta 180 grados.
+      this._placeCameraKeepingOrientation(
         new THREE.Vector3().copy(sceneCenter).addScaledVector(viewDir, -this._frameDistance(this.model.bounds, viewDir)),
         sceneCenter,
       )
-      this.section?.setPlane({ point: center.toArray(), normal: viewDir.normalize().toArray() })
-      // Igual que al activar el corte global: de perfil por defecto.
-      this.section?.orientToCamera?.(this.camera)
+      // Perfil determinista: se gira el corte de frente 90 grados tomando como
+      // ejes los de la pantalla (normal = arriba de la vista, eje X del gizmo =
+      // derecha de la vista). Antes se rotaba sobre el X local del gizmo, que
+      // arrastraba el balanceo aleatorio de la camara y salia inclinado.
+      const screenUp = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1).normalize()
+      const screenRight = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0).normalize()
+      this.section?.setPlane({
+        point: center.toArray(),
+        normal: screenUp.toArray(),
+        xAxis: screenRight.toArray(),
+      })
       if (!this.section?.enabled) this.section?.setEnabled(true)
       this._syncDoc()
       this.emit('section', this.section.serialize())
@@ -669,10 +777,100 @@ this.camera.position.set(40, 30, 60)
     return doc
   }
 
+  /**
+   * Medidas actuales listas para copiar a otro caso (mismas coordenadas del
+   * modelo normalizado en mm).
+   */
+  copyMeasurements() {
+    return this.measure?.serialize() ?? []
+  }
+
+  /**
+   * Anade medidas copiadas de otro caso, sin duplicar las que ya estan.
+   * Devuelve cuantas se han anadido.
+   */
+  pasteMeasurements(list) {
+    if (!this.measure) return 0
+    const current = this._preservingMeasures
+      ? (this.doc.measurements ?? [])
+      : this.copyMeasurements()
+    const added = mergeMeasurements(current, list)
+    if (!added.length) return 0
+    // `restore` cambia el conjunto visible y emite un solo 'changed'; los ids
+    // de las medidas que ya habia se conservan y las nuevas reciben uno nuevo.
+    this._preservingMeasures = false
+    this.measure.restore([...current, ...added])
+    this.measure.update()
+    this.requestRender()
+    return added.length
+  }
+
+  /** Corte seccional actual, listo para pegar en otro caso. */
+  copySection() {
+    return this.section?.serialize() ?? null
+  }
+
+  /** Restaura un corte copiado de otro caso (posicion, giro y color). */
+  pasteSection(data) {
+    if (!this.section || !data) return false
+    this.section.restore(data)
+    this._syncDoc()
+    this.emit('section', this.section.serialize())
+    this.requestRender()
+    return true
+  }
+
+  /**
+   * Todo el trabajo editable del caso en un solo paquete: medidas, corte,
+   * marcadores (con su texto, clase y snapshot completo) y visibilidad de
+   * piezas. Las coordenadas son las del modelo normalizado, en mm.
+   */
+  copyBundle() {
+    if (!this.model) return null
+    return {
+      version: 1,
+      measurements: structuredClone(this.doc.measurements ?? []),
+      section: this.section?.serialize() ?? null,
+      markers: structuredClone(this.doc.markers ?? []),
+      objects: this.listObjects().map(({ index, visible }) => ({ index, visible })),
+    }
+  }
+
+  /**
+   * Sustituye el trabajo del caso por el paquete copiado. Conserva la
+   * configuracion del caso de destino (id, doctor, fecha) y su modelo.
+   */
+  pasteBundle(bundle) {
+    if (!this.model || !bundle) return false
+    if (this._focusedMarkerId) this.exitMarkerFocus()
+
+    this.applyAnnotations({
+      ...createDocument({ model: this.doc.model, meta: this.doc.meta }),
+      measurements: bundle.measurements ?? [],
+      section: bundle.section ?? this.section?.serialize(),
+      markers: bundle.markers ?? [],
+    })
+    // El visibilidad actual no vive en el documento: se guarda aparte y se
+    // aplica despues de restaurar los snapshots de cada marcador.
+    for (const { index, visible } of bundle.objects ?? []) {
+      this.setMeshVisible(index, visible)
+    }
+    this.setMarkersVisible(false)
+    this._syncDoc()
+    this.emit('markers', this.doc.markers)
+    this.emit('section', this.section.serialize())
+    this.requestRender()
+    return true
+  }
+
   addMarker({ position, text = '', kind = 'note', snapshot = true }) {
     const serial = this.section?.serialize() ?? null
+    let id
+    do {
+      id = `k${this._nextMarkerId++}_${Date.now().toString(36).slice(-4)}`
+    } while (this.doc.markers.some((marker) => marker.id === id))
     const marker = {
-      id: `k${this.markerGroup.children.length + 1}_${Date.now().toString(36).slice(-4)}`,
+      id,
       position,
       text,
       kind,
@@ -684,6 +882,10 @@ this.camera.position.set(40, 30, 60)
       marker.view = {
         position: this.camera.position.toArray().map((n) => round(n)),
         target: this.controls.target.toArray().map((n) => round(n)),
+        // Cuaternion completo: guarda tambien el balanceo (roll) de la
+        // camara. Sin el, al volver al paso la vista se recolocaba con el
+        // arriba del mundo y daba un giro raro.
+        quaternion: this.camera.quaternion.toArray().map((n) => round(n, 6)),
         // Zoom: en ortografica ArcballControls lo guarda en camera.zoom (la
         // distancia no magnifica nada). Sin esto un paso creado con la pieza
         // ampliada se restauraba con el zoom que hubiera en ese momento.
@@ -704,8 +906,29 @@ this.camera.position.set(40, 30, 60)
   removeMarker(id) {
     const index = this.doc.markers.findIndex((m) => m.id === id)
     if (index === -1) return false
+    // Si se borra el paso que se esta mostrando, se sale de el antes de
+    // quitar la etiqueta: si no, quedarian visibles sus medidas y su corte.
+    if (this._focusedMarkerId === id) this.exitMarkerFocus()
     for (const marker of this.doc.markers) this.measure?.removeOverlay(`marker:${marker.id}`)
     this.doc.markers.splice(index, 1)
+    this._renderMarkers()
+    this._syncDoc()
+    this.emit('markers', this.doc.markers)
+    return true
+  }
+
+  /**
+   * Mueve un marcador una posicion arriba (-1) o abajo (+1) en la
+   * presentacion. Devuelve false si ya esta en el extremo.
+   */
+  moveMarker(id, delta) {
+    const from = this.doc.markers.findIndex((m) => m.id === id)
+    if (from === -1) return false
+    const step = Math.sign(delta)
+    const to = Math.max(0, Math.min(this.doc.markers.length - 1, from + step))
+    if (!step || to === from) return false
+    const [marker] = this.doc.markers.splice(from, 1)
+    this.doc.markers.splice(to, 0, marker)
     this._renderMarkers()
     this._syncDoc()
     this.emit('markers', this.doc.markers)
@@ -729,15 +952,8 @@ this.camera.position.set(40, 30, 60)
     const marker = this.doc.markers.find((m) => m.id === id)
     if (!marker) return null
     if (marker.view?.position && marker.view?.target) {
-      // El zoom va ANTES de colocar la camara: ArcballControls cachea zoom y
-      // matriz en setCamera(), asi que ponerlo despues haria que el siguiente
-      // gesto de rueda partiese de un zoom viejo. Los pasos antiguos sin zoom
-      // en el JSON conservan el que haya ahora.
-      if (Number.isFinite(marker.view.zoom)) {
-        this.camera.zoom = marker.view.zoom
-        this.camera.updateProjectionMatrix()
-      }
-      this._placeCamera(new THREE.Vector3().fromArray(marker.view.position), new THREE.Vector3().fromArray(marker.view.target))
+      // Restaura posicion, objetivo, zoom y balanceo exactos del paso.
+      this._restoreView(marker.view)
       this.emit('view', marker.id)
     }
     if (marker.section) {
@@ -973,7 +1189,11 @@ this.camera.position.set(40, 30, 60)
   pick() {
     if (!this.model) return null
     this.raycaster.setFromCamera(this.pointer, this.camera)
-    const hits = this.raycaster.intersectObjects(this.model.meshes, false)
+    // Solo piezas visibles: Raycaster no mira `mesh.visible`, asi que sin este
+    // filtro una pieza ocultada con el ojo seguia atrayendo el punto de la
+    // medicion (el cursor "se iba" a geometria que no se ve).
+    const meshes = this.model.meshes.filter(isMeshVisible)
+    const hits = this.raycaster.intersectObjects(meshes, false)
     let closer = null
     for (const hit of hits) {
       // `hits` viene ordenado por distancia: el primero no recortado es el mas
@@ -989,6 +1209,87 @@ this.camera.position.set(40, 30, 60)
     const cap = this.section?.pickCap?.(this.raycaster.ray) ?? null
     if (cap && (!closer || cap.distance < closer.distance)) return cap
     return closer
+  }
+
+  /**
+   * Punto de la superficie bajo el puntero con iman de borde.
+   *
+   * Si el rayo acierta, devuelve el hit normal. Si cae en aire pero a menos de
+   * `maxPx` de la silueta visible, devuelve el vertice de superficie mas
+   * cercano en pantalla: la medicion no se "escapa" de la pieza al salir por
+   * un borde con aire detras. Lejos del modelo devuelve null.
+   */
+  pickSticky(clientX, clientY, maxPx = 32) {
+    const hit = this.pick()
+    if (hit) return hit
+    const point = this.nearestSurfacePoint(clientX, clientY, maxPx)
+    return point ? { point, object: null, face: null, sticky: true } : null
+  }
+
+  /**
+   * Vertice visible mas cercano al puntero, en pixeles de pantalla.
+   *
+   * Se muestrean hasta ~12 000 vertices del modelo (suficiente para bordes de
+   * piezas dentales) y se proyectan solo cuando el rayo ha fallado, que es
+   * cuando hace falta el iman. Respeta piezas ocultas y el lado del corte.
+   */
+  nearestSurfacePoint(clientX, clientY, maxPx = 32) {
+    if (!this.model || maxPx <= 0) return null
+    const rect = this.container.getBoundingClientRect()
+    const px = clientX - rect.left
+    const py = clientY - rect.top
+    const width = this.container.clientWidth || 1
+    const height = this.container.clientHeight || 1
+    const visible = this.section?.visibilityTest?.() ?? (() => true)
+    const tmp = this._tmp
+    let best = null
+    let bestDist = maxPx
+    for (const { mesh, points } of this._surfaceSampleSets()) {
+      if (!isMeshVisible(mesh)) continue
+      for (let i = 0; i < points.length; i += 3) {
+        tmp.set(points[i], points[i + 1], points[i + 2])
+        if (!visible(tmp)) continue
+        tmp.project(this.camera)
+        if (tmp.z > 1) continue
+        const x = (tmp.x * 0.5 + 0.5) * width
+        const y = (-tmp.y * 0.5 + 0.5) * height
+        const distance = Math.hypot(x - px, y - py)
+        if (distance < bestDist) {
+          bestDist = distance
+          best = [points[i], points[i + 1], points[i + 2]]
+        }
+      }
+    }
+    return best ? new THREE.Vector3(...best) : null
+  }
+
+  /** Muestras de vertices en mundo, cacheadas mientras no cambie el modelo. */
+  _surfaceSampleSets() {
+    if (this._surfaceSamplesModel === this.model) return this._surfaceSamples
+    const meshes = this.model?.meshes ?? []
+    // Reparto homogeneo entre piezas: una escena de 9 piezas y 500 000
+    // vertices no debe proyectar medio millon de puntos en cada movimiento.
+    const budget = this._isMobile ? 6000 : 12000
+    const perMesh = Math.max(80, Math.floor(budget / Math.max(1, meshes.length)))
+    const tmp = new THREE.Vector3()
+    this._surfaceSamples = meshes.map((mesh) => {
+      const position = mesh.geometry.getAttribute('position')
+      if (!position) return { mesh, points: new Float32Array(0) }
+      mesh.updateWorldMatrix(true, false)
+      const step = Math.max(1, Math.floor(position.count / perMesh))
+      const count = Math.ceil(position.count / step)
+      const points = new Float32Array(count * 3)
+      let offset = 0
+      for (let i = 0; i < position.count; i += step) {
+        tmp.set(position.getX(i), position.getY(i), position.getZ(i)).applyMatrix4(mesh.matrixWorld)
+        points[offset++] = tmp.x
+        points[offset++] = tmp.y
+        points[offset++] = tmp.z
+      }
+      return { mesh, points }
+    })
+    this._surfaceSamplesModel = this.model
+    return this._surfaceSamples
   }
 
   /**
@@ -1013,7 +1314,7 @@ this.camera.position.set(40, 30, 60)
   dragMeasureEndpoint(event) {
     if (!this._dragMeasure) return false
     this.setPointer(event)
-    const hit = this.pick()
+    const hit = this.pickSticky(event.clientX, event.clientY)
     if (hit) {
       const snapped = this.measure.snapToSurface?.(hit) ?? hit.point
       this.measure.moveEndpoint(this._dragMeasure.measurement, this._dragMeasure.key, snapped ?? hit.point)
@@ -1088,7 +1389,7 @@ this.camera.position.set(40, 30, 60)
     // Edicion: si el cursor agarra un extremo de una medida, arrastrarlo
     // manda sobre crear una nueva.
     if (this.grabMeasureEndpoint(event)) return null
-    const hit = this.pick()
+    const hit = this.pickSticky(event.clientX, event.clientY)
     if (!hit) return null
     // Adherencia a superficie/borde: ajusta al vertice cercano si procede.
     const snapped = this.measure.snapToSurface?.(hit) ?? hit.point
@@ -1111,7 +1412,7 @@ this.camera.position.set(40, 30, 60)
   handleMeasureMove(event) {
     if (this.dragMeasureEndpoint(event)) return
     this.setPointer(event)
-    const hit = this.pick()
+    const hit = this.pickSticky(event.clientX, event.clientY)
     if (!hit || !this.measure?.enabled) {
       this.measure?.setHover(null)
       return
@@ -1231,4 +1532,14 @@ function nameOf(mesh, index) {
   if (mesh.name) return mesh.name
   if (mesh.parent?.name) return `${mesh.parent.name} #${index + 1}`
   return `Pieza ${index + 1}`
+}
+
+/**
+ * ¿La pieza se ve? Raycaster no comprueba `visible`, y un material oculto
+ * tampoco debe atraer el cursor de medicion.
+ */
+function isMeshVisible(mesh) {
+  if (!mesh?.visible) return false
+  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+  return materials.some((material) => material && material.visible !== false)
 }

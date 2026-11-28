@@ -44,6 +44,10 @@ test('el enlace del doctor es de solo lectura, sin controles de edicion', async 
   for (const boton of await page.locator('[data-action="add-marker"]').all()) {
     await expect(boton, 'el boton de anadir marcador no se muestra').toBeHidden()
   }
+  for (const accion of ['copy-case', 'paste-case']) {
+    await expect(page.locator(`[data-action="${accion}"]`), `${accion} no se muestra`).toBeHidden()
+  }
+  expect(await page.locator('#markers-list .marker-action').count()).toBe(0)
   await expect(page.locator('[data-action="save-case"]')).toBeHidden()
   await expect(page.locator('[data-action="undo-case"]')).toBeHidden()
   await expect(page.locator('#save-status')).toBeHidden()

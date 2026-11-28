@@ -136,7 +136,12 @@ test('los marcadores conservan el snapshot de presentacion', () => {
       {
         position: [1, 2, 3],
         text: 'paso 1',
-        view: { position: [10, 5, 30], target: [0, 0, 0], zoom: 2.5 },
+        view: {
+          position: [10, 5, 30],
+          target: [0, 0, 0],
+          quaternion: [0, 0, 0.7071, 0.7071],
+          zoom: 2.5,
+        },
         section: { enabled: true, point: [0, 0, 1], normal: [0, 0, 1] },
       },
     ],
@@ -144,6 +149,7 @@ test('los marcadores conservan el snapshot de presentacion', () => {
   assert.deepEqual(doc.markers[0].view, {
     position: [10, 5, 30],
     target: [0, 0, 0],
+    quaternion: [0, 0, 0.7071, 0.7071],
     zoom: 2.5,
   })
   assert.equal(doc.markers[0].section.enabled, true)
@@ -164,6 +170,15 @@ test('un zoom invalido se descarta y no rompe el paso', () => {
       markers: [{ position: [0, 0, 0], view: { position: [1, 1, 1], target: [0, 0, 0], zoom } }],
     })
     assert.equal(doc.markers[0].view.zoom, undefined, `zoom=${zoom}`)
+  }
+})
+
+test('un cuaternion invalido se descarta y no rompe el paso', () => {
+  for (const quaternion of [[1, 0, 0], [1, 0, 0, 'x'], null, 'giro']) {
+    const doc = validateDocument({
+      markers: [{ position: [0, 0, 0], view: { position: [1, 1, 1], target: [0, 0, 0], quaternion } }],
+    })
+    assert.equal(doc.markers[0].view.quaternion, undefined, `quaternion=${quaternion}`)
   }
 })
 
